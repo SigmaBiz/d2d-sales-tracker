@@ -8,9 +8,12 @@ import {
   Switch,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StorageService } from '../services/storageService';
+import { SupabaseService } from '../services/supabaseService';
+import { StorageUsage } from '../services/supabaseClient';
 
 export default function SettingsScreen() {
   const [settings, setSettings] = useState({
@@ -20,15 +23,29 @@ export default function SettingsScreen() {
     notificationsEnabled: true,
     dailyKnockGoal: '100',
   });
+  const [cloudConnected, setCloudConnected] = useState(false);
+  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadSettings();
+    checkCloudConnection();
   }, []);
 
   const loadSettings = async () => {
     const savedSettings = await StorageService.getSettings();
     if (savedSettings && Object.keys(savedSettings).length > 0) {
       setSettings({ ...settings, ...savedSettings });
+    }
+  };
+
+  const checkCloudConnection = async () => {
+    const connected = await SupabaseService.initialize();
+    setCloudConnected(connected);
+    
+    if (connected) {
+      const usage = await SupabaseService.getStorageUsage();
+      setStorageUsage(usage);
     }
   };
 
@@ -57,10 +74,33 @@ export default function SettingsScreen() {
   };
 
   const syncData = async () => {
-    const unsyncedKnocks = await StorageService.getUnsyncedKnocks();
+    if (!cloudConnected) {
+      // Try to connect first
+      const connected = await SupabaseService.initialize();
+      if (!connected) {
+        // If still not connected, try anonymous auth
+        const signedIn = await SupabaseService.signInAnonymously();
+        if (!signedIn) {
+          Alert.alert(
+            'Cloud Not Connected',
+            'Please check your internet connection and Supabase configuration.'
+          );
+          return;
+        }
+      }
+    }
+
+    setSyncing(true);
+    const result = await SupabaseService.syncKnocks();
+    setSyncing(false);
+
+    // Refresh storage usage
+    const usage = await SupabaseService.getStorageUsage();
+    setStorageUsage(usage);
+
     Alert.alert(
-      'Sync Status',
-      `${unsyncedKnocks.length} knocks waiting to sync.\n\nSync functionality will be available with the backend integration.`
+      'Sync Complete',
+      `✅ ${result.synced} knocks synced to cloud\n${result.failed > 0 ? `❌ ${result.failed} failed to sync` : ''}`
     );
   };
 
@@ -146,11 +186,71 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Cloud Storage</Text>
+        
+        <View style={styles.cloudStatusCard}>
+          <View style={styles.cloudStatusHeader}>
+            <Ionicons 
+              name={cloudConnected ? "cloud-done" : "cloud-offline"} 
+              size={32} 
+              color={cloudConnected ? "#22c55e" : "#6b7280"} 
+            />
+            <Text style={styles.cloudStatusText}>
+              {cloudConnected ? 'Connected to Cloud' : 'Local Storage Only'}
+            </Text>
+          </View>
+
+          {storageUsage && (
+            <View style={styles.storageInfo}>
+              <View style={styles.storageRow}>
+                <Text style={styles.storageLabel}>Storage Used:</Text>
+                <Text style={styles.storageValue}>
+                  {(storageUsage.total_bytes / (1024 * 1024)).toFixed(1)} MB / 500 MB
+                </Text>
+              </View>
+              <View style={styles.storageRow}>
+                <Text style={styles.storageLabel}>Total Knocks:</Text>
+                <Text style={styles.storageValue}>{storageUsage.knock_count.toLocaleString()}</Text>
+              </View>
+              <View style={styles.storageRow}>
+                <Text style={styles.storageLabel}>Usage:</Text>
+                <Text style={styles.storageValue}>{storageUsage.percentage_used.toFixed(1)}%</Text>
+              </View>
+              {storageUsage.percentage_used < 95 && (
+                <View style={styles.storageRow}>
+                  <Text style={styles.storageLabel}>Est. Days Left:</Text>
+                  <Text style={styles.storageValue}>
+                    {storageUsage.days_until_full > 9999 ? '∞' : storageUsage.days_until_full}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {!cloudConnected && (
+            <Text style={styles.cloudHelpText}>
+              See SUPABASE_SETUP.md to enable cloud backup
+            </Text>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data Management</Text>
         
-        <TouchableOpacity style={styles.actionButton} onPress={syncData}>
-          <Ionicons name="cloud-upload" size={24} color="#1e40af" />
-          <Text style={styles.actionButtonText}>Sync Data</Text>
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={syncData}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <ActivityIndicator size="small" color="#1e40af" />
+          ) : (
+            <Ionicons name="cloud-upload" size={24} color="#1e40af" />
+          )}
+          <Text style={styles.actionButtonText}>
+            {syncing ? 'Syncing...' : 'Sync Data'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -250,5 +350,50 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     paddingHorizontal: 16,
     marginBottom: 4,
+  },
+  cloudStatusCard: {
+    marginHorizontal: 16,
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  cloudStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cloudStatusText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 12,
+    color: '#1f2937',
+  },
+  storageInfo: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 12,
+  },
+  storageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  storageLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  storageValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  cloudHelpText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

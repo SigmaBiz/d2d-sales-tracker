@@ -5,7 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import screens (we'll create these next)
-import MapScreen from '../screens/MapScreen';
+import SimpleMapScreen from '../screens/SimpleMapScreen';
 import KnockScreen from '../screens/KnockScreen';
 import StatsScreen from '../screens/StatsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -45,7 +45,7 @@ function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Territory Map' }} />
+      <Tab.Screen name="Map" component={SimpleMapScreen} options={{ title: 'Territory' }} />
       <Tab.Screen name="Knock" component={KnockScreen} options={{ title: 'Record Knock' }} />
       <Tab.Screen name="Stats" component={StatsScreen} options={{ title: 'Analytics' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />

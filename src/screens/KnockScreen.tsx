@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageService';
+import { SupabaseService } from '../services/supabaseService';
 import { Knock, KnockOutcome } from '../types';
 
 const OUTCOMES: { value: KnockOutcome; label: string; color: string }[] = [
@@ -101,6 +102,13 @@ export default function KnockScreen() {
       }
 
       await StorageService.saveDailyStats(todayStats);
+
+      // Auto-sync if enabled
+      const settings = await StorageService.getSettings();
+      if (settings.autoSync) {
+        // Sync in background, don't wait
+        SupabaseService.syncKnocks().catch(console.error);
+      }
 
       Alert.alert('Success', 'Knock recorded successfully', [
         {

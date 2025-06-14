@@ -111,28 +111,45 @@ d2d-sales-tracker/
 - Sync status tracked per record
 - Backend sync prepared but not required for MVP
 
-## Current State (as of creation)
+## Current State (as of latest update)
 
 ### Working Features
 ✅ Complete knock tracking workflow
-✅ Real-time map with visual feedback
+✅ Territory activity list view (Expo Go compatible)
 ✅ Comprehensive analytics dashboard
 ✅ Offline data persistence
 ✅ Settings and configuration
+✅ **Supabase cloud storage integration**
+✅ **Automatic sync when online**
+✅ **Storage usage monitoring**
+✅ **Anonymous authentication**
+
+### Cloud Storage Features Added
+- Supabase integration with 500MB free tier
+- Automatic background sync when auto-sync enabled
+- Real-time storage usage tracking
+- Offline-first with cloud backup
+- Anonymous auth for easy start
+- Storage monitoring shows MB used, knock count, days until full
 
 ### Pending Features
-- Backend API integration (Node.js + PostgreSQL planned)
-- User authentication
+- Native maps (works in standalone build)
+- Full background tracking (limited in Expo Go)
 - Team management
-- Data synchronization
 - Weather/hail tracking (planned as add-on)
 - Income overlay data (planned as add-on)
 
-### Known Limitations
-1. No backend - all data is local only
-2. No multi-user support yet
-3. No data export functionality
-4. No route optimization
+### Known Limitations in Expo Go
+1. Maps show as list view (native maps work in standalone)
+2. Background tracking limited (works when app is open)
+3. Some location features restricted
+
+### Supabase Configuration Required
+To enable cloud storage:
+1. Create free account at supabase.com
+2. Run SQL setup from SUPABASE_SETUP.md
+3. Update credentials in src/services/supabaseClient.ts
+4. App works without this (local storage only)
 
 ## Running the App
 

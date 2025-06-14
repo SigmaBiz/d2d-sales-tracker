@@ -29,20 +29,29 @@ export class LocationService {
   }
 
   static async startBackgroundLocationTracking(): Promise<void> {
-    await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 5000, // 5 seconds
-      distanceInterval: 10, // 10 meters
-      showsBackgroundLocationIndicator: true,
-      foregroundService: {
-        notificationTitle: 'D2D Sales Tracker',
-        notificationBody: 'Tracking your territory',
-      },
-    });
+    try {
+      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000, // 5 seconds
+        distanceInterval: 10, // 10 meters
+        showsBackgroundLocationIndicator: true,
+        foregroundService: {
+          notificationTitle: 'D2D Sales Tracker',
+          notificationBody: 'Tracking your territory',
+        },
+      });
+    } catch (error) {
+      console.log('Background tracking not available in Expo Go:', error);
+      // Fallback to foreground tracking
+    }
   }
 
   static async stopBackgroundLocationTracking(): Promise<void> {
-    await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    try {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    } catch (error) {
+      console.log('Error stopping background tracking:', error);
+    }
   }
 
   static async getStoredKnockLocations(): Promise<any[]> {
