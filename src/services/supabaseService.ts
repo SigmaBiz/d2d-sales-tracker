@@ -9,14 +9,24 @@ export class SupabaseService {
   // Initialize service and check auth
   static async initialize(): Promise<boolean> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Initializing Supabase...');
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Supabase session error:', error);
+        return false;
+      }
+      
       if (session?.user) {
         this.userId = session.user.id;
+        console.log('Supabase connected with existing session');
         return true;
       }
+      
+      console.log('No existing session, will need to sign in');
       return false;
     } catch (error) {
-      console.log('Supabase not configured yet');
+      console.error('Supabase initialization error:', error);
       return false;
     }
   }
@@ -24,10 +34,22 @@ export class SupabaseService {
   // Anonymous auth for easy start
   static async signInAnonymously(): Promise<boolean> {
     try {
+      console.log('Attempting anonymous sign in...');
       const { data, error } = await supabase.auth.signInAnonymously();
-      if (error) throw error;
-      this.userId = data.user?.id || null;
-      return true;
+      
+      if (error) {
+        console.error('Anonymous sign in error:', error);
+        throw error;
+      }
+      
+      if (data.user) {
+        this.userId = data.user.id;
+        console.log('Successfully signed in anonymously, userId:', this.userId);
+        return true;
+      }
+      
+      console.log('No user returned from anonymous sign in');
+      return false;
     } catch (error) {
       console.error('Error signing in:', error);
       return false;
@@ -156,39 +178,35 @@ export class SupabaseService {
     if (!this.userId) return null;
 
     try {
-      const { data: knockCount } = await supabase
+      // Get knock count
+      const { count: knockCount, error: countError } = await supabase
         .from('knocks')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', this.userId);
 
-      const { data: usage } = await supabase
-        .rpc('get_user_storage_usage', { user_id: this.userId });
-
-      if (!usage || usage.length === 0) {
-        return {
-          total_bytes: 0,
-          knock_count: knockCount?.count || 0,
-          percentage_used: 0,
-          days_until_full: 99999,
-        };
+      if (countError) {
+        console.error('Error getting knock count:', countError);
       }
 
-      const bytesUsed = usage[0].total_bytes || 0;
+      // For now, estimate storage based on knock count
+      // Average knock size is about 280 bytes
+      const totalKnocks = knockCount || 0;
+      const avgBytesPerKnock = 280;
+      const bytesUsed = totalKnocks * avgBytesPerKnock;
       const freeLimit = 500 * 1024 * 1024; // 500MB in bytes
       const percentageUsed = (bytesUsed / freeLimit) * 100;
       
       // Calculate days until full based on current rate
-      const avgBytesPerKnock = knockCount?.count ? bytesUsed / knockCount.count : 280;
       const knocksPerDay = 100; // Estimate
       const bytesPerDay = avgBytesPerKnock * knocksPerDay;
       const bytesRemaining = freeLimit - bytesUsed;
-      const daysUntilFull = Math.floor(bytesRemaining / bytesPerDay);
+      const daysUntilFull = bytesRemaining > 0 ? Math.floor(bytesRemaining / bytesPerDay) : 0;
 
       return {
         total_bytes: bytesUsed,
-        knock_count: knockCount?.count || 0,
+        knock_count: totalKnocks,
         percentage_used: percentageUsed,
-        days_until_full: daysUntilFull,
+        days_until_full: daysUntilFull > 99999 ? 99999 : daysUntilFull,
       };
     } catch (error) {
       console.error('Error getting storage usage:', error);

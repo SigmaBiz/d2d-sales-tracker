@@ -30,7 +30,16 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadSettings();
     checkCloudConnection();
-  }, []);
+    
+    // Refresh when screen is focused
+    const interval = setInterval(() => {
+      if (cloudConnected) {
+        SupabaseService.getStorageUsage().then(setStorageUsage);
+      }
+    }, 5000); // Refresh every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [cloudConnected]);
 
   const loadSettings = async () => {
     const savedSettings = await StorageService.getSettings();
@@ -40,7 +49,13 @@ export default function SettingsScreen() {
   };
 
   const checkCloudConnection = async () => {
-    const connected = await SupabaseService.initialize();
+    let connected = await SupabaseService.initialize();
+    
+    // If not connected, try anonymous sign in
+    if (!connected) {
+      connected = await SupabaseService.signInAnonymously();
+    }
+    
     setCloudConnected(connected);
     
     if (connected) {
