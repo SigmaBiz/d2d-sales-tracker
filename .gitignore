@@ -1,37 +1,66 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
 
 # Expo
 .expo/
 dist/
 web-build/
-expo-env.d.ts
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# Native builds
+*.ipa
+*.apk
+*.aab
 
-# Metro
-.metro-health-check*
-
-# debug
+# Debug files
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
+*.DS_Store
 
-# local env files
-.env*.local
+# Temporary files
+*.log
+*.tmp
+*.swp
 
-# typescript
-*.tsbuildinfo
+# Private keys and certificates
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+*.keystore
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.cache/
+.parcel-cache/
+.turbo/
+
+# Sentry
+.sentryclirc
+
+# Expo updates
+.expo-shared/
+
+# EAS Build
+eas.json
