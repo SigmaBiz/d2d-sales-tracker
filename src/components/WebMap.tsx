@@ -48,23 +48,34 @@ export default function WebMap({ knocks, userLocation, onKnockClick }: WebMapPro
           maxZoom: 19
         }).addTo(map);
         
-        // Marker colors based on outcome
-        const markerColors = {
-          not_home: '#6b7280',
-          no_soliciting: '#ef4444',
-          lead: '#eab308',
-          sale: '#22c55e',
-          callback: '#f59e0b',
-          not_interested: '#991b1b'
+        // Marker colors and emojis based on outcome
+        const markerData = {
+          // Primary outcomes
+          not_home: { color: '#6b7280', emoji: '👻' },
+          revisit: { color: '#3b82f6', emoji: '👀' },
+          no_soliciting: { color: '#ef4444', emoji: '🚫' },
+          lead: { color: '#10b981', emoji: '✅' },
+          sale: { color: '#22c55e', emoji: '📝' },
+          callback: { color: '#f59e0b', emoji: '🔄' },
+          // Property status
+          new_roof: { color: '#8b5cf6', emoji: '🏠' },
+          competitor: { color: '#dc2626', emoji: '🚧' },
+          renter: { color: '#6366f1', emoji: '🔑' },
+          poor_condition: { color: '#78716c', emoji: '🏚️' },
+          // Action taken
+          proposal_left: { color: '#0891b2', emoji: '📋' },
+          stay_away: { color: '#991b1b', emoji: '⚠️' },
+          // Legacy
+          not_interested: { color: '#991b1b', emoji: '❌' }
         };
         
-        // Custom icon creator
-        function createIcon(color) {
+        // Custom icon creator with emoji
+        function createIcon(color, emoji) {
           return L.divIcon({
             className: 'custom-marker',
-            html: '<div style="background-color: ' + color + '; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+            html: '<div style="background-color: ' + color + '; width: 36px; height: 36px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 20px;">' + emoji + '</div>',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
           });
         }
         
@@ -79,9 +90,9 @@ export default function WebMap({ knocks, userLocation, onKnockClick }: WebMapPro
           
           // Add knock markers
           knocksData.forEach(knock => {
-            const color = markerColors[knock.outcome] || '#6b7280';
+            const data = markerData[knock.outcome] || { color: '#6b7280', emoji: '❓' };
             const marker = L.marker([knock.latitude, knock.longitude], {
-              icon: createIcon(color)
+              icon: createIcon(data.color, data.emoji)
             });
             
             // Format time

@@ -124,16 +124,33 @@ d2d-sales-tracker/
 ✅ **Storage usage monitoring**
 ✅ **Anonymous authentication**
 
-### Map Features Added (Latest)
+### Map Features Added
 - Full interactive map using Leaflet/OpenStreetMap
-- Shows all previous knocks as colored pins
-- Different colors for different outcomes (sale=green, lead=yellow, etc)
+- Shows all previous knocks as colored pins with emojis
 - Current location shown with blue pulsing dot
 - Click pins to see knock details
 - Real-time stats bar showing total knocks, sales, leads
 - Refresh button to reload knocks
 - Center-on-user button
 - Works perfectly in Expo Go!
+
+### Roofing-Specific Customizations (Latest)
+- **Custom knock outcomes with emojis:**
+  - 👻 Not Home - Track houses to revisit
+  - 👀 Revisit - High-value prospects worth returning to
+  - 🚫 No Soliciting - Avoid these properties
+  - ✅ Lead - Interested homeowner
+  - 📝 Signed - Contract secured!
+  - 🔄 Follow Up - Needs another touch
+  - 🏠 New Roof - Recently replaced (skip)
+  - 🚧 Competitor - Another company working
+  - 🔑 Renter - Not the decision maker
+  - 🏚️ Poor Condition - House needs major work
+  - 📋 Proposal Left - Estimate delivered
+  - ⚠️ Stay Away - Dangerous/problematic
+- Organized into categories: Primary, Property Status, Actions
+- Map pins show emojis for instant recognition
+- Optimized for roofing sales workflow
 
 ### Cloud Storage Features
 - Supabase integration with 500MB free tier

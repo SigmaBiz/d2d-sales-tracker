@@ -1,4 +1,21 @@
-export type KnockOutcome = 'not_home' | 'no_soliciting' | 'lead' | 'sale' | 'callback' | 'not_interested';
+export type KnockOutcome = 
+  // Primary outcomes
+  | 'not_home'        // 👻 Nobody answered
+  | 'revisit'         // 👀 Worth coming back
+  | 'no_soliciting'   // 🚫 No soliciting sign
+  | 'lead'            // ✅ Interested prospect
+  | 'sale'            // 📝 Contract signed
+  | 'callback'        // 🔄 Follow up needed
+  // Property status
+  | 'new_roof'        // 🏠 Recently replaced roof
+  | 'competitor'      // 🚧 Another company working
+  | 'renter'          // 🔑 Tenant, not owner
+  | 'poor_condition'  // 🏚️ House in bad shape
+  // Action taken
+  | 'proposal_left'   // 📋 Left estimate/proposal
+  | 'stay_away'       // ⚠️ Dangerous or problematic
+  // Legacy (for backward compatibility)
+  | 'not_interested';
 
 export interface Knock {
   id: string;

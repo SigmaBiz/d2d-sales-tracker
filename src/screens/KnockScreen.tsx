@@ -15,13 +15,24 @@ import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
 import { Knock, KnockOutcome } from '../types';
 
-const OUTCOMES: { value: KnockOutcome; label: string; color: string }[] = [
-  { value: 'not_home', label: 'Not Home', color: '#6b7280' },
-  { value: 'no_soliciting', label: 'No Soliciting', color: '#ef4444' },
-  { value: 'not_interested', label: 'Not Interested', color: '#991b1b' },
-  { value: 'callback', label: 'Call Back', color: '#f59e0b' },
-  { value: 'lead', label: 'Lead', color: '#eab308' },
-  { value: 'sale', label: 'Sale', color: '#22c55e' },
+const OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: string }[] = [
+  // Primary outcomes
+  { value: 'not_home', label: '👻 Not Home', color: '#6b7280', emoji: '👻' },
+  { value: 'revisit', label: '👀 Revisit', color: '#3b82f6', emoji: '👀' },
+  { value: 'no_soliciting', label: '🚫 No Soliciting', color: '#ef4444', emoji: '🚫' },
+  { value: 'lead', label: '✅ Lead', color: '#10b981', emoji: '✅' },
+  { value: 'sale', label: '📝 Signed', color: '#22c55e', emoji: '📝' },
+  { value: 'callback', label: '🔄 Follow Up', color: '#f59e0b', emoji: '🔄' },
+  
+  // Property status
+  { value: 'new_roof', label: '🏠 New Roof', color: '#8b5cf6', emoji: '🏠' },
+  { value: 'competitor', label: '🚧 Competitor', color: '#dc2626', emoji: '🚧' },
+  { value: 'renter', label: '🔑 Renter', color: '#6366f1', emoji: '🔑' },
+  { value: 'poor_condition', label: '🏚️ Poor Condition', color: '#78716c', emoji: '🏚️' },
+  
+  // Action taken
+  { value: 'proposal_left', label: '📋 Proposal Left', color: '#0891b2', emoji: '📋' },
+  { value: 'stay_away', label: '⚠️ Stay Away', color: '#991b1b', emoji: '⚠️' },
 ];
 
 export default function KnockScreen() {
@@ -143,9 +154,9 @@ export default function KnockScreen() {
       </View>
 
       <View style={styles.outcomeSection}>
-        <Text style={styles.sectionTitle}>Select Outcome</Text>
+        <Text style={styles.sectionTitle}>Primary Outcomes</Text>
         <View style={styles.outcomeGrid}>
-          {OUTCOMES.map((outcome) => (
+          {OUTCOMES.slice(0, 6).map((outcome) => (
             <TouchableOpacity
               key={outcome.value}
               style={[
@@ -157,13 +168,68 @@ export default function KnockScreen() {
               ]}
               onPress={() => setSelectedOutcome(outcome.value)}
             >
+              <Text style={styles.outcomeEmoji}>{outcome.emoji}</Text>
               <Text
                 style={[
                   styles.outcomeText,
                   selectedOutcome === outcome.value && styles.selectedOutcomeText,
                 ]}
               >
-                {outcome.label}
+                {outcome.label.replace(outcome.emoji + ' ', '')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Property Status</Text>
+        <View style={styles.outcomeGrid}>
+          {OUTCOMES.slice(6, 10).map((outcome) => (
+            <TouchableOpacity
+              key={outcome.value}
+              style={[
+                styles.outcomeButton,
+                { borderColor: outcome.color },
+                selectedOutcome === outcome.value && {
+                  backgroundColor: outcome.color,
+                },
+              ]}
+              onPress={() => setSelectedOutcome(outcome.value)}
+            >
+              <Text style={styles.outcomeEmoji}>{outcome.emoji}</Text>
+              <Text
+                style={[
+                  styles.outcomeText,
+                  selectedOutcome === outcome.value && styles.selectedOutcomeText,
+                ]}
+              >
+                {outcome.label.replace(outcome.emoji + ' ', '')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Actions</Text>
+        <View style={styles.outcomeGrid}>
+          {OUTCOMES.slice(10).map((outcome) => (
+            <TouchableOpacity
+              key={outcome.value}
+              style={[
+                styles.outcomeButton,
+                { borderColor: outcome.color },
+                selectedOutcome === outcome.value && {
+                  backgroundColor: outcome.color,
+                },
+              ]}
+              onPress={() => setSelectedOutcome(outcome.value)}
+            >
+              <Text style={styles.outcomeEmoji}>{outcome.emoji}</Text>
+              <Text
+                style={[
+                  styles.outcomeText,
+                  selectedOutcome === outcome.value && styles.selectedOutcomeText,
+                ]}
+              >
+                {outcome.label.replace(outcome.emoji + ' ', '')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -246,16 +312,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   outcomeButton: {
-    width: '48%',
-    padding: 16,
+    width: '31%',
+    padding: 12,
     borderRadius: 12,
     borderWidth: 2,
     marginBottom: 12,
     backgroundColor: 'white',
+    alignItems: 'center',
+  },
+  outcomeEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
   },
   outcomeText: {
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '500',
     color: '#1f2937',
   },
