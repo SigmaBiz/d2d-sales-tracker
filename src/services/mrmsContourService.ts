@@ -75,6 +75,8 @@ export class MRMSContourService {
    * Interpolate point data to regular grid using IDW
    */
   private static interpolateToGrid(reports: HailReport[]): MRMSGridData {
+    console.log(`Interpolating ${reports.length} reports to grid`);
+    
     // Oklahoma bounds
     const bounds = {
       north: 37.0,
@@ -119,8 +121,15 @@ export class MRMSContourService {
       }
     }
 
+    // Log interpolation results
+    const maxInterpolatedValue = Math.max(...values.flat());
+    console.log(`Interpolation complete: max value before smoothing = ${maxInterpolatedValue}`);
+    
     // Apply Gaussian smoothing for professional appearance
     const smoothed = this.gaussianSmooth(values, 2);
+    
+    const maxSmoothedValue = Math.max(...smoothed.flat());
+    console.log(`After smoothing: max value = ${maxSmoothedValue}`);
 
     return { values: smoothed, width, height, bounds };
   }
@@ -185,9 +194,22 @@ export class MRMSContourService {
    */
   static generateContours(gridData: MRMSGridData): any {
     const { values, width, height, bounds } = gridData;
+    console.log(`Generating contours from grid: ${width}x${height}`);
 
     // Flatten grid for d3-contour
     const flatValues = values.flat();
+    
+    // Find max value in grid for debugging
+    const maxValue = Math.max(...flatValues);
+    console.log(`Max value in grid: ${maxValue}`);
+    
+    if (maxValue === 0) {
+      console.warn('Grid contains only zeros - no contours will be generated');
+      return {
+        type: 'FeatureCollection',
+        features: []
+      };
+    }
 
     // Create contour generator
     const contourGenerator = contours()
@@ -196,21 +218,39 @@ export class MRMSContourService {
 
     // Generate contours
     const contourFeatures = contourGenerator(flatValues);
+    console.log(`Generated ${contourFeatures.length} contour features`);
 
     // Convert to GeoJSON with proper coordinates
-    const features = contourFeatures.map(feature => {
-      const threshold = feature.value;
-      const color = this.CONTOUR_COLORS[threshold] || 'rgba(128, 128, 128, 0.5)';
+    const features = contourFeatures.map((feature: any, index: number) => {
+      const threshold = feature.value as number;
+      const color = (this.CONTOUR_COLORS as any)[threshold] || 'rgba(128, 128, 128, 0.5)';
+
+      // Log first feature's raw coordinates for debugging
+      if (index === 0 && feature.coordinates.length > 0) {
+        console.log('First contour feature raw coordinates sample:', feature.coordinates[0][0]?.slice(0, 3));
+      }
 
       // Transform grid coordinates to lat/lon
-      const coordinates = feature.coordinates.map(ring =>
-        ring.map(point => {
-          const [x, y] = point;
-          const lon = bounds.west + (x / width) * (bounds.east - bounds.west);
-          const lat = bounds.north - (y / height) * (bounds.north - bounds.south);
-          return [lon, lat];
-        })
-      );
+      // d3-contour returns MultiPolygon geometry where each polygon is an array of rings
+      const coordinates = feature.coordinates.map((polygon: any[]) => {
+        // Check if polygon is already an array of rings or just a single ring
+        const rings = Array.isArray(polygon[0]) && Array.isArray(polygon[0][0]) ? polygon : [polygon];
+        
+        return rings.map((ring: any[]) =>
+          ring.map((point: any[]) => {
+            const [x, y] = point;
+            const lon = bounds.west + (x / width) * (bounds.east - bounds.west);
+            const lat = bounds.north - (y / height) * (bounds.north - bounds.south);
+            return [lon, lat];
+          })
+        );
+      });
+
+      // Log first transformed coordinate for debugging
+      if (index === 0 && coordinates.length > 0 && coordinates[0].length > 0) {
+        console.log('First contour transformed coordinates sample:', coordinates[0][0]?.slice(0, 3));
+        console.log('Transform params - bounds:', bounds, 'width:', width, 'height:', height);
+      }
 
       return {
         type: 'Feature',
@@ -221,7 +261,7 @@ export class MRMSContourService {
         },
         geometry: {
           type: 'MultiPolygon',
-          coordinates: [coordinates]
+          coordinates: coordinates
         }
       };
     });

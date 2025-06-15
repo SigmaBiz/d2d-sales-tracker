@@ -56,7 +56,10 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
           if (typeof L !== 'undefined') {
             console.log('Leaflet loaded successfully!');
             try {
-              var map = L.map('map').setView([35.4676, -97.5164], 13);
+              // Start with user location if available, otherwise default to OKC
+              var initialLat = ${userLocation ? userLocation.lat : 35.4676};
+              var initialLng = ${userLocation ? userLocation.lng : -97.5164};
+              var map = L.map('map').setView([initialLat, initialLng], 13);
               
               // Street view layer
               var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -245,6 +248,36 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 // Bring contours to back so knock markers are on top
                 hailContourLayer.bringToBack();
                 console.log('Hail contour layer added to map');
+                
+                // Fit map to show hail contours with bounds validation
+                try {
+                  var bounds = hailContourLayer.getBounds();
+                  console.log('Contour bounds:', bounds);
+                  
+                  // Check if bounds are valid and not at 0,0
+                  if (bounds.isValid()) {
+                    var sw = bounds.getSouthWest();
+                    var ne = bounds.getNorthEast();
+                    console.log('SouthWest:', sw.lat, sw.lng, 'NorthEast:', ne.lat, ne.lng);
+                    
+                    // Check if bounds are near 0,0 (Africa coast)
+                    if (Math.abs(sw.lat) < 1 && Math.abs(sw.lng) < 1) {
+                      console.log('WARNING: Bounds are near 0,0 - likely invalid coordinates');
+                      // Try to use Oklahoma bounds as fallback
+                      map.fitBounds([[33.6, -103.0], [37.0, -94.4]], { padding: [50, 50] });
+                    } else {
+                      console.log('Fitting map to valid hail contour bounds');
+                      map.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                  } else {
+                    console.log('Bounds are not valid, using Oklahoma default bounds');
+                    map.fitBounds([[33.6, -103.0], [37.0, -94.4]], { padding: [50, 50] });
+                  }
+                } catch (e) {
+                  console.log('Could not fit bounds:', e);
+                  // Fallback to Oklahoma bounds
+                  map.fitBounds([[33.6, -103.0], [37.0, -94.4]], { padding: [50, 50] });
+                }
               };
               
               
@@ -278,6 +311,50 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   } else if (data.type === 'updateHailContours') {
                     console.log('Received updateHailContours message');
                     updateHailContours(data.contourData);
+                  } else if (data.type === 'focusOnHail') {
+                    console.log('Focusing on hail contours');
+                    if (hailContourLayer) {
+                      try {
+                        var bounds = hailContourLayer.getBounds();
+                        console.log('Focus bounds:', bounds);
+                        
+                        if (bounds.isValid()) {
+                          var sw = bounds.getSouthWest();
+                          var ne = bounds.getNorthEast();
+                          console.log('Focus SouthWest:', sw.lat, sw.lng, 'NorthEast:', ne.lat, ne.lng);
+                          
+                          // Check if bounds are near 0,0 (Africa coast)
+                          if (Math.abs(sw.lat) < 1 && Math.abs(sw.lng) < 1) {
+                            console.log('WARNING: Focus bounds are near 0,0 - using Oklahoma bounds instead');
+                            map.fitBounds([[33.6, -103.0], [37.0, -94.4]], { padding: [50, 50] });
+                          } else {
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                          }
+                        } else {
+                          console.log('Focus bounds invalid, using Oklahoma bounds');
+                          map.fitBounds([[33.6, -103.0], [37.0, -94.4]], { padding: [50, 50] });
+                        }
+                      } catch (e) {
+                        console.log('Could not focus on hail:', e);
+                        // Fallback to Oklahoma bounds
+                        map.fitBounds([[33.6, -103.0], [37.0, -94.4]], { padding: [50, 50] });
+                      }
+                    } else {
+                      console.log('No hail contour layer to focus on');
+                    }
+                  } else if (data.type === 'focusOnBounds') {
+                    console.log('Focusing on specific bounds:', data.bounds);
+                    if (data.bounds) {
+                      try {
+                        var leafletBounds = L.latLngBounds(
+                          [data.bounds.south, data.bounds.west],
+                          [data.bounds.north, data.bounds.east]
+                        );
+                        map.fitBounds(leafletBounds, { padding: [50, 50] });
+                      } catch (e) {
+                        console.log('Could not focus on bounds:', e);
+                      }
+                    }
                   }
                 } catch (e) {
                   console.error('Message error:', e);

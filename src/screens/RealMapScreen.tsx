@@ -12,6 +12,7 @@ import { SupabaseService } from '../services/supabaseService';
 import { MRMSService, StormEvent, HailReport } from '../services/mrmsService';
 import { HailAlertService } from '../services/hailAlertService';
 import { SimpleContourService } from '../services/simpleContourService';
+import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
 import { Knock } from '../types';
 
@@ -23,6 +24,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [activeStorms, setActiveStorms] = useState<StormEvent[]>([]);
   const [hailData, setHailData] = useState<HailReport[]>([]);
   const [hailContours, setHailContours] = useState<any>(null);
+  const [useSmoothContours, setUseSmoothContours] = useState(true); // Default to smooth MRMS contours
   const webMapRef = useRef<any>(null);
 
   useEffect(() => {
@@ -164,9 +166,42 @@ export default function RealMapScreen({ navigation }: any) {
       
       // Generate contours from reports
       if (allReports.length > 0) {
-        const contourData = SimpleContourService.generateSimpleContours(allReports);
+        // Generate contours directly from the collected reports
+        console.log(`Generating contours from ${allReports.length} hail reports`);
+        
+        let contourData = null;
+        
+        // Use user preference or fall back gracefully
+        if (useSmoothContours) {
+          // Try MRMS contours first for smoother visualization
+          try {
+            console.log('Attempting MRMS contour generation...');
+            contourData = await MRMSContourService.generateContoursFromReports(allReports);
+            console.log('MRMS contours generated successfully:', contourData);
+          } catch (mrmsError) {
+            console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
+            
+            // Fallback to simple contours
+            try {
+              contourData = SimpleContourService.generateSimpleContours(allReports);
+              console.log('Simple contours generated as fallback:', contourData);
+            } catch (simpleError) {
+              console.error('Both contour methods failed:', simpleError);
+            }
+          }
+        } else {
+          // User prefers simple contours
+          try {
+            contourData = SimpleContourService.generateSimpleContours(allReports);
+            console.log('Simple contours generated:', contourData);
+          } catch (simpleError) {
+            console.error('Simple contour generation failed:', simpleError);
+          }
+        }
+        
         setHailContours(contourData);
       } else {
+        console.log('No hail reports available for contour generation');
         setHailContours(null);
       }
     } catch (error) {
@@ -184,6 +219,25 @@ export default function RealMapScreen({ navigation }: any) {
 
   const handleStormFocus = async (stormId: string) => {
     await loadHailData();
+    
+    // Get the focused storm to find its bounds
+    const storms = await MRMSService.getActiveStorms();
+    const focusedStorm = storms.find(s => s.id === stormId && s.enabled);
+    
+    if (focusedStorm && focusedStorm.bounds && webMapRef.current) {
+      console.log('Focusing on storm bounds:', focusedStorm.bounds);
+      
+      // Send focus command to webview with specific bounds
+      webMapRef.current.postMessage(JSON.stringify({
+        type: 'focusOnBounds',
+        bounds: {
+          north: focusedStorm.bounds.north,
+          south: focusedStorm.bounds.south,
+          east: focusedStorm.bounds.east,
+          west: focusedStorm.bounds.west
+        }
+      }));
+    }
   };
 
   return (
@@ -248,6 +302,21 @@ export default function RealMapScreen({ navigation }: any) {
       >
         <Ionicons name="refresh" size={24} color="#1e40af" />
       </TouchableOpacity>
+
+      {hailContours && (
+        <TouchableOpacity 
+          style={styles.hailButton} 
+          onPress={() => {
+            if (webMapRef.current) {
+              webMapRef.current.postMessage(JSON.stringify({
+                type: 'focusOnHail'
+              }));
+            }
+          }}
+        >
+          <Ionicons name="thunderstorm" size={24} color="#ef4444" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -311,6 +380,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 170,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  hailButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 240,
     backgroundColor: 'white',
     borderRadius: 30,
     width: 60,

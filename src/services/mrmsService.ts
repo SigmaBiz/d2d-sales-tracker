@@ -122,13 +122,20 @@ export class MRMSService {
     const reports: HailReport[] = [];
     const now = new Date();
     
-    // Add some reports in Metro OKC
-    if (Math.random() > 0.5) {
+    // Always generate at least 3-5 reports for testing
+    const numReports = Math.floor(Math.random() * 3) + 3; // 3-5 reports
+    
+    // Add reports in Metro OKC area
+    for (let i = 0; i < Math.min(2, numReports); i++) {
+      const lat = 35.4676 + (Math.random() - 0.5) * 0.3;
+      const lng = -97.5164 + (Math.random() - 0.5) * 0.3;
+      console.log(`Mock report ${i} OKC: lat=${lat}, lng=${lng}`);
+      
       reports.push({
-        id: `hail_${Date.now()}_1`,
-        latitude: 35.4676 + (Math.random() - 0.5) * 0.2,
-        longitude: -97.5164 + (Math.random() - 0.5) * 0.2,
-        size: Math.random() * 2 + 0.5, // 0.5 to 2.5 inches
+        id: `hail_${Date.now()}_${i}`,
+        latitude: lat,
+        longitude: lng,
+        size: Math.random() * 2 + 0.75, // 0.75 to 2.75 inches
         timestamp: now,
         confidence: 70 + Math.random() * 30,
         city: 'Oklahoma City',
@@ -136,12 +143,16 @@ export class MRMSService {
       });
     }
     
-    // Add some reports in Norman
-    if (Math.random() > 0.7) {
+    // Add reports in Norman area
+    for (let i = 2; i < numReports; i++) {
+      const lat = 35.2226 + (Math.random() - 0.5) * 0.2;
+      const lng = -97.4395 + (Math.random() - 0.5) * 0.2;
+      console.log(`Mock report ${i} Norman: lat=${lat}, lng=${lng}`);
+      
       reports.push({
-        id: `hail_${Date.now()}_2`,
-        latitude: 35.2226 + (Math.random() - 0.5) * 0.1,
-        longitude: -97.4395 + (Math.random() - 0.5) * 0.1,
+        id: `hail_${Date.now()}_${i}`,
+        latitude: lat,
+        longitude: lng,
         size: Math.random() * 1.5 + 0.75,
         timestamp: now,
         confidence: 60 + Math.random() * 40,
@@ -150,6 +161,7 @@ export class MRMSService {
       });
     }
     
+    console.log(`Generated ${reports.length} mock hail reports`);
     return reports;
   }
   
@@ -164,18 +176,26 @@ export class MRMSService {
     const lats = reports.map(r => r.latitude);
     const lngs = reports.map(r => r.longitude);
     
+    console.log('Storm bounds calculation:');
+    console.log('Latitudes:', lats);
+    console.log('Longitudes:', lngs);
+    
+    const bounds = {
+      north: Math.max(...lats),
+      south: Math.min(...lats),
+      east: Math.max(...lngs),
+      west: Math.min(...lngs)
+    };
+    
+    console.log('Calculated bounds:', bounds);
+    
     const storm: StormEvent = {
       id: stormId,
       name: `${now.toLocaleDateString()} Oklahoma Storm`,
       startTime: new Date(Math.min(...reports.map(r => r.timestamp.getTime()))),
       peakSize: Math.max(...reports.map(r => r.size)),
       reports: reports,
-      bounds: {
-        north: Math.max(...lats),
-        south: Math.min(...lats),
-        east: Math.max(...lngs),
-        west: Math.min(...lngs)
-      },
+      bounds: bounds,
       enabled: true
     };
     

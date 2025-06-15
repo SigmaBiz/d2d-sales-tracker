@@ -9,12 +9,14 @@ import { HailReport } from './mrmsService';
 export class SimpleContourService {
   /**
    * Generate simple contour polygons from hail reports
-   * Groups reports by size ranges and creates convex hulls
+   * Groups reports by size ranges and creates storm-path-like polygons
    */
   static generateSimpleContours(reports: HailReport[]): any {
     if (!reports || reports.length === 0) {
       return { type: 'FeatureCollection', features: [] };
     }
+    
+    console.log(`SimpleContourService: Processing ${reports.length} hail reports`);
 
     // Group reports by size ranges
     const sizeRanges = [
