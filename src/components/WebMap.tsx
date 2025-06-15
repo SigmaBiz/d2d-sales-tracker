@@ -54,12 +54,15 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               // Add street layer by default
               streetLayer.addTo(map);
               
-              // Add layer control
+              // Add layer control with custom position
               var baseMaps = {
                 "Street View": streetLayer,
                 "Satellite View": satelliteLayer
               };
-              L.control.layers(baseMaps).addTo(map);
+              L.control.layers(baseMaps, null, {
+                position: 'topright'
+              }).addTo(map);
+              
               
               // Define colors and emojis
               var colors = {
@@ -186,9 +189,9 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 }
               });
               
-              // Add pulse animation
+              // Add custom styles
               var style = document.createElement('style');
-              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }';
+              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } .leaflet-top.leaflet-right { top: 80px !important; }';
               document.head.appendChild(style);
               
               // Send ready message
