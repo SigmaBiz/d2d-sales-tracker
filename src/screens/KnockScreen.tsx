@@ -259,22 +259,24 @@ export default function KnockScreen({ route }: any) {
         SupabaseService.syncKnocks().catch(console.error);
       }
 
-      if (!skipAlert) {
-        Alert.alert('Success', 'Knock recorded successfully', [
+      // For new knocks, just reset without alert
+      if (!editingKnockId) {
+        setSelectedOutcome(null);
+        setNotes('');
+        getCurrentLocation();
+      } else {
+        // For edits, show success
+        Alert.alert('Success', 'Knock updated successfully', [
           {
             text: 'OK',
             onPress: () => {
               setSelectedOutcome(null);
               setNotes('');
+              setEditingKnockId(null);
               getCurrentLocation();
             },
           },
         ]);
-      } else {
-        // Reset state when saving with form
-        setSelectedOutcome(null);
-        setNotes('');
-        getCurrentLocation();
       }
       
       return knockId;
@@ -436,11 +438,32 @@ export default function KnockScreen({ route }: any) {
 
       <TouchableOpacity
         style={[styles.saveButton, !selectedOutcome && styles.saveButtonDisabled]}
-        onPress={() => saveKnock()}
+        onPress={() => {
+          if (editingKnockId) {
+            // Show confirmation for edits
+            Alert.alert(
+              'Update Knock',
+              'Are you sure you want to update this knock?',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Update',
+                  onPress: () => saveKnock(),
+                },
+              ]
+            );
+          } else {
+            // Save directly for new knocks
+            saveKnock();
+          }
+        }}
         disabled={!selectedOutcome || loading}
       >
         <Ionicons name="checkmark-circle" size={24} color="white" />
-        <Text style={styles.saveButtonText}>Save Knock</Text>
+        <Text style={styles.saveButtonText}>{editingKnockId ? 'Update Knock' : 'Save Knock'}</Text>
       </TouchableOpacity>
 
       {showContactForm && selectedOutcome && (

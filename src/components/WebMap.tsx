@@ -122,6 +122,17 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   var popupContent = '<div style="font-size: 14px;"><h4 style="margin: 0 0 8px 0; color: #1e40af;">' + emoji + ' ' + knock.outcome.replace(/_/g, ' ').toUpperCase() + '</h4>';
                   popupContent += '<p style="margin: 4px 0;"><strong>Address:</strong> ' + (knock.address || 'No address') + '</p>';
                   popupContent += '<p style="margin: 4px 0;"><strong>Time:</strong> ' + new Date(knock.timestamp).toLocaleString() + '</p>';
+                  
+                  // Show history if exists
+                  if (knock.history && knock.history.length > 0) {
+                    popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>History:</strong>';
+                    knock.history.forEach(function(h) {
+                      var histEmoji = emojis[h.outcome] || '📍';
+                      popupContent += '<br><span style="color: #6b7280; font-size: 12px;">' + histEmoji + ' ' + h.outcome.replace(/_/g, ' ') + ' - ' + new Date(h.timestamp).toLocaleDateString() + '</span>';
+                    });
+                    popupContent += '</div>';
+                  }
+                  
                   if (knock.notes) {
                     popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>Notes:</strong><br>' + knock.notes.replace(/\\n/g, '<br>') + '</div>';
                   }

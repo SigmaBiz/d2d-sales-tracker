@@ -23,8 +23,24 @@ export class StorageService {
     );
     
     if (existingIndex !== -1) {
-      // Replace existing knock at this location
-      knocks[existingIndex] = { ...knock, id: knocks[existingIndex].id };
+      // Update existing knock and maintain history
+      const existingKnock = knocks[existingIndex];
+      const history = existingKnock.history || [];
+      
+      // Add previous state to history if outcome changed
+      if (existingKnock.outcome !== knock.outcome) {
+        history.push({
+          outcome: existingKnock.outcome,
+          timestamp: existingKnock.timestamp,
+          notes: existingKnock.notes
+        });
+      }
+      
+      knocks[existingIndex] = { 
+        ...knock, 
+        id: existingKnock.id,
+        history: history
+      };
     } else {
       // Add new knock
       knocks.push(knock);

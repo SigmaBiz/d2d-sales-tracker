@@ -28,6 +28,11 @@ export interface Knock {
   timestamp: Date;
   repId: string;
   syncStatus: 'pending' | 'synced';
+  history?: Array<{
+    outcome: KnockOutcome;
+    timestamp: Date;
+    notes?: string;
+  }>;
 }
 
 export interface Territory {

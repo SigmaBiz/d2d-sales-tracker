@@ -101,6 +101,7 @@ export default function RealMapScreen({ navigation }: any) {
         address: knockData.address,
         outcome: knockData.outcome,
         notes: knockData.notes,
+        history: knockData.history,
       });
     } else {
       // Creating new knock

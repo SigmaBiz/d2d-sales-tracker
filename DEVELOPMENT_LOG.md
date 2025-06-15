@@ -306,14 +306,21 @@ web-build/
    - Uses Esri World Imagery tiles
    - Fixed positioning to appear below stats bar
    
-4. **One Tag Per Location** ✅
+4. **One Tag Per Location with History** ✅
    - Each address/location can only have one active tag
    - Previous knocks at same location are automatically replaced
    - Added "Edit" button to map popups for existing knocks
    - Clicking Edit navigates to Record Knock with pre-filled data
+   - **Knock history tracking** - Shows previous outcomes in popup (e.g., "🪜 inspected - 1/14/2025")
    - Strategic implementation to minimize code changes
    
-5. **Backup Solution Available**
+5. **Improved Save Workflow** ✅
+   - **New knocks**: Save immediately without success prompt (faster workflow)
+   - **Edit knocks**: Show confirmation dialog with Cancel/Update options
+   - Button text changes to "Update Knock" when editing
+   - Success message only shown after updates
+   
+6. **Backup Solution Available**
    - WebMapSimple component available as fallback (simple dots, no emojis)
    - Can switch by editing import in RealMapScreen.tsx
 
