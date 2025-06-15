@@ -10,6 +10,7 @@ import KnockScreen from '../screens/KnockScreen';
 import StatsScreen from '../screens/StatsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import StormSearchScreen from '../screens/StormSearchScreen';
+import DataFlowDashboard from '../screens/DataFlowDashboard';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -67,6 +68,20 @@ function MainStack() {
         component={StormSearchScreen}
         options={{ 
           title: 'Storm History',
+          headerStyle: {
+            backgroundColor: '#1e40af',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen 
+        name="DataFlow" 
+        component={DataFlowDashboard}
+        options={{ 
+          title: 'Data Flow Monitor',
           headerStyle: {
             backgroundColor: '#1e40af',
           },

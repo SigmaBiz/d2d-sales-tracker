@@ -77,7 +77,23 @@ export class MRMSService {
       // Try multiple data sources in order of preference
       let reports: HailReport[] = [];
       
-      // 1. Try WeatherAPI.com first (commercial provider with CORS support)
+      // 1. Try FREE MRMS Proxy first (real NOAA data!)
+      try {
+        const { MRMSProxyService } = await import('./mrmsProxyService');
+        if (process.env.EXPO_PUBLIC_MRMS_PROXY_URL) {
+          reports = await MRMSProxyService.fetchRealtimeMRMS();
+          if (reports.length > 0) {
+            console.log(`Fetched ${reports.length} real-time MRMS reports from proxy`);
+            // Apply confidence scoring
+            reports = await this.applyConfidenceScoring(reports);
+            return reports;
+          }
+        }
+      } catch (error) {
+        console.log('MRMS proxy failed, trying WeatherAPI...', error);
+      }
+      
+      // 2. Try WeatherAPI.com as backup (commercial provider with CORS support)
       try {
         const { WeatherApiService } = await import('./weatherApiService');
         if (WeatherApiService.hasApiKey()) {
@@ -89,10 +105,10 @@ export class MRMSService {
             return reports;
           }
         } else {
-          console.log('WeatherAPI key not configured, trying MRMS...');
+          console.log('WeatherAPI key not configured, trying direct MRMS...');
         }
       } catch (error) {
-        console.log('WeatherAPI fetch failed, trying MRMS...', error);
+        console.log('WeatherAPI fetch failed, trying direct MRMS...', error);
       }
       
       // 2. Try real MRMS data as backup

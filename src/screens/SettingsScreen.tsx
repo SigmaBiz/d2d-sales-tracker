@@ -15,7 +15,7 @@ import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
 import { StorageUsage } from '../services/supabaseClient';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }: any) {
   const [settings, setSettings] = useState({
     autoSync: true,
     trackingEnabled: true,
@@ -275,6 +275,20 @@ export default function SettingsScreen() {
           <Ionicons name="trash" size={24} color="#dc2626" />
           <Text style={[styles.actionButtonText, styles.dangerText]}>
             Clear All Data
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Advanced</Text>
+        
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => navigation.navigate('DataFlow')}
+        >
+          <Ionicons name="analytics" size={24} color="#1e40af" />
+          <Text style={styles.actionButtonText}>
+            Data Flow Monitor
           </Text>
         </TouchableOpacity>
       </View>

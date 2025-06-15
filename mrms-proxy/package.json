@@ -1,0 +1,16 @@
+{
+  "name": "mrms-proxy",
+  "version": "1.0.0",
+  "description": "Free MRMS proxy server for D2D Sales Tracker",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  }
+}
