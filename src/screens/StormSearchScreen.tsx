@@ -47,15 +47,17 @@ export default function StormSearchScreen({ navigation }: any) {
 
         case 'date':
           // Search specific date
-          results = await WeatherHistoryService.getStormsByDate(
-            selectedDate,
-            searchLocation || 'Oklahoma'
-          );
+          results = await WeatherHistoryService.searchStorms({
+            date: selectedDate,
+            location: searchLocation || undefined
+          });
           break;
 
         case 'location':
           // Search by zip code or address
-          results = await WeatherHistoryService.searchRecentStorms(searchLocation);
+          results = await WeatherHistoryService.searchStorms({
+            location: searchLocation
+          });
           break;
       }
 
@@ -103,7 +105,7 @@ export default function StormSearchScreen({ navigation }: any) {
       case 'extreme': return '#991b1b';
       case 'severe': return '#dc2626';
       case 'moderate': return '#f59e0b';
-      case 'minor': return '#10b981';
+      case 'low': return '#10b981';
       default: return '#6b7280';
     }
   };
@@ -178,7 +180,7 @@ export default function StormSearchScreen({ navigation }: any) {
             if (date) setSelectedDate(date);
           }}
           maximumDate={new Date()}
-          minimumDate={new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)} // 7 days ago
+          minimumDate={new Date('2019-10-01')} // IEM Archives available from October 2019
         />
       )}
 
@@ -222,13 +224,15 @@ export default function StormSearchScreen({ navigation }: any) {
                 {event.date.toLocaleDateString()} at {event.date.toLocaleTimeString()}
               </Text>
               
-              <Text style={styles.resultDescription}>{event.description}</Text>
+              <Text style={styles.resultDescription}>
+                {event.reports.length} hail reports • {event.source}
+              </Text>
               
               <View style={styles.resultStats}>
                 <View style={styles.statItem}>
                   <Ionicons name="resize" size={16} color="#6b7280" />
                   <Text style={styles.statText}>
-                    Max: {event.maxHailSize.toFixed(2)}"
+                    Max: {event.hailSize.toFixed(2)}"
                   </Text>
                 </View>
                 <View style={styles.statItem}>
@@ -245,11 +249,26 @@ export default function StormSearchScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Note about limitations */}
+      {/* Significant Storm Dates */}
+      <View style={styles.significantDatesContainer}>
+        <Text style={styles.significantDatesTitle}>Known Storm Dates</Text>
+        <TouchableOpacity
+          style={styles.significantDateButton}
+          onPress={() => {
+            setSelectedDate(new Date('2024-09-24'));
+            setSearchType('date');
+          }}
+        >
+          <Text style={styles.significantDateText}>Sept 24, 2024 - Major OKC Metro Event</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Note about capabilities */}
       <View style={styles.noteContainer}>
         <Ionicons name="information-circle" size={20} color="#6b7280" />
         <Text style={styles.noteText}>
-          Free tier allows searching up to 7 days of history. For extended history, upgrade to a paid plan.
+          Search historical storms back to October 2019 using NOAA IEM Archives. 
+          Data quality and availability may vary for older dates.
         </Text>
       </View>
     </ScrollView>
@@ -438,5 +457,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     lineHeight: 18,
+  },
+  significantDatesContainer: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  significantDatesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  significantDateButton: {
+    backgroundColor: '#f3f4f6',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  significantDateText: {
+    fontSize: 14,
+    color: '#1e40af',
+    fontWeight: '500',
   },
 });
