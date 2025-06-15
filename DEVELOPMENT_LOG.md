@@ -392,11 +392,92 @@ web-build/
 
 ---
 
-*Last Updated: 2025-06-14*
-*Context Usage at Update: ~80%*
-*Next Update Due: At 90% context usage*
+*Last Updated: 2025-01-15*
+*Context Usage at Update: ~90%*
+*Next Update Due: At 95% context usage*
 
-## IMPORTANT: Git Commit Protocol
+---
+
+# VERSION 0.9.0 - HAIL INTELLIGENCE FEATURES
+
+## Development Branch: feature/hail-intelligence-v0.9
+*Started: 2025-01-15*
+
+### Phase 1: Hail Mapping Core (Week 1)
+- [ ] MRMS API integration for Oklahoma
+- [ ] Real-time hail alerts (statewide with Metro OKC priority)
+- [ ] Storm event grouping logic
+- [ ] 3-storm management system
+- [ ] Alert push notifications
+- [ ] Team alert broadcasting
+
+### Phase 2: Intelligence Layer (Week 2)
+- [ ] Confidence scoring algorithm
+- [ ] Social media integration (Twitter)
+- [ ] Property-specific hail reports
+- [ ] Presentation mode for homeowners
+
+### Phase 3: Canvassing Integration (Week 3)
+- [ ] Hail-informed territory boundaries
+- [ ] Mode-specific workflows
+- [ ] Hail zone performance analytics
+
+### Architecture Decisions:
+- **Coverage**: All of Oklahoma (user adjustable)
+- **Storage**: Minimal - only active storms (3 max)
+- **Alerts**: Every hail instance with smart grouping
+- **Map**: Keep WebView for now (overlay compatible)
+- **Data**: Real-time fetch, no bulk storage
+
+### Nice to Haves (Future):
+- Bulk historical data storage
+- ML damage predictions
+- Satellite imagery integration
+- Weather pattern predictions
+- Competitor activity tracking
+- Offline hail data packages
+
+## IMPORTANT: Multi-Agent Debugging Protocol
+For persistent and complex bugs/errors, deploy multiple agents with different perspectives:
+
+### When to Use Multi-Agent Debugging
+- Bug persists after 3+ single-agent attempts
+- Error involves multiple interconnected systems
+- Performance issues with unclear origin
+- Platform-specific bugs (iOS vs Android)
+- Race conditions or timing issues
+
+### Multi-Agent Deployment Process
+1. **Agent 1 - Code Analyzer**: Focus on code structure, dependencies, and logic flow
+2. **Agent 2 - System Debugger**: Focus on environment, APIs, and system interactions
+3. **Agent 3 - User Flow Specialist**: Focus on UI/UX and user action sequences
+
+### Implementation in Claude Code:
+```
+// Deploy 3 concurrent agents
+Task 1: "Analyze code structure for [bug description]"
+Task 2: "Debug system interactions causing [bug description]"
+Task 3: "Trace user flow leading to [bug description]"
+
+// Agents will:
+- Work independently first
+- Share findings in their reports
+- I synthesize their findings into solution
+```
+
+### Example Usage:
+"Deploy multi-agent debugging for map flickering issue"
+- Agent 1: Examines React re-render cycles
+- Agent 2: Checks WebView-Native bridge communication
+- Agent 3: Analyzes user interaction patterns
+
+### Benefits:
+- 3x faster complex bug resolution
+- Multiple perspectives prevent blind spots
+- Parallel processing of different angles
+- Higher success rate on persistent issues
+
+## Git Commit Protocol
 After updating this log:
 1. Stage all changes: `git add .`
 2. Commit with message: `docs: Update development log at X% context`
