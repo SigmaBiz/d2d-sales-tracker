@@ -317,6 +317,33 @@ export default function RealMapScreen({ navigation }: any) {
           <Ionicons name="thunderstorm" size={24} color="#ef4444" />
         </TouchableOpacity>
       )}
+      
+      {/* Data source indicator */}
+      {hailData.length > 0 && (
+        <View style={{
+          position: 'absolute',
+          bottom: 100,
+          left: 10,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: 5,
+          borderRadius: 5,
+          flexDirection: 'row',
+          alignItems: 'center'
+        }}>
+          <View style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: hailData[0].id.startsWith('weather_api') ? '#4CAF50' : 
+                           hailData[0].id.startsWith('hail_') ? '#FF9800' : '#2196F3',
+            marginRight: 5
+          }} />
+          <Text style={{ color: 'white', fontSize: 11 }}>
+            {hailData[0].id.startsWith('weather_api') ? 'Live Data' : 
+             hailData[0].id.startsWith('hail_') ? 'Mock Data' : 'MRMS Data'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

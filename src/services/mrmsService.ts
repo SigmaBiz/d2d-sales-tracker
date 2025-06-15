@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MRMSParser } from './mrmsParser';
 import { ConfidenceScoring, ConfidenceFactors } from './confidenceScoring';
+import { WeatherAPIService } from './weatherApiService';
 
 // MRMS API endpoints
 const MRMS_BASE_URL = 'https://mrms.ncep.noaa.gov/data/realtime/';
@@ -76,7 +77,25 @@ export class MRMSService {
       // Try multiple data sources in order of preference
       let reports: HailReport[] = [];
       
-      // 1. Try real MRMS data first
+      // 1. Try WeatherAPI.com first (commercial provider with CORS support)
+      try {
+        const { WeatherApiService } = await import('./weatherApiService');
+        if (WeatherApiService.hasApiKey()) {
+          reports = await WeatherApiService.fetchOklahomaHailReports();
+          if (reports.length > 0) {
+            console.log(`Fetched ${reports.length} real-time reports from WeatherAPI`);
+            // Apply confidence scoring
+            reports = await this.applyConfidenceScoring(reports);
+            return reports;
+          }
+        } else {
+          console.log('WeatherAPI key not configured, trying MRMS...');
+        }
+      } catch (error) {
+        console.log('WeatherAPI fetch failed, trying MRMS...', error);
+      }
+      
+      // 2. Try real MRMS data as backup
       try {
         reports = await MRMSParser.fetchLatestMESH();
         if (reports.length > 0) {
@@ -89,7 +108,7 @@ export class MRMSService {
         console.log('MRMS direct fetch failed, trying Mesonet...');
       }
       
-      // 2. Try Iowa State Mesonet as backup
+      // 3. Try Iowa State Mesonet as additional backup
       try {
         reports = await MRMSParser.fetchFromMesonet();
         if (reports.length > 0) {
@@ -102,7 +121,7 @@ export class MRMSService {
         console.log('Mesonet fetch failed, using mock data...');
       }
       
-      // 3. Fall back to mock data for development
+      // 4. Fall back to mock data for development
       console.log('Using mock data for development');
       reports = await this.getMockHailData();
       // Apply confidence scoring to mock data too
