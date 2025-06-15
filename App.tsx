@@ -6,6 +6,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { HailAlertService } from './src/services/hailAlertService';
 import { HailDataFlowService } from './src/services/hailDataFlowService';
 import { SupabaseService } from './src/services/supabaseService';
+import { IntegratedHailIntelligence } from './src/services/integratedHailIntelligence';
 
 export default function App() {
   const notificationListener = useRef<any>();
@@ -15,9 +16,17 @@ export default function App() {
     // Initialize services
     SupabaseService.initialize();
     
-    // Initialize automated data flow
-    HailDataFlowService.initializeDataFlow();
-    console.log('[App] Data flow initialized');
+    // Initialize 3-Tier Hail Intelligence System
+    IntegratedHailIntelligence.initialize({
+      enableRealTime: true,
+      enableHistorical: true,
+      enableValidation: true,
+      alertThreshold: 25  // 1 inch hail
+    }).then(() => {
+      console.log('[App] 3-Tier Hail Intelligence System initialized');
+    }).catch(error => {
+      console.error('[App] Failed to initialize Hail Intelligence:', error);
+    });
     
     // Handle notifications when app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {

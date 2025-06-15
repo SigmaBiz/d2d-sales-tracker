@@ -291,6 +291,16 @@ export default function SettingsScreen({ navigation }: any) {
             Data Flow Monitor
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => navigation.navigate('HailIntelligence')}
+        >
+          <Ionicons name="thunderstorm" size={24} color="#1e40af" />
+          <Text style={styles.actionButtonText}>
+            3-Tier Hail Intelligence
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>

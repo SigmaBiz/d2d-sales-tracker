@@ -7,7 +7,7 @@ export const MRMS_CONFIG = {
   // Data source priority (in order of preference)
   dataSources: [
     {
-      name: 'NOAA Direct',
+      name: 'NCEP MRMS Real-Time',  // TIER 1: Real-time detection
       enabled: true,
       endpoints: {
         mesh24hr: 'https://mrms.ncep.noaa.gov/data/realtime/MESH_Max_1440min/',
@@ -16,7 +16,7 @@ export const MRMS_CONFIG = {
       }
     },
     {
-      name: 'Iowa State Mesonet',
+      name: 'IEM Archives',  // TIER 2: Historical processing
       enabled: true,
       endpoints: {
         current: 'https://mesonet.agron.iastate.edu/json/radar',
@@ -28,6 +28,14 @@ export const MRMS_CONFIG = {
       enabled: false, // Disabled by default due to rate limits
       endpoints: {
         wms: 'https://opengeo.ncep.noaa.gov/geoserver/conus/conus_mrms_mesh/ows',
+      }
+    },
+    {
+      name: 'Storm Events Database',  // TIER 3: Validation & tuning
+      enabled: true,
+      endpoints: {
+        api: 'https://www.ncdc.noaa.gov/stormevents/json',
+        csv: 'https://www.ncdc.noaa.gov/stormevents/csv',
       }
     }
   ],

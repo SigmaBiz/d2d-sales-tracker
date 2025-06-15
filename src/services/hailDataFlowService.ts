@@ -10,6 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport, MRMSService } from './mrmsService';
 import { HailAlertService } from './hailAlertService';
 import { MRMSProxyService } from './mrmsProxyService';
+import { NCEPMRMSService } from './tier1NCEPService';
+import { IEMArchiveService } from './tier2IEMService';
+import { StormEventsService } from './tier3StormEventsService';
 
 export interface DataFlowStage {
   stage: 'realtime' | 'historical' | 'validation';
@@ -25,17 +28,23 @@ export class HailDataFlowService {
   
   /**
    * STAGE 1: Real-Time Detection
+   * TIER 1: NCEP MRMS Real-Time → Immediate Alerts
    * Runs every 2-5 minutes during active weather
    */
   static async processRealtimeStage(): Promise<void> {
-    console.log('[DataFlow] Stage 1: Real-time detection starting...');
+    console.log('[DataFlow] Stage 1: NCEP MRMS Real-time detection starting...');
     
     try {
       // Update flow state
       await this.updateFlowState('realtime', 'processing');
       
-      // Fetch real-time MRMS data
-      const reports = await MRMSService.fetchCurrentHailData();
+      // TIER 1: Fetch real-time NCEP MRMS data
+      let reports = await NCEPMRMSService.checkForNewStorms();
+      
+      // Fallback to existing service if needed
+      if (reports.length === 0) {
+        reports = await MRMSService.fetchCurrentHailData();
+      }
       
       if (reports.length > 0) {
         console.log(`[DataFlow] Detected ${reports.length} active hail reports`);
@@ -76,8 +85,13 @@ export class HailDataFlowService {
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() - 2); // 48 hours ago
       
-      // Fetch enhanced historical data
-      const historicalData = await MRMSProxyService.fetchHistoricalMRMS(targetDate);
+      // TIER 2: Fetch enhanced historical data from IEM Archives
+      let historicalData = await IEMArchiveService.fetchHistoricalStorm(targetDate);
+      
+      // Fallback to proxy if IEM fails
+      if (historicalData.length === 0) {
+        historicalData = await MRMSProxyService.fetchHistoricalMRMS(targetDate);
+      }
       
       if (historicalData.length > 0) {
         console.log(`[DataFlow] Processing ${historicalData.length} historical reports`);
@@ -113,18 +127,11 @@ export class HailDataFlowService {
     try {
       await this.updateFlowState('validation', 'processing');
       
-      // Get last week's predictions
-      const lastWeek = new Date();
-      lastWeek.setDate(lastWeek.getDate() - 7);
+      // TIER 3: Use Storm Events Database for validation
+      const metrics = await StormEventsService.performValidation();
       
-      // Fetch ground truth from Storm Events
-      const groundTruth = await MRMSProxyService.fetchStormValidation(lastWeek);
-      
-      // Get our predictions from that period
-      const predictions = await this.getStoredPredictions(lastWeek);
-      
-      // Calculate accuracy metrics
-      const metrics = await this.calculateAccuracyMetrics(predictions, groundTruth);
+      // The tier 3 service handles all validation internally
+      console.log(`[DataFlow] Validation complete - F1 Score: ${(metrics.f1Score * 100).toFixed(1)}%`);
       
       console.log(`[DataFlow] Validation metrics:`, metrics);
       

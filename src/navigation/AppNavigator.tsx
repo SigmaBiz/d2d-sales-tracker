@@ -11,6 +11,7 @@ import StatsScreen from '../screens/StatsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import StormSearchScreen from '../screens/StormSearchScreen';
 import DataFlowDashboard from '../screens/DataFlowDashboard';
+import HailIntelligenceDashboard from '../screens/HailIntelligenceDashboard';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -82,6 +83,20 @@ function MainStack() {
         component={DataFlowDashboard}
         options={{ 
           title: 'Data Flow Monitor',
+          headerStyle: {
+            backgroundColor: '#1e40af',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen 
+        name="HailIntelligence" 
+        component={HailIntelligenceDashboard}
+        options={{ 
+          title: 'Hail Intelligence',
           headerStyle: {
             backgroundColor: '#1e40af',
           },
