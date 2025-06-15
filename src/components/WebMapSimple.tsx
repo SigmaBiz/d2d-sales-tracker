@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Knock } from '../types';
-import { Ionicons } from '@expo/vector-icons';
 
 interface WebMapProps {
   knocks: Knock[];
@@ -10,14 +9,11 @@ interface WebMapProps {
   onKnockClick?: (knock: Knock) => void;
 }
 
-const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick }, ref) => {
+export default function WebMapSimple({ knocks, userLocation, onKnockClick }: WebMapProps) {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
 
-  // Expose WebView methods to parent
-  React.useImperativeHandle(ref, () => webViewRef.current as WebView);
-
+  // Stable HTML template with simple colored dots (no emojis)
   const mapHTML = React.useMemo(() => `
     <!DOCTYPE html>
     <html>
@@ -32,36 +28,17 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
     </head>
     <body>
       <div id="map"></div>
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       <script>
-        // Wait a bit for Leaflet to load
+        // Wait for Leaflet to load
         setTimeout(function() {
           if (typeof L !== 'undefined') {
             try {
               var map = L.map('map').setView([35.4676, -97.5164], 13);
-              
-              // Street view layer
-              var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
-              });
+              }).addTo(map);
               
-              // Satellite view layer
-              var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-              });
-              
-              // Add street layer by default
-              streetLayer.addTo(map);
-              
-              // Add layer control
-              var baseMaps = {
-                "Street View": streetLayer,
-                "Satellite View": satelliteLayer
-              };
-              L.control.layers(baseMaps).addTo(map);
-              
-              // Define colors and emojis
+              // Define colors for outcomes
               var colors = {
                 not_home: '#6b7280',
                 inspected: '#3b82f6', 
@@ -79,23 +56,6 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 not_interested: '#991b1b'
               };
               
-              var emojis = {
-                not_home: '👻',
-                inspected: '🪜',
-                no_soliciting: '🚫',
-                lead: '✅',
-                sale: '📝',
-                callback: '🔄',
-                new_roof: '👼',
-                competitor: '🏗️',
-                renter: '🧟',
-                poor_condition: '🏚️',
-                proposal_left: '📋',
-                stay_away: '👹',
-                revisit: '👀',
-                not_interested: '❌'
-              };
-              
               var markers = [];
               var userMarker = null;
               
@@ -107,18 +67,17 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 });
                 markers = [];
                 
-                // Add each knock
+                // Add each knock with simple colored circle
                 knocksData.forEach(function(knock) {
                   var color = colors[knock.outcome] || '#6b7280';
-                  var emoji = emojis[knock.outcome] || '📍';
                   
                   var icon = L.divIcon({
-                    html: '<div style="background-color: ' + color + '; width: 36px; height: 36px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 20px;">' + emoji + '</div>',
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
+                    html: '<div style="background-color: ' + color + '; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
                   });
                   
-                  var popupContent = '<div style="font-size: 14px;"><h4 style="margin: 0 0 8px 0; color: #1e40af;">' + emoji + ' ' + knock.outcome.replace(/_/g, ' ').toUpperCase() + '</h4>';
+                  var popupContent = '<div style="font-size: 14px;"><h4 style="margin: 0 0 8px 0; color: #1e40af;">' + knock.outcome.replace(/_/g, ' ').toUpperCase() + '</h4>';
                   popupContent += '<p style="margin: 4px 0;"><strong>Address:</strong> ' + (knock.address || 'No address') + '</p>';
                   popupContent += '<p style="margin: 4px 0;"><strong>Time:</strong> ' + new Date(knock.timestamp).toLocaleString() + '</p>';
                   if (knock.notes) {
@@ -140,7 +99,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   userMarker.setLatLng([lat, lng]);
                 } else {
                   var userIcon = L.divIcon({
-                    html: '<div style="width: 16px; height: 16px; background-color: #3b82f6; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><div style="width: 40px; height: 40px; background-color: rgba(59, 130, 246, 0.2); border-radius: 50%; position: absolute; top: -12px; left: -12px; animation: pulse 2s infinite;"></div></div>',
+                    html: '<div style="width: 16px; height: 16px; background-color: #3b82f6; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);<div style="width: 40px; height: 40px; background-color: rgba(59, 130, 246, 0.2); border-radius: 50%; position: absolute; top: -12px; left: -12px; animation: pulse 2s infinite;"></div></div>',
                     iconSize: [16, 16],
                     iconAnchor: [8, 8]
                   });
@@ -154,21 +113,6 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   map.setView(userMarker.getLatLng(), 16);
                 }
               };
-              
-              // Add map click handler for creating new knocks
-              map.on('click', function(e) {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'mapClick',
-                    lat: e.latlng.lat,
-                    lng: e.latlng.lng
-                  }));
-                }
-              });
-              
-              // Add initial data
-              ${knocks.length > 0 ? `updateKnocks(${JSON.stringify(knocks)});` : ''}
-              ${userLocation ? `updateUserLocation(${userLocation.lat}, ${userLocation.lng});` : ''}
               
               // Listen for messages from React Native
               window.addEventListener('message', function(event) {
@@ -201,7 +145,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
           } else {
             document.body.innerHTML = '<div style="padding: 20px;">Leaflet failed to load. Try refreshing.</div>';
           }
-        }, 2000);
+        }, 1000);
       </script>
     </body>
     </html>
@@ -233,35 +177,11 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'mapReady') {
         setIsLoading(false);
-        setLoadError(false);
-      } else if (data.type === 'mapClick') {
-        // Handle map click - pass to parent if handler provided
-        if (onKnockClick) {
-          onKnockClick({
-            id: '',
-            latitude: data.lat,
-            longitude: data.lng,
-            address: '',
-            outcome: 'not_home',
-            timestamp: new Date(),
-            notes: '',
-            syncStatus: 'pending'
-          } as Knock);
-        }
       }
     } catch (error) {
       console.error('WebMap message error:', error);
     }
   };
-
-  // Force hide loading after 3 seconds
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
-
-    return () => clearTimeout(timeout);
-  }, []);
 
   return (
     <View style={styles.container}>
@@ -270,19 +190,8 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
         source={{ html: mapHTML }}
         style={styles.webView}
         onMessage={handleMessage}
-        onError={(error) => {
-          console.error('WebView error:', error);
-          setLoadError(true);
-          setIsLoading(false);
-        }}
-        onHttpError={(error) => {
-          console.error('WebView HTTP error:', error);
-        }}
         javaScriptEnabled
         domStorageEnabled
-        startInLoadingState
-        scalesPageToFit={false}
-        scrollEnabled={false}
         originWhitelist={['*']}
         mixedContentMode="compatibility"
       />
@@ -294,9 +203,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
       )}
     </View>
   );
-});
-
-export default WebMap;
+}
 
 const styles = StyleSheet.create({
   container: {

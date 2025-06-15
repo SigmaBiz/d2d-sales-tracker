@@ -41,7 +41,7 @@ const OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: stri
   { value: 'revisit', label: '👀 Revisit', color: '#3b82f6', emoji: '👀' },
 ];
 
-export default function KnockScreen() {
+export default function KnockScreen({ route }: any) {
   const [selectedOutcome, setSelectedOutcome] = useState<KnockOutcome | null>(null);
   const [notes, setNotes] = useState('');
   const [address, setAddress] = useState('');
@@ -53,8 +53,18 @@ export default function KnockScreen() {
   const [addressHasForm, setAddressHasForm] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
-    getCurrentLocation();
-  }, []);
+    // Check if location was passed from map click
+    if (route?.params?.latitude && route?.params?.longitude) {
+      setCurrentLocation({
+        lat: route.params.latitude,
+        lng: route.params.longitude
+      });
+      // Get address for this location
+      getAddressFromCoords(route.params.latitude, route.params.longitude);
+    } else {
+      getCurrentLocation();
+    }
+  }, [route?.params]);
 
   useEffect(() => {
     if (address) {
@@ -78,6 +88,13 @@ export default function KnockScreen() {
       setPreviousFormData(undefined);
       setAddressHasForm({});
     }
+  };
+
+  const getAddressFromCoords = async (latitude: number, longitude: number) => {
+    setLoading(true);
+    const addr = await LocationService.reverseGeocode(latitude, longitude);
+    setAddress(addr);
+    setLoading(false);
   };
 
   const getCurrentLocation = async () => {

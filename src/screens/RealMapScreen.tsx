@@ -1,14 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import WebMap from '../components/WebMap';
-// import TestWebView from '../components/TestWebView'; // Uncomment to test WebView
+// SOLUTION SWITCHER: Comment/uncomment to try different solutions
+import WebMap from '../components/WebMap'; // Solution 1: Stabilized with useMemo
+// import WebMap from '../components/WebMapSimple'; // Solution 2: Simple dots (no emojis)
+// import TestWebView from '../components/TestWebView'; // Test WebView
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
 import { Knock } from '../types';
 
-export default function RealMapScreen() {
+export default function RealMapScreen({ navigation }: any) {
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -89,11 +91,21 @@ export default function RealMapScreen() {
     }
   };
 
+  const handleMapClick = (knockData: Knock) => {
+    // Navigate to knock screen with pre-filled location
+    navigation.navigate('Knock', {
+      latitude: knockData.latitude,
+      longitude: knockData.longitude,
+    });
+  };
+
   return (
     <View style={styles.container}>
       <WebMap 
+        ref={webMapRef}
         knocks={knocks}
         userLocation={userLocation}
+        onKnockClick={handleMapClick}
       />
       
       <View style={styles.statsBar}>

@@ -285,16 +285,29 @@ web-build/
 
 ## Current Issues & Debugging Steps
 
-### WebView Map Loading Issue
-**Problem**: The WebView-based map was working but started experiencing issues after emoji updates:
-1. Map loads initially but flickers/resets when data updates
-2. WebView bridge communication seems inconsistent
-3. Map was showing gray background, then working, then breaking again
+### WebView Map Loading Issue - RESOLVED ✅
+**Problem**: The WebView-based map was experiencing flickering/reset issues after emoji updates.
 
-**Root Cause Analysis**:
-- WebView requires external resources (Leaflet CDN) which may not load consistently
-- The HTML template is recreated on each render causing map resets
-- Unicode emojis (🪜, 👼, 🏗️, 🧟, 👹) may have rendering issues in WebView
+**Solution Implemented**: Used React.useMemo to stabilize the HTML template and prevent recreation on every render. This fixed the flickering while keeping emoji support.
+
+### New Features Implemented (Latest Session)
+1. **Fixed Center-on-User Button** ✅
+   - Added ref forwarding to WebMap component
+   - Center button now immediately focuses on user's blue dot location
+   
+2. **Map Click to Create Knock** ✅
+   - Click anywhere on map to navigate to Record Knock screen
+   - Pre-fills location coordinates
+   - Automatically fetches address for clicked location
+   
+3. **Satellite View Toggle** ✅
+   - Added layer control to switch between Street and Satellite views
+   - Satellite view shows roof structures for canvassing decisions
+   - Uses Esri World Imagery tiles
+   
+4. **Backup Solution Available**
+   - WebMapSimple component available as fallback (simple dots, no emojis)
+   - Can switch by editing import in RealMapScreen.tsx
 
 **Debugging Steps Taken**:
 1. Verified JavaScript execution (gray background = JS running)
