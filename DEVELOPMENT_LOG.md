@@ -933,6 +933,62 @@ TIER 3: Storm Events (Weekly) → Ground Truth → Algorithm Tuning
 3. If Storm Events fails: Use cached validation data
 4. All tiers have robust fallback mechanisms
 
+## Nice to Haves (Future Features)
+
+### Sales Cycle Analytics
+- **Time Tracker**: Track duration from initial contact to sale conversion
+  - Initial knock timestamp
+  - Follow-up timestamps
+  - Final sale timestamp
+  - Average conversion time analytics
+  - Time-of-day success rate analysis
+
+### Lead Management System
+- **Calendar View**: Visual scheduling for follow-ups
+  - Daily/weekly/monthly calendar views
+  - Drag-and-drop appointment scheduling
+  - Integration with device calendar
+  - Reminder notifications
+  - Color-coded by lead temperature (hot/warm/cold)
+
+### Team Collaboration
+- **Multi-User Ecosystem**: Connect sales teams
+  - Team creation and management
+  - Territory assignment and boundaries
+  - Real-time team member locations
+  - Shared lead pool for team territories
+  - Team leaderboards and competitions
+  - Manager dashboard with team analytics
+
+### Enhanced Data Persistence
+- **Door Knock Memory**: Comprehensive Supabase backup
+  - Full knock history with all interactions
+  - Automatic cloud sync
+  - Cross-device data access
+  - Data export capabilities
+  - Offline queue for sync when connected
+
+### CRM Integration
+- **Lead & Customer Management**: Professional CRM features
+  - Complete contact profiles
+  - Interaction history timeline
+  - Custom tags and categories
+  - Email/SMS integration
+  - Document attachments (quotes, contracts)
+  - Pipeline visualization
+  - Automated follow-up sequences
+  - Integration with popular CRMs (Salesforce, HubSpot)
+
+### Additional Nice-to-Haves
+- **Route Optimization**: AI-powered daily route planning
+- **Photo Attachments**: Before/after photos for roofing
+- **Voice Notes**: Quick audio notes for each knock
+- **Signature Capture**: Digital contract signing
+- **Payment Processing**: Accept deposits on-site
+- **Weather-Based Scheduling**: Auto-adjust routes based on weather
+- **Competitive Intelligence**: Track competitor activity
+- **Training Mode**: Onboard new reps with guided knocking
+
 ## Git Commit Protocol
 After updating this log:
 1. Stage all changes: `git add .`

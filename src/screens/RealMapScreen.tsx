@@ -262,8 +262,8 @@ export default function RealMapScreen({ navigation }: any) {
           onClose={() => setShowStormPanel(false)}
           dataSource={
             hailData.length > 0 
-              ? hailData[0].id.startsWith('weather_api') ? 'live' : 
-                hailData[0].id.startsWith('hail_') ? 'mock' : 'mrms'
+              ? hailData[0].source?.includes('NCEP') || hailData[0].source?.includes('MRMS') ? 'MRMS' :
+                hailData[0].source?.includes('IEM') ? 'IEM' : 'Mock'
               : undefined
           }
         />

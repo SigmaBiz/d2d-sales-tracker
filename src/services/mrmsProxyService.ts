@@ -6,8 +6,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
 
-// Your FREE Vercel proxy URL (after deployment)
-const PROXY_URL = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'https://your-app.vercel.app';
+// Your FREE Vercel proxy URL
+const PROXY_URL = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'https://mrms-proxy-1749991977.vercel.app';
 
 export class MRMSProxyService {
   private static CACHE_KEY = '@mrms_proxy_cache';

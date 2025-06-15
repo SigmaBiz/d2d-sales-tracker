@@ -8,7 +8,7 @@ interface HailOverlayProps {
   onStormDelete: (stormId: string) => void;
   onStormFocus: (stormId: string) => void;
   onClose?: () => void;
-  dataSource?: 'live' | 'mock' | 'mrms';
+  dataSource?: 'MRMS' | 'IEM' | 'Mock';
 }
 
 export default function HailOverlay({ 
@@ -78,12 +78,12 @@ export default function HailOverlay({
               <View style={styles.dataSourceBadge}>
                 <View style={[
                   styles.dataSourceDot,
-                  { backgroundColor: dataSource === 'live' ? '#4CAF50' : 
-                                   dataSource === 'mock' ? '#FF9800' : '#2196F3' }
+                  { backgroundColor: dataSource === 'MRMS' ? '#10b981' : 
+                                   dataSource === 'IEM' ? '#3b82f6' : '#f59e0b' }
                 ]} />
                 <Text style={styles.dataSourceText}>
-                  {dataSource === 'live' ? 'Live' : 
-                   dataSource === 'mock' ? 'Mock' : 'MRMS'}
+                  {dataSource === 'MRMS' ? 'NOAA MRMS' : 
+                   dataSource === 'IEM' ? 'IEM Archive' : 'Mock Data'}
                 </Text>
               </View>
             )}

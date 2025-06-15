@@ -1,40 +1,14 @@
 /**
- * MRMS (Multi-Radar Multi-Sensor) Service
- * Fetches real-time hail data from NOAA
+ * MRMS Service - WITHOUT WeatherAPI dependency
+ * Uses only NOAA MRMS and IEM data sources
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MRMSParser } from './mrmsParser';
-import { ConfidenceScoring, ConfidenceFactors } from './confidenceScoring';
-import { WeatherAPIService } from './weatherApiService';
-
-// MRMS API endpoints
-const MRMS_BASE_URL = 'https://mrms.ncep.noaa.gov/data/realtime/';
-const MESH_ENDPOINT = 'MESH_Max_1440min'; // Maximum Expected Size of Hail (24hr)
-
-// Oklahoma bounds
-const OKLAHOMA_BOUNDS = {
-  north: 37.0,
-  south: 33.6,
-  east: -94.4,
-  west: -103.0
-};
-
-// Metro OKC cities for priority alerts
-const METRO_OKC_CITIES = [
-  'Oklahoma City',
-  'Norman',
-  'Edmond',
-  'Moore',
-  'Midwest City',
-  'Del City',
-  'Yukon',
-  'Mustang',
-  'Bethany',
-  'The Village',
-  'Nichols Hills',
-  'Warr Acres'
-];
+import { ConfidenceScoring } from './confidenceScoring';
+import { MRMSProxyService } from './mrmsProxyService';
+import { NCEPMRMSService } from './tier1NCEPService';
+import { IEMArchiveService } from './tier2IEMService';
 
 export interface HailReport {
   id: string;
@@ -42,10 +16,12 @@ export interface HailReport {
   longitude: number;
   size: number; // in inches
   timestamp: Date;
-  confidence: number; // 0-100%
-  confidenceFactors?: ConfidenceFactors; // Detailed confidence breakdown
+  confidence: number;
   city?: string;
   isMetroOKC?: boolean;
+  source?: string;
+  meshValue?: number; // Raw MESH value in mm
+  polygon?: number[][]; // For contour data
 }
 
 export interface StormEvent {
@@ -53,355 +29,275 @@ export interface StormEvent {
   name: string;
   startTime: Date;
   endTime?: Date;
-  peakSize: number;
   reports: HailReport[];
-  bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  };
-  enabled: boolean;
+  maxSize: number;
+  center: { lat: number; lon: number };
+  isActive: boolean;
+  source: 'MRMS' | 'IEM' | 'Mock';
+  confidence: number;
 }
 
 export class MRMSService {
-  private static STORAGE_KEY = '@hail_data';
-  private static ALERT_LOG_KEY = '@hail_alerts';
-  private static ACTIVE_STORMS_KEY = '@active_storms';
-  
+  private static STORAGE_KEY = '@mrms_storms';
+  private static LAST_UPDATE_KEY = '@mrms_last_update';
+  private static MAX_STORMS = 3;
+  private static UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
   /**
-   * Fetch current MESH data for Oklahoma
+   * Fetch current hail data - NOAA MRMS ONLY
    */
   static async fetchCurrentHailData(): Promise<HailReport[]> {
     try {
-      // Try multiple data sources in order of preference
-      let reports: HailReport[] = [];
+      console.log('[MRMS] Fetching real-time data from NOAA MRMS...');
       
-      // 1. Try FREE MRMS Proxy first (real NOAA data!)
-      try {
-        const { MRMSProxyService } = await import('./mrmsProxyService');
-        if (process.env.EXPO_PUBLIC_MRMS_PROXY_URL) {
-          reports = await MRMSProxyService.fetchRealtimeMRMS();
-          if (reports.length > 0) {
-            console.log(`Fetched ${reports.length} real-time MRMS reports from proxy`);
-            // Apply confidence scoring
-            reports = await this.applyConfidenceScoring(reports);
-            return reports;
-          }
-        }
-      } catch (error) {
-        console.log('MRMS proxy failed, trying WeatherAPI...', error);
+      // Try TIER 1: NCEP MRMS first
+      let reports = await NCEPMRMSService.checkForNewStorms();
+      
+      if (reports && reports.length > 0) {
+        console.log(`[MRMS] Found ${reports.length} reports from NCEP MRMS`);
+        return reports;
       }
+
+      // Try proxy if direct NCEP fails
+      reports = await MRMSProxyService.fetchRealtimeMRMS();
       
-      // 2. Try WeatherAPI.com as backup (commercial provider with CORS support)
-      try {
-        const { WeatherApiService } = await import('./weatherApiService');
-        if (WeatherApiService.hasApiKey()) {
-          reports = await WeatherApiService.fetchOklahomaHailReports();
-          if (reports.length > 0) {
-            console.log(`Fetched ${reports.length} real-time reports from WeatherAPI`);
-            // Apply confidence scoring
-            reports = await this.applyConfidenceScoring(reports);
-            return reports;
-          }
-        } else {
-          console.log('WeatherAPI key not configured, trying direct MRMS...');
-        }
-      } catch (error) {
-        console.log('WeatherAPI fetch failed, trying direct MRMS...', error);
+      if (reports && reports.length > 0) {
+        console.log(`[MRMS] Found ${reports.length} reports from MRMS Proxy`);
+        return reports;
       }
+
+      // If no current storms, check recent historical (last 2 hours)
+      const twoHoursAgo = new Date();
+      twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
       
-      // 2. Try real MRMS data as backup
-      try {
-        reports = await MRMSParser.fetchLatestMESH();
-        if (reports.length > 0) {
-          console.log(`Fetched ${reports.length} real MRMS reports`);
-          // Apply confidence scoring
-          reports = await this.applyConfidenceScoring(reports);
-          return reports;
-        }
-      } catch (error) {
-        console.log('MRMS direct fetch failed, trying Mesonet...');
+      reports = await IEMArchiveService.fetchHistoricalStorm(twoHoursAgo);
+      
+      if (reports && reports.length > 0) {
+        console.log(`[MRMS] Found ${reports.length} recent reports from IEM`);
+        return reports;
       }
-      
-      // 3. Try Iowa State Mesonet as additional backup
-      try {
-        reports = await MRMSParser.fetchFromMesonet();
-        if (reports.length > 0) {
-          console.log(`Fetched ${reports.length} reports from Mesonet`);
-          // Apply confidence scoring
-          reports = await this.applyConfidenceScoring(reports);
-          return reports;
-        }
-      } catch (error) {
-        console.log('Mesonet fetch failed, using mock data...');
-      }
-      
-      // 4. Fall back to mock data for development
-      console.log('Using mock data for development');
-      reports = await this.getMockHailData();
-      // Apply confidence scoring to mock data too
-      reports = await this.applyConfidenceScoring(reports);
-      return reports;
+
+      console.log('[MRMS] No active hail detected');
+      return [];
+
     } catch (error) {
-      console.error('Error fetching MRMS data:', error);
-      throw error;
+      console.error('[MRMS] Error fetching data:', error);
+      
+      // Last resort: return mock data for testing ONLY
+      if (__DEV__) {
+        console.warn('[MRMS] Using mock data in development mode');
+        return this.generateMockData();
+      }
+      
+      return [];
     }
   }
-  
+
   /**
-   * Get mock hail data for development
+   * Get active storms from storage
    */
-  private static async getMockHailData(): Promise<HailReport[]> {
-    // Simulate real hail reports across Oklahoma
-    const reports: HailReport[] = [];
-    const now = new Date();
-    
-    // Always generate at least 3-5 reports for testing
-    const numReports = Math.floor(Math.random() * 3) + 3; // 3-5 reports
-    
-    // Add reports in Metro OKC area
-    for (let i = 0; i < Math.min(2, numReports); i++) {
-      const lat = 35.4676 + (Math.random() - 0.5) * 0.3;
-      const lng = -97.5164 + (Math.random() - 0.5) * 0.3;
-      console.log(`Mock report ${i} OKC: lat=${lat}, lng=${lng}`);
+  static async getActiveStorms(): Promise<StormEvent[]> {
+    try {
+      const stored = await AsyncStorage.getItem(this.STORAGE_KEY);
+      if (!stored) return [];
       
-      reports.push({
-        id: `hail_${Date.now()}_${i}`,
-        latitude: lat,
-        longitude: lng,
-        size: Math.random() * 2 + 0.75, // 0.75 to 2.75 inches
-        timestamp: now,
-        confidence: 70 + Math.random() * 30,
-        city: 'Oklahoma City',
-        isMetroOKC: true
-      });
-    }
-    
-    // Add reports in Norman area
-    for (let i = 2; i < numReports; i++) {
-      const lat = 35.2226 + (Math.random() - 0.5) * 0.2;
-      const lng = -97.4395 + (Math.random() - 0.5) * 0.2;
-      console.log(`Mock report ${i} Norman: lat=${lat}, lng=${lng}`);
+      const storms: StormEvent[] = JSON.parse(stored);
       
-      reports.push({
-        id: `hail_${Date.now()}_${i}`,
-        latitude: lat,
-        longitude: lng,
-        size: Math.random() * 1.5 + 0.75,
-        timestamp: now,
-        confidence: 60 + Math.random() * 40,
-        city: 'Norman',
-        isMetroOKC: true
-      });
+      // Convert date strings back to Date objects
+      return storms.map(storm => ({
+        ...storm,
+        startTime: new Date(storm.startTime),
+        endTime: storm.endTime ? new Date(storm.endTime) : undefined,
+        reports: storm.reports.map(report => ({
+          ...report,
+          timestamp: new Date(report.timestamp)
+        }))
+      }));
+    } catch (error) {
+      console.error('[MRMS] Error loading storms:', error);
+      return [];
     }
-    
-    console.log(`Generated ${reports.length} mock hail reports`);
-    return reports;
   }
-  
+
   /**
-   * Group hail reports into storm events
+   * Save storm event
+   */
+  static async saveStormEvent(storm: StormEvent): Promise<void> {
+    const storms = await this.getActiveStorms();
+    
+    // Check if storm already exists
+    const existingIndex = storms.findIndex(s => s.id === storm.id);
+    
+    if (existingIndex >= 0) {
+      storms[existingIndex] = storm;
+    } else {
+      storms.push(storm);
+      
+      // Maintain max storms limit
+      if (storms.length > this.MAX_STORMS) {
+        // Remove oldest inactive storm
+        const inactiveStorms = storms.filter(s => !s.isActive);
+        if (inactiveStorms.length > 0) {
+          const oldest = inactiveStorms.sort((a, b) => 
+            a.startTime.getTime() - b.startTime.getTime()
+          )[0];
+          const index = storms.findIndex(s => s.id === oldest.id);
+          storms.splice(index, 1);
+        }
+      }
+    }
+    
+    await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(storms));
+  }
+
+  /**
+   * Group reports into storm events
    */
   static async groupIntoStormEvents(reports: HailReport[]): Promise<StormEvent> {
-    const now = new Date();
-    const stormId = `storm_${now.toISOString().split('T')[0]}_${now.getHours()}`;
+    if (reports.length === 0) {
+      throw new Error('No reports to group');
+    }
     
-    // Calculate storm bounds
-    const lats = reports.map(r => r.latitude);
-    const lngs = reports.map(r => r.longitude);
+    // Calculate storm center
+    const center = this.calculateCenter(reports);
     
-    console.log('Storm bounds calculation:');
-    console.log('Latitudes:', lats);
-    console.log('Longitudes:', lngs);
+    // Calculate average confidence
+    const avgConfidence = reports.reduce((sum, r) => sum + r.confidence, 0) / reports.length;
     
-    const bounds = {
-      north: Math.max(...lats),
-      south: Math.min(...lats),
-      east: Math.max(...lngs),
-      west: Math.min(...lngs)
-    };
-    
-    console.log('Calculated bounds:', bounds);
+    // Determine source
+    const source = reports[0]?.source?.includes('NCEP') ? 'MRMS' :
+                  reports[0]?.source?.includes('IEM') ? 'IEM' : 'Mock';
     
     const storm: StormEvent = {
-      id: stormId,
-      name: `${now.toLocaleDateString()} Oklahoma Storm`,
+      id: `storm_${Date.now()}`,
+      name: `Storm ${new Date().toLocaleTimeString()}`,
       startTime: new Date(Math.min(...reports.map(r => r.timestamp.getTime()))),
-      peakSize: Math.max(...reports.map(r => r.size)),
       reports: reports,
-      bounds: bounds,
-      enabled: true
+      maxSize: Math.max(...reports.map(r => r.size)),
+      center: center,
+      isActive: true,
+      source: source,
+      confidence: avgConfidence
     };
     
     return storm;
   }
-  
+
   /**
-   * Save storm event to storage
+   * Calculate center of reports
    */
-  static async saveStormEvent(storm: StormEvent): Promise<void> {
-    try {
-      const storms = await this.getActiveStorms();
-      
-      // Check if storm already exists
-      const existingIndex = storms.findIndex(s => s.id === storm.id);
-      if (existingIndex >= 0) {
-        storms[existingIndex] = storm;
-      } else {
-        // Add new storm and manage 3-storm limit
-        storms.push(storm);
-        
-        // If more than 3 storms, remove oldest
-        if (storms.length > 3) {
-          storms.sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
-          storms.pop(); // Remove oldest
-        }
+  private static calculateCenter(reports: HailReport[]): { lat: number; lon: number } {
+    const sum = reports.reduce((acc, report) => ({
+      lat: acc.lat + report.latitude,
+      lon: acc.lon + report.longitude
+    }), { lat: 0, lon: 0 });
+    
+    return {
+      lat: sum.lat / reports.length,
+      lon: sum.lon / reports.length
+    };
+  }
+
+  /**
+   * Check if update is needed
+   */
+  static async shouldUpdate(): Promise<boolean> {
+    const lastUpdate = await AsyncStorage.getItem(this.LAST_UPDATE_KEY);
+    if (!lastUpdate) return true;
+    
+    const lastUpdateTime = new Date(lastUpdate).getTime();
+    const now = new Date().getTime();
+    
+    return (now - lastUpdateTime) > this.UPDATE_INTERVAL;
+  }
+
+  /**
+   * Mark last update time
+   */
+  static async markUpdated(): Promise<void> {
+    await AsyncStorage.setItem(this.LAST_UPDATE_KEY, new Date().toISOString());
+  }
+
+  /**
+   * Clear all storms
+   */
+  static async clearAllStorms(): Promise<void> {
+    await AsyncStorage.multiRemove([this.STORAGE_KEY, this.LAST_UPDATE_KEY]);
+  }
+
+  /**
+   * Generate mock data for development ONLY
+   */
+  private static generateMockData(): HailReport[] {
+    if (!__DEV__) return [];
+    
+    console.warn('[MRMS] Generating mock data for development');
+    
+    const mockReports: HailReport[] = [
+      {
+        id: `mock_${Date.now()}_1`,
+        latitude: 35.4676,
+        longitude: -97.5164,
+        size: 1.75,
+        timestamp: new Date(),
+        confidence: 65,
+        city: 'Oklahoma City',
+        isMetroOKC: true,
+        source: 'Mock Data',
+        meshValue: 44.5
+      },
+      {
+        id: `mock_${Date.now()}_2`,
+        latitude: 35.2226,
+        longitude: -97.4395,
+        size: 1.25,
+        timestamp: new Date(),
+        confidence: 70,
+        city: 'Norman',
+        isMetroOKC: true,
+        source: 'Mock Data',
+        meshValue: 31.75
       }
-      
-      await AsyncStorage.setItem(this.ACTIVE_STORMS_KEY, JSON.stringify(storms));
-    } catch (error) {
-      console.error('Error saving storm event:', error);
-      throw error;
-    }
+    ];
+    
+    return mockReports;
   }
-  
+
   /**
-   * Get active storm events
+   * Toggle storm active status
    */
-  static async getActiveStorms(): Promise<StormEvent[]> {
-    try {
-      const data = await AsyncStorage.getItem(this.ACTIVE_STORMS_KEY);
-      if (!data) return [];
-      
-      const storms = JSON.parse(data);
-      // Convert date strings back to Date objects
-      return storms.map((storm: any) => ({
-        ...storm,
-        startTime: new Date(storm.startTime),
-        endTime: storm.endTime ? new Date(storm.endTime) : undefined,
-        reports: storm.reports.map((r: any) => ({
-          ...r,
-          timestamp: new Date(r.timestamp)
-        }))
-      }));
-    } catch (error) {
-      console.error('Error getting active storms:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Toggle storm visibility
-   */
-  static async toggleStorm(stormId: string, enabled: boolean): Promise<void> {
+  static async toggleStormActive(stormId: string): Promise<void> {
     const storms = await this.getActiveStorms();
     const storm = storms.find(s => s.id === stormId);
+    
     if (storm) {
-      storm.enabled = enabled;
-      await AsyncStorage.setItem(this.ACTIVE_STORMS_KEY, JSON.stringify(storms));
-    }
-  }
-  
-  /**
-   * Disable all storms except the specified one
-   */
-  static async focusOnStorm(stormId: string): Promise<void> {
-    const storms = await this.getActiveStorms();
-    storms.forEach(storm => {
-      storm.enabled = storm.id === stormId;
-    });
-    await AsyncStorage.setItem(this.ACTIVE_STORMS_KEY, JSON.stringify(storms));
-  }
-  
-  /**
-   * Delete a storm event
-   */
-  static async deleteStorm(stormId: string): Promise<void> {
-    const storms = await this.getActiveStorms();
-    const filtered = storms.filter(s => s.id !== stormId);
-    await AsyncStorage.setItem(this.ACTIVE_STORMS_KEY, JSON.stringify(filtered));
-  }
-  
-  /**
-   * Check if location is in Metro OKC
-   */
-  static isInMetroOKC(lat: number, lng: number): boolean {
-    // Simplified check - in production would use proper geocoding
-    const OKC_CENTER = { lat: 35.4676, lng: -97.5164 };
-    const distance = Math.sqrt(
-      Math.pow(lat - OKC_CENTER.lat, 2) + 
-      Math.pow(lng - OKC_CENTER.lng, 2)
-    );
-    return distance < 0.5; // Roughly 50 mile radius
-  }
-  
-  /**
-   * Apply confidence scoring to hail reports
-   */
-  private static async applyConfidenceScoring(reports: HailReport[]): Promise<HailReport[]> {
-    // Calculate confidence for each report
-    return reports.map(report => {
-      // Find nearby reports for density scoring
-      const nearbyReports = reports.filter(r => {
-        if (r.id === report.id) return false;
-        const distance = Math.sqrt(
-          Math.pow(report.latitude - r.latitude, 2) + 
-          Math.pow(report.longitude - r.longitude, 2)
-        );
-        return distance < 0.1; // ~10 miles
-      });
-      
-      // Calculate confidence factors
-      const confidenceFactors = ConfidenceScoring.calculateConfidence(
-        report,
-        nearbyReports,
-        [] // Social media data would go here in production
-      );
-      
-      return {
-        ...report,
-        confidence: confidenceFactors.totalScore,
-        confidenceFactors
-      };
-    });
-  }
-  
-  /**
-   * Log alert for history
-   */
-  static async logAlert(alert: {
-    timestamp: Date;
-    message: string;
-    hailSize: number;
-    location: string;
-    dismissed: boolean;
-  }): Promise<void> {
-    try {
-      const logs = await this.getAlertLog();
-      logs.push(alert);
-      
-      // Keep only last 100 alerts
-      if (logs.length > 100) {
-        logs.splice(0, logs.length - 100);
+      storm.isActive = !storm.isActive;
+      if (!storm.isActive && !storm.endTime) {
+        storm.endTime = new Date();
       }
-      
-      await AsyncStorage.setItem(this.ALERT_LOG_KEY, JSON.stringify(logs));
-    } catch (error) {
-      console.error('Error logging alert:', error);
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(storms));
     }
   }
-  
+
   /**
-   * Get alert history
+   * Get data source status
    */
-  static async getAlertLog(): Promise<any[]> {
-    try {
-      const data = await AsyncStorage.getItem(this.ALERT_LOG_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('Error getting alert log:', error);
-      return [];
-    }
+  static async getDataSourceStatus(): Promise<{
+    primary: 'MRMS' | 'IEM' | 'Mock';
+    isLive: boolean;
+    lastUpdate: Date | null;
+  }> {
+    const storms = await this.getActiveStorms();
+    const lastUpdate = await AsyncStorage.getItem(this.LAST_UPDATE_KEY);
+    
+    // Check most recent storm source
+    const recentStorm = storms
+      .sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0];
+    
+    return {
+      primary: recentStorm?.source || 'MRMS',
+      isLive: recentStorm?.source === 'MRMS',
+      lastUpdate: lastUpdate ? new Date(lastUpdate) : null
+    };
   }
 }
