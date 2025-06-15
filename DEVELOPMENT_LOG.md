@@ -392,9 +392,44 @@ web-build/
 
 ---
 
-*Last Updated: 2025-06-14*
-*Context Usage at Update: ~80%*
-*Next Update Due: At 90% context usage*
+*Last Updated: 2025-01-15*
+*Context Usage at Update: ~85%*
+*Next Update Due: At 95% context usage*
+
+## Branch Structure (Git Flow)
+- **main**: Production-ready releases only
+- **develop**: Integration branch for features
+- **feature/***: Individual feature branches
+- **release/***: Preparation for production release
+- **hotfix/***: Emergency fixes for production
+
+## Release: v0.8.0 - Core Features Stable
+*Branch: release/v0.8.0*
+*Date: 2025-01-15*
+
+### Release Summary
+This release represents a stable implementation of all core D2D sales tracking features:
+- ✅ Roofing-specific knock outcomes with emojis
+- ✅ One tag per location with history tracking
+- ✅ WebView map with satellite view for roof inspection
+- ✅ Contact form integration with Calendly
+- ✅ Progressive sales workflow (Lead → Inspected → Follow Up → Signed)
+- ✅ Streamlined save workflow with auto-navigation
+- ✅ Cloud storage with Supabase
+- ✅ Offline-first architecture
+
+### Known Stable Features
+- Map flickering resolved with useMemo
+- Edit functionality with history tracking
+- Auto-refresh on screen focus
+- Proper tag sizing for house visibility
+- All emojis properly mapped and displayed
+
+### Ready for Production Testing
+This release is suitable for field testing with the following caveats:
+- Native maps require standalone build (not Expo Go)
+- Background tracking limited in Expo Go
+- Weather/hail tracking pending as future enhancement
 
 ## IMPORTANT: Git Commit Protocol
 After updating this log:
