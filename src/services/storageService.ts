@@ -14,7 +14,22 @@ export class StorageService {
   // Knocks
   static async saveKnock(knock: Knock): Promise<void> {
     const knocks = await this.getKnocks();
-    knocks.push(knock);
+    
+    // Check if there's already a knock at this address/location
+    const existingIndex = knocks.findIndex(k => 
+      (k.address && k.address === knock.address) || 
+      (Math.abs(k.latitude - knock.latitude) < 0.0001 && 
+       Math.abs(k.longitude - knock.longitude) < 0.0001)
+    );
+    
+    if (existingIndex !== -1) {
+      // Replace existing knock at this location
+      knocks[existingIndex] = { ...knock, id: knocks[existingIndex].id };
+    } else {
+      // Add new knock
+      knocks.push(knock);
+    }
+    
     await AsyncStorage.setItem(KEYS.KNOCKS, JSON.stringify(knocks));
   }
 

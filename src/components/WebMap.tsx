@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Knock } from '../types';
-import { Ionicons } from '@expo/vector-icons';
 
 interface WebMapProps {
   knocks: Knock[];
@@ -13,7 +12,6 @@ interface WebMapProps {
 const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick }, ref) => {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
 
   // Expose WebView methods to parent
   React.useImperativeHandle(ref, () => webViewRef.current as WebView);
@@ -127,6 +125,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   if (knock.notes) {
                     popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>Notes:</strong><br>' + knock.notes.replace(/\\n/g, '<br>') + '</div>';
                   }
+                  popupContent += '<div style="margin-top: 10px;"><button onclick="window.editKnock(\\\'' + knock.id + '\\\')" style="background-color: #1e40af; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Edit</button></div>';
                   popupContent += '</div>';
                   
                   var marker = L.marker([knock.latitude, knock.longitude], {icon: icon})
@@ -155,6 +154,16 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               window.centerOnUser = function() {
                 if (userMarker) {
                   map.setView(userMarker.getLatLng(), 16);
+                }
+              };
+              
+              // Function to edit knock
+              window.editKnock = function(knockId) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'editKnock',
+                    knockId: knockId
+                  }));
                 }
               };
               
@@ -236,7 +245,6 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'mapReady') {
         setIsLoading(false);
-        setLoadError(false);
       } else if (data.type === 'mapClick') {
         // Handle map click - pass to parent if handler provided
         if (onKnockClick) {
@@ -250,6 +258,12 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
             notes: '',
             syncStatus: 'pending'
           } as Knock);
+        }
+      } else if (data.type === 'editKnock') {
+        // Handle edit knock - pass knock data to parent
+        const knock = knocks.find(k => k.id === data.knockId);
+        if (knock && onKnockClick) {
+          onKnockClick(knock);
         }
       }
     } catch (error) {
@@ -275,7 +289,6 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
         onMessage={handleMessage}
         onError={(error) => {
           console.error('WebView error:', error);
-          setLoadError(true);
           setIsLoading(false);
         }}
         onHttpError={(error) => {

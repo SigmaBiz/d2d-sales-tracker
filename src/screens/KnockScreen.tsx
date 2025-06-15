@@ -51,10 +51,21 @@ export default function KnockScreen({ route }: any) {
   const [contactFormMode, setContactFormMode] = useState<'full' | 'quick'>('full');
   const [previousFormData, setPreviousFormData] = useState<ContactFormData | undefined>();
   const [addressHasForm, setAddressHasForm] = useState<{ [key: string]: boolean }>({});
+  const [editingKnockId, setEditingKnockId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if location was passed from map click
-    if (route?.params?.latitude && route?.params?.longitude) {
+    // Check if we're editing an existing knock
+    if (route?.params?.knockId) {
+      setEditingKnockId(route.params.knockId);
+      setSelectedOutcome(route.params.outcome);
+      setNotes(route.params.notes || '');
+      setAddress(route.params.address || '');
+      setCurrentLocation({
+        lat: route.params.latitude,
+        lng: route.params.longitude
+      });
+    } else if (route?.params?.latitude && route?.params?.longitude) {
+      // Creating new knock from map click
       setCurrentLocation({
         lat: route.params.latitude,
         lng: route.params.longitude
@@ -62,6 +73,7 @@ export default function KnockScreen({ route }: any) {
       // Get address for this location
       getAddressFromCoords(route.params.latitude, route.params.longitude);
     } else {
+      // Normal knock recording
       getCurrentLocation();
     }
   }, [route?.params]);
@@ -201,7 +213,7 @@ export default function KnockScreen({ route }: any) {
       return null;
     }
 
-    const knockId = Date.now().toString();
+    const knockId = editingKnockId || Date.now().toString();
     const knock: Knock = {
       id: knockId,
       latitude: currentLocation.lat,

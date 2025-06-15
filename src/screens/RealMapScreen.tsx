@@ -92,11 +92,23 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const handleMapClick = (knockData: Knock) => {
-    // Navigate to knock screen with pre-filled location
-    navigation.navigate('Knock', {
-      latitude: knockData.latitude,
-      longitude: knockData.longitude,
-    });
+    if (knockData.id) {
+      // Editing existing knock
+      navigation.navigate('Knock', {
+        knockId: knockData.id,
+        latitude: knockData.latitude,
+        longitude: knockData.longitude,
+        address: knockData.address,
+        outcome: knockData.outcome,
+        notes: knockData.notes,
+      });
+    } else {
+      // Creating new knock
+      navigation.navigate('Knock', {
+        latitude: knockData.latitude,
+        longitude: knockData.longitude,
+      });
+    }
   };
 
   return (

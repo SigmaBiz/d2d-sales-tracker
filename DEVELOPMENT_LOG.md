@@ -304,8 +304,16 @@ web-build/
    - Added layer control to switch between Street and Satellite views
    - Satellite view shows roof structures for canvassing decisions
    - Uses Esri World Imagery tiles
+   - Fixed positioning to appear below stats bar
    
-4. **Backup Solution Available**
+4. **One Tag Per Location** ✅
+   - Each address/location can only have one active tag
+   - Previous knocks at same location are automatically replaced
+   - Added "Edit" button to map popups for existing knocks
+   - Clicking Edit navigates to Record Knock with pre-filled data
+   - Strategic implementation to minimize code changes
+   
+5. **Backup Solution Available**
    - WebMapSimple component available as fallback (simple dots, no emojis)
    - Can switch by editing import in RealMapScreen.tsx
 
