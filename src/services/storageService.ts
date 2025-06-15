@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Knock, Territory, DailyStats } from '../types';
+import { Knock, Territory, DailyStats, ContactForm, ContactFormData } from '../types';
 
 const KEYS = {
   KNOCKS: '@knocks',
@@ -7,6 +7,7 @@ const KEYS = {
   DAILY_STATS: '@daily_stats',
   USER: '@user',
   SETTINGS: '@settings',
+  CONTACT_FORMS: '@contact_forms',
 };
 
 export class StorageService {
@@ -96,6 +97,54 @@ export class StorageService {
       console.error('Error getting settings:', error);
       return {};
     }
+  }
+
+  // Contact Forms
+  static async saveContactForm(knockId: string, formData: ContactFormData): Promise<void> {
+    const forms = await this.getContactForms();
+    const form: ContactForm = {
+      id: Date.now().toString(),
+      knockId,
+      formData,
+      createdAt: new Date(),
+    };
+    forms.push(form);
+    await AsyncStorage.setItem(KEYS.CONTACT_FORMS, JSON.stringify(forms));
+  }
+
+  static async getContactForms(): Promise<ContactForm[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.CONTACT_FORMS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting contact forms:', error);
+      return [];
+    }
+  }
+
+  static async getContactFormByAddress(address: string): Promise<ContactForm | null> {
+    const forms = await this.getContactForms();
+    const knocks = await this.getKnocks();
+    
+    // Find the most recent form for this address
+    const addressKnocks = knocks.filter(k => k.address === address);
+    const knockIds = addressKnocks.map(k => k.id);
+    
+    const addressForms = forms.filter(f => knockIds.includes(f.knockId));
+    
+    if (addressForms.length === 0) {
+      return null;
+    }
+    
+    // Return the most recent form
+    return addressForms.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+  }
+
+  static async getContactFormsByKnockIds(knockIds: string[]): Promise<ContactForm[]> {
+    const forms = await this.getContactForms();
+    return forms.filter(f => knockIds.includes(f.knockId));
   }
 
   // Clear all data

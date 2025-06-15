@@ -111,11 +111,11 @@ d2d-sales-tracker/
 - Sync status tracked per record
 - Backend sync prepared but not required for MVP
 
-## Current State (as of latest update - 40% context)
+## Current State (as of latest update - 70% context)
 
 ### Working Features
 ✅ Complete knock tracking workflow
-✅ **Real interactive map with OpenStreetMap** (NEW!)
+✅ **Real interactive map with OpenStreetMap**
 ✅ Comprehensive analytics dashboard
 ✅ Offline data persistence
 ✅ Settings and configuration
@@ -123,34 +123,51 @@ d2d-sales-tracker/
 ✅ **Automatic sync when online**
 ✅ **Storage usage monitoring**
 ✅ **Anonymous authentication**
+✅ **Contact form integration with Calendly**
+✅ **Progressive sales workflow tracking**
 
 ### Map Features Added
-- Full interactive map using Leaflet/OpenStreetMap
+- Full interactive map using Leaflet/OpenStreetMap via WebView
 - Shows all previous knocks as colored pins with emojis
 - Current location shown with blue pulsing dot
-- Click pins to see knock details
+- Click pins to see knock details including contact form data
 - Real-time stats bar showing total knocks, sales, leads
 - Refresh button to reload knocks
 - Center-on-user button
-- Works perfectly in Expo Go!
+- Works in Expo Go with WebView
 
-### Roofing-Specific Customizations (Latest)
-- **Custom knock outcomes with emojis:**
-  - 👻 Not Home - Track houses to revisit
-  - 👀 Revisit - High-value prospects worth returning to
-  - 🚫 No Soliciting - Avoid these properties
-  - ✅ Lead - Interested homeowner
-  - 📝 Signed - Contract secured!
+### Roofing-Specific Customizations (Latest Updates)
+- **Updated knock outcomes with specific emojis:**
+  - 👻 Not Home - Nobody answered
+  - 🪜 Inspected - Roof inspected (replaced Revisit in primary)
+  - 🚫 No Soliciting - No soliciting sign
+  - ✅ Lead - Interested prospect
+  - 📝 Signed - Contract secured
   - 🔄 Follow Up - Needs another touch
-  - 🏠 New Roof - Recently replaced (skip)
-  - 🚧 Competitor - Another company working
-  - 🔑 Renter - Not the decision maker
-  - 🏚️ Poor Condition - House needs major work
+  - 👼 New Roof - Recently replaced (angel baby emoji)
+  - 🏗️ Competitor - Another company working (construction crane)
+  - 🧟 Renter - Not the decision maker (zombie)
+  - 🏚️ Poor Condition - House in bad shape
   - 📋 Proposal Left - Estimate delivered
-  - ⚠️ Stay Away - Dangerous/problematic
-- Organized into categories: Primary, Property Status, Actions
+  - 👹 Stay Away - Dangerous/problematic (ogre)
+  - 👀 Revisit - Worth coming back (moved to Actions)
+- Organized into categories: Sales Pipeline, Primary, Property Status, Actions
 - Map pins show emojis for instant recognition
-- Optimized for roofing sales workflow
+
+### Contact Form & Workflow Features (NEW)
+- **Sales Pipeline Section** with visual progression:
+  - Lead → Inspected → Follow Up → Signed
+  - Visual arrows showing sales flow
+- **Contact Form Integration**:
+  - Full form (Leads/Signed): Name, phone, email, insurance, appointment
+  - Quick form (Follow-ups): Go-by name, phone, appointment
+  - Forms auto-populate at same address
+  - Email integration - sends contact info immediately
+  - Calendly integration for scheduling (URL: https://calendly.com/aescalante-oksigma/new-meeting)
+- **Smart Data Management**:
+  - Contact info saved in knock notes
+  - Visual indicators (📋) for knocks with forms
+  - Progressive data collection through pipeline
 
 ### Cloud Storage Features
 - Supabase integration with 500MB free tier
@@ -266,21 +283,63 @@ web-build/
 - Route optimization
 - CRM integration
 
+## Current Issues & Debugging Steps
+
+### WebView Map Loading Issue
+**Problem**: The WebView-based map was working but started experiencing issues after emoji updates:
+1. Map loads initially but flickers/resets when data updates
+2. WebView bridge communication seems inconsistent
+3. Map was showing gray background, then working, then breaking again
+
+**Root Cause Analysis**:
+- WebView requires external resources (Leaflet CDN) which may not load consistently
+- The HTML template is recreated on each render causing map resets
+- Unicode emojis (🪜, 👼, 🏗️, 🧟, 👹) may have rendering issues in WebView
+
+**Debugging Steps Taken**:
+1. Verified JavaScript execution (gray background = JS running)
+2. Tested basic HTML rendering (confirmed working)
+3. Added timeouts for Leaflet library loading
+4. Simplified emoji set to avoid Unicode issues
+5. Attempted to stabilize HTML template with refs
+
+**Next Debugging Steps**:
+1. **Fix the module export error**: Change WebMap back to default export
+2. **Implement stable WebView pattern**: 
+   - Create HTML once and use message passing for all updates
+   - Avoid recreating map on each render
+3. **Alternative approaches**:
+   - Consider react-native-maps for production (requires standalone build)
+   - Implement static image fallback for Expo Go
+   - Use server-rendered map tiles
+4. **Performance optimization**:
+   - Debounce location updates
+   - Batch knock updates
+   - Cache map tiles locally
+
+### Contact Form Integration Success
+- Successfully implemented progressive workflow
+- Calendly integration working with pre-filled customer data
+- Email functionality ready for immediate contact info sharing
+- Forms properly linked to knock locations
+
 ## Handoff Context
 
 ### Current Session Summary
-- Created complete React Native app structure
-- Implemented all MVP features
-- Set up offline-first architecture
-- Prepared for backend integration
-- App is fully functional standalone
+- Implemented custom roofing sales workflow with specific emojis
+- Added contact form system with Calendly integration
+- Created progressive sales pipeline tracking
+- Debugged WebView map issues (partially resolved)
+- App functional but map needs stabilization
 
 ### Critical Files to Review
 1. `App.tsx` - Entry point
 2. `src/navigation/AppNavigator.tsx` - Navigation structure
-3. `src/services/storageService.ts` - Data persistence
-4. `src/services/locationService.ts` - GPS functionality
-5. `src/types/index.ts` - TypeScript interfaces
+3. `src/components/WebMap.tsx` - Map component (needs fixing)
+4. `src/screens/KnockScreen.tsx` - Updated with sales pipeline
+5. `src/components/ContactForm.tsx` - New contact form system
+6. `src/services/emailService.ts` - Email integration
+7. `src/types/index.ts` - Updated TypeScript interfaces
 
 ### Environment Details
 - Node version: Expected 14+
@@ -298,9 +357,9 @@ web-build/
 
 ---
 
-*Last Updated: [Current Date]*
-*Context Usage at Update: ~30%*
-*Next Update Due: At 40% context usage*
+*Last Updated: 2025-06-14*
+*Context Usage at Update: ~80%*
+*Next Update Due: At 90% context usage*
 
 ## IMPORTANT: Git Commit Protocol
 After updating this log:

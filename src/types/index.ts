@@ -1,19 +1,20 @@
 export type KnockOutcome = 
   // Primary outcomes
   | 'not_home'        // 👻 Nobody answered
-  | 'revisit'         // 👀 Worth coming back
+  | 'inspected'       // 🪜 Roof inspected
   | 'no_soliciting'   // 🚫 No soliciting sign
   | 'lead'            // ✅ Interested prospect
   | 'sale'            // 📝 Contract signed
   | 'callback'        // 🔄 Follow up needed
   // Property status
-  | 'new_roof'        // 🏠 Recently replaced roof
-  | 'competitor'      // 🚧 Another company working
-  | 'renter'          // 🔑 Tenant, not owner
+  | 'new_roof'        // 👼 Recently replaced roof
+  | 'competitor'      // 🏗️ Another company working
+  | 'renter'          // 🧟 Tenant, not owner
   | 'poor_condition'  // 🏚️ House in bad shape
   // Action taken
   | 'proposal_left'   // 📋 Left estimate/proposal
-  | 'stay_away'       // ⚠️ Dangerous or problematic
+  | 'stay_away'       // 👹 Dangerous or problematic
+  | 'revisit'         // 👀 Worth coming back
   // Legacy (for backward compatibility)
   | 'not_interested';
 
@@ -69,4 +70,22 @@ export interface HailEvent {
   };
   severity: 'light' | 'moderate' | 'severe';
   affectedRadius: number; // in miles
+}
+
+export interface ContactFormData {
+  fullName?: string;
+  goByName?: string;
+  phone: string;
+  email?: string;
+  appointmentTime: Date | string;
+  insuranceCarrier?: string;
+  outcome: 'lead' | 'callback' | 'sale';
+  address: string;
+}
+
+export interface ContactForm {
+  id: string;
+  knockId: string;
+  formData: ContactFormData;
+  createdAt: Date;
 }

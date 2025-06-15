@@ -8,19 +8,20 @@ import { Knock } from '../types';
 const OUTCOME_COLORS = {
   // Primary outcomes
   not_home: '#6b7280',      // 👻 Gray
-  revisit: '#3b82f6',       // 👀 Blue
+  inspected: '#3b82f6',     // 🪜 Blue
   no_soliciting: '#ef4444', // 🚫 Red
   lead: '#10b981',          // ✅ Green
   sale: '#22c55e',          // 📝 Bright green
   callback: '#f59e0b',      // 🔄 Orange
   // Property status
-  new_roof: '#8b5cf6',      // 🏠 Purple
-  competitor: '#dc2626',    // 🚧 Dark red
-  renter: '#6366f1',        // 🔑 Indigo
+  new_roof: '#8b5cf6',      // 👼 Purple
+  competitor: '#dc2626',    // 🏗️ Dark red
+  renter: '#6366f1',        // 🧟 Indigo
   poor_condition: '#78716c', // 🏚️ Brown
   // Action taken
   proposal_left: '#0891b2', // 📋 Cyan
-  stay_away: '#991b1b',     // ⚠️ Dark red
+  stay_away: '#991b1b',     // 👹 Dark red
+  revisit: '#3b82f6',       // 👀 Blue
   // Legacy
   not_interested: '#991b1b',
 };

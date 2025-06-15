@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import WebMap from '../components/WebMap';
+// import TestWebView from '../components/TestWebView'; // Uncomment to test WebView
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
@@ -12,6 +13,7 @@ export default function RealMapScreen() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [loading, setLoading] = useState(true);
+  const webMapRef = useRef<any>(null);
 
   useEffect(() => {
     initializeMap();
@@ -48,6 +50,7 @@ export default function RealMapScreen() {
     try {
       // First get local knocks
       const localKnocks = await StorageService.getKnocks();
+      console.log('Loaded knocks:', localKnocks.length);
       setKnocks(localKnocks);
       
       // Then try to get cloud knocks if connected
@@ -79,6 +82,11 @@ export default function RealMapScreen() {
 
   const centerOnUser = () => {
     updateLocation();
+    if (webMapRef.current && userLocation) {
+      webMapRef.current.postMessage(JSON.stringify({
+        type: 'centerOnUser'
+      }));
+    }
   };
 
   return (
