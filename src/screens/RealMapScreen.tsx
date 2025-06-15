@@ -25,6 +25,8 @@ export default function RealMapScreen({ navigation }: any) {
   const [hailData, setHailData] = useState<HailReport[]>([]);
   const [hailContours, setHailContours] = useState<any>(null);
   const [useSmoothContours, setUseSmoothContours] = useState(true); // Default to smooth MRMS contours
+  const [showStormPanel, setShowStormPanel] = useState(false);
+  const [mapType, setMapType] = useState<'street' | 'satellite'>('street');
   const webMapRef = useRef<any>(null);
 
   useEffect(() => {
@@ -251,11 +253,21 @@ export default function RealMapScreen({ navigation }: any) {
         activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
       />
       
-      <HailOverlay
-        onStormToggle={handleStormToggle}
-        onStormDelete={handleStormDelete}
-        onStormFocus={handleStormFocus}
-      />
+      {/* Storm Panel - Only show when toggled */}
+      {showStormPanel && (
+        <HailOverlay
+          onStormToggle={handleStormToggle}
+          onStormDelete={handleStormDelete}
+          onStormFocus={handleStormFocus}
+          onClose={() => setShowStormPanel(false)}
+          dataSource={
+            hailData.length > 0 
+              ? hailData[0].id.startsWith('weather_api') ? 'live' : 
+                hailData[0].id.startsWith('hail_') ? 'mock' : 'mrms'
+              : undefined
+          }
+        />
+      )}
       
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
@@ -278,9 +290,79 @@ export default function RealMapScreen({ navigation }: any) {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.centerButton} onPress={centerOnUser}>
-        <Ionicons name="locate" size={24} color="#1e40af" />
-      </TouchableOpacity>
+      {/* Right Button Stack - Storm related */}
+      <View style={styles.rightButtonStack}>
+        {/* Focus on Hail Button */}
+        {hailContours && (
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => {
+              if (webMapRef.current) {
+                webMapRef.current.postMessage(JSON.stringify({
+                  type: 'focusOnHail'
+                }));
+              }
+            }}
+          >
+            <Ionicons name="thunderstorm" size={24} color="#ef4444" />
+          </TouchableOpacity>
+        )}
+        
+        {/* Active Storms Button with badge */}
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => setShowStormPanel(!showStormPanel)}
+        >
+          <Ionicons name="cloud" size={24} color="#1e40af" />
+          {activeStorms.filter(s => s.enabled).length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {activeStorms.filter(s => s.enabled).length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        
+        {/* Storm Search Button */}
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => navigation.navigate('StormSearch')}
+        >
+          <Ionicons name="search" size={24} color="#1e40af" />
+        </TouchableOpacity>
+      </View>
+      
+      {/* Left Button Stack - Map controls */}
+      <View style={styles.leftButtonStack}>
+        {/* Map Type Toggle */}
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => {
+            const newType = mapType === 'street' ? 'satellite' : 'street';
+            setMapType(newType);
+            if (webMapRef.current) {
+              webMapRef.current.postMessage(JSON.stringify({
+                type: 'toggleMapType'
+              }));
+            }
+          }}
+        >
+          <Text style={{ fontSize: 24 }}>{mapType === 'street' ? '🗺️' : '🛰️'}</Text>
+        </TouchableOpacity>
+        
+        {/* Refresh Button */}
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={loadKnocks}
+        >
+          <Ionicons name="refresh" size={24} color="#1e40af" />
+        </TouchableOpacity>
+        
+        {/* Center on User Button */}
+        <TouchableOpacity style={styles.actionButton} onPress={centerOnUser}>
+          <Ionicons name="locate" size={24} color="#1e40af" />
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity 
         style={[styles.trackingButton, isTracking && styles.trackingActive]} 
@@ -288,62 +370,14 @@ export default function RealMapScreen({ navigation }: any) {
       >
         <Ionicons 
           name={isTracking ? "pause-circle" : "play-circle"} 
-          size={24} 
+          size={20} 
           color="white" 
         />
         <Text style={styles.trackingText}>
-          {isTracking ? 'Stop Tracking' : 'Start Tracking'}
+          {isTracking ? 'Stop' : 'Track'}
         </Text>
       </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={styles.refreshButton} 
-        onPress={loadKnocks}
-      >
-        <Ionicons name="refresh" size={24} color="#1e40af" />
-      </TouchableOpacity>
-
-      {hailContours && (
-        <TouchableOpacity 
-          style={styles.hailButton} 
-          onPress={() => {
-            if (webMapRef.current) {
-              webMapRef.current.postMessage(JSON.stringify({
-                type: 'focusOnHail'
-              }));
-            }
-          }}
-        >
-          <Ionicons name="thunderstorm" size={24} color="#ef4444" />
-        </TouchableOpacity>
-      )}
       
-      {/* Data source indicator */}
-      {hailData.length > 0 && (
-        <View style={{
-          position: 'absolute',
-          bottom: 100,
-          left: 10,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          padding: 5,
-          borderRadius: 5,
-          flexDirection: 'row',
-          alignItems: 'center'
-        }}>
-          <View style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: hailData[0].id.startsWith('weather_api') ? '#4CAF50' : 
-                           hailData[0].id.startsWith('hail_') ? '#FF9800' : '#2196F3',
-            marginRight: 5
-          }} />
-          <Text style={{ color: 'white', fontSize: 11 }}>
-            {hailData[0].id.startsWith('weather_api') ? 'Live Data' : 
-             hailData[0].id.startsWith('hail_') ? 'Mock Data' : 'MRMS Data'}
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -387,43 +421,18 @@ const styles = StyleSheet.create({
     height: 30,
     backgroundColor: '#e5e7eb',
   },
-  centerButton: {
+  rightButtonStack: {
     position: 'absolute',
     right: 16,
-    bottom: 100,
-    backgroundColor: 'white',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    bottom: 80, // Above the tab bar
   },
-  refreshButton: {
+  leftButtonStack: {
     position: 'absolute',
-    right: 16,
-    bottom: 170,
-    backgroundColor: 'white',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    left: 16,
+    bottom: 80, // Above the tab bar
   },
-  hailButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 240,
-    backgroundColor: 'white',
+  actionButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Transparent white
     borderRadius: 30,
     width: 60,
     height: 60,
@@ -431,33 +440,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.15,
     shadowRadius: 3.84,
     elevation: 5,
+    marginBottom: 10,
+    backdropFilter: 'blur(10px)', // iOS blur effect
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   trackingButton: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 20,
     alignSelf: 'center',
-    backgroundColor: '#1e40af',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(30, 64, 175, 0.9)', // Semi-transparent blue
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.15,
     shadowRadius: 3.84,
     elevation: 5,
   },
   trackingActive: {
-    backgroundColor: '#dc2626',
+    backgroundColor: 'rgba(220, 38, 38, 0.9)', // Semi-transparent red
   },
   trackingText: {
     color: 'white',
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: 6,
+    fontSize: 14,
     fontWeight: '600',
   },
 });

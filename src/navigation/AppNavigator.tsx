@@ -9,6 +9,7 @@ import RealMapScreen from '../screens/RealMapScreen';
 import KnockScreen from '../screens/KnockScreen';
 import StatsScreen from '../screens/StatsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import StormSearchScreen from '../screens/StormSearchScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -53,10 +54,36 @@ function TabNavigator() {
   );
 }
 
+function MainStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="Main" 
+        component={TabNavigator} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="StormSearch" 
+        component={StormSearchScreen}
+        options={{ 
+          title: 'Storm History',
+          headerStyle: {
+            backgroundColor: '#1e40af',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <TabNavigator />
+      <MainStack />
     </NavigationContainer>
   );
 }

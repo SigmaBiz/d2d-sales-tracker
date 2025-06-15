@@ -7,12 +7,16 @@ interface HailOverlayProps {
   onStormToggle: (stormId: string, enabled: boolean) => void;
   onStormDelete: (stormId: string) => void;
   onStormFocus: (stormId: string) => void;
+  onClose?: () => void;
+  dataSource?: 'live' | 'mock' | 'mrms';
 }
 
 export default function HailOverlay({ 
   onStormToggle, 
   onStormDelete,
-  onStormFocus 
+  onStormFocus,
+  onClose,
+  dataSource 
 }: HailOverlayProps) {
   const [storms, setStorms] = useState<StormEvent[]>([]);
   const [expanded, setExpanded] = useState(true);
@@ -58,27 +62,50 @@ export default function HailOverlay({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.header}
-        onPress={() => setExpanded(!expanded)}
-      >
-        <View style={styles.headerLeft}>
-          <Ionicons 
-            name={expanded ? "chevron-down" : "chevron-up"} 
-            size={20} 
-            color="#1e40af" 
-          />
-          <Text style={styles.title}>Active Storms ({storms.length}/3)</Text>
-        </View>
-        {storms.some(s => s.enabled) && (
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.headerContent}
+          onPress={() => setExpanded(!expanded)}
+        >
+          <View style={styles.headerLeft}>
+            <Ionicons 
+              name={expanded ? "chevron-down" : "chevron-up"} 
+              size={20} 
+              color="#1e40af" 
+            />
+            <Text style={styles.title}>Active Storms ({storms.length}/3)</Text>
+            {dataSource && (
+              <View style={styles.dataSourceBadge}>
+                <View style={[
+                  styles.dataSourceDot,
+                  { backgroundColor: dataSource === 'live' ? '#4CAF50' : 
+                                   dataSource === 'mock' ? '#FF9800' : '#2196F3' }
+                ]} />
+                <Text style={styles.dataSourceText}>
+                  {dataSource === 'live' ? 'Live' : 
+                   dataSource === 'mock' ? 'Mock' : 'MRMS'}
+                </Text>
+              </View>
+            )}
+          </View>
+          {storms.some(s => s.enabled) && (
+            <TouchableOpacity
+              onPress={() => storms.forEach(s => handleToggle(s.id, false))}
+              style={styles.toggleAllButton}
+            >
+              <Text style={styles.toggleAllText}>Hide All</Text>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+        {onClose && (
           <TouchableOpacity
-            onPress={() => storms.forEach(s => handleToggle(s.id, false))}
-            style={styles.toggleAllButton}
+            onPress={onClose}
+            style={styles.closeButton}
           >
-            <Text style={styles.toggleAllText}>Hide All</Text>
+            <Ionicons name="close" size={20} color="#6b7280" />
           </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </View>
 
       {expanded && (
         <ScrollView style={styles.stormList}>
@@ -187,12 +214,20 @@ const styles = StyleSheet.create({
     maxHeight: 300,
   },
   header: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    padding: 8,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -302,5 +337,25 @@ const styles = StyleSheet.create({
     color: '#10b981',
     fontWeight: '500',
     marginTop: 2,
+  },
+  dataSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+  },
+  dataSourceDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  dataSourceText: {
+    fontSize: 10,
+    color: '#6b7280',
+    fontWeight: '500',
   },
 });

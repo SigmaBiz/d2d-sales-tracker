@@ -74,14 +74,21 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               // Add street layer by default
               streetLayer.addTo(map);
               
-              // Add layer control with custom position
-              var baseMaps = {
-                "Street View": streetLayer,
-                "Satellite View": satelliteLayer
+              // Store layer references for toggling
+              var currentLayer = 'street';
+              
+              // Function to toggle map type
+              window.toggleMapType = function() {
+                if (currentLayer === 'street') {
+                  map.removeLayer(streetLayer);
+                  map.addLayer(satelliteLayer);
+                  currentLayer = 'satellite';
+                } else {
+                  map.removeLayer(satelliteLayer);
+                  map.addLayer(streetLayer);
+                  currentLayer = 'street';
+                }
               };
-              L.control.layers(baseMaps, null, {
-                position: 'topright'
-              }).addTo(map);
               
               
               // Define colors and emojis
@@ -354,6 +361,11 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                       } catch (e) {
                         console.log('Could not focus on bounds:', e);
                       }
+                    }
+                  } else if (data.type === 'toggleMapType') {
+                    console.log('Toggling map type');
+                    if (window.toggleMapType) {
+                      window.toggleMapType();
                     }
                   }
                 } catch (e) {
