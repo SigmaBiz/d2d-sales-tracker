@@ -8,6 +8,9 @@ import WebMap from '../components/WebMap'; // Solution 1: Stabilized with useMem
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
+import { MRMSService, StormEvent, HailReport } from '../services/mrmsService';
+import { HailAlertService } from '../services/hailAlertService';
+import HailOverlay from '../components/HailOverlay';
 import { Knock } from '../types';
 
 export default function RealMapScreen({ navigation }: any) {
@@ -15,16 +18,23 @@ export default function RealMapScreen({ navigation }: any) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeStorms, setActiveStorms] = useState<StormEvent[]>([]);
+  const [hailData, setHailData] = useState<HailReport[]>([]);
   const webMapRef = useRef<any>(null);
 
   useEffect(() => {
     initializeMap();
     loadKnocks();
+    loadHailData();
+    initializeHailAlerts();
     
     // Set up location watching
     const interval = setInterval(updateLocation, 5000); // Update every 5 seconds
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      HailAlertService.stopMonitoring();
+    };
   }, []);
 
   // Reload knocks when screen comes into focus
@@ -121,6 +131,45 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
+  const initializeHailAlerts = async () => {
+    try {
+      await HailAlertService.initialize();
+      await HailAlertService.startMonitoring(5); // Check every 5 minutes
+    } catch (error) {
+      console.error('Error initializing hail alerts:', error);
+    }
+  };
+
+  const loadHailData = async () => {
+    try {
+      const storms = await MRMSService.getActiveStorms();
+      setActiveStorms(storms);
+      
+      // Combine all enabled storm reports
+      const allReports: HailReport[] = [];
+      storms.forEach(storm => {
+        if (storm.enabled) {
+          allReports.push(...storm.reports);
+        }
+      });
+      setHailData(allReports);
+    } catch (error) {
+      console.error('Error loading hail data:', error);
+    }
+  };
+
+  const handleStormToggle = async (stormId: string, enabled: boolean) => {
+    await loadHailData();
+  };
+
+  const handleStormDelete = async (stormId: string) => {
+    await loadHailData();
+  };
+
+  const handleStormFocus = async (stormId: string) => {
+    await loadHailData();
+  };
+
   return (
     <View style={styles.container}>
       <WebMap 
@@ -128,6 +177,14 @@ export default function RealMapScreen({ navigation }: any) {
         knocks={knocks}
         userLocation={userLocation}
         onKnockClick={handleMapClick}
+        hailData={hailData}
+        activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
+      />
+      
+      <HailOverlay
+        onStormToggle={handleStormToggle}
+        onStormDelete={handleStormDelete}
+        onStormFocus={handleStormFocus}
       />
       
       <View style={styles.statsBar}>

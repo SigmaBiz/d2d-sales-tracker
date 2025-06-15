@@ -404,12 +404,14 @@ web-build/
 *Started: 2025-01-15*
 
 ### Phase 1: Hail Mapping Core (Week 1)
-- [ ] MRMS API integration for Oklahoma
-- [ ] Real-time hail alerts (statewide with Metro OKC priority)
-- [ ] Storm event grouping logic
-- [ ] 3-storm management system
-- [ ] Alert push notifications
-- [ ] Team alert broadcasting
+- [x] MRMS API integration for Oklahoma (mock data ready, real API pending)
+- [x] Real-time hail alerts (statewide with Metro OKC priority)
+- [x] Storm event grouping logic
+- [x] 3-storm management system
+- [x] Alert push notifications
+- [x] Hail overlay on existing WebView map
+- [ ] Team alert broadcasting (individual preferences done)
+- [ ] Real MRMS data parsing (currently using mock data)
 
 ### Phase 2: Intelligence Layer (Week 2)
 - [ ] Confidence scoring algorithm
@@ -429,6 +431,39 @@ web-build/
 - **Map**: Keep WebView for now (overlay compatible)
 - **Data**: Real-time fetch, no bulk storage
 
+### Implementation Progress (v0.9.0)
+
+#### Core Services Created:
+1. **MRMSService** (`mrmsService.ts`)
+   - Mock data for development (real MRMS parsing pending)
+   - Storm event management (3 max)
+   - Oklahoma bounds checking
+   - Metro OKC priority detection
+
+2. **HailAlertService** (`hailAlertService.ts`)
+   - Push notification setup
+   - 5-minute monitoring intervals
+   - Alert type detection (initial/escalation/expansion)
+   - User preferences (size threshold, quiet hours, zones)
+   - Alert history logging
+
+3. **HailOverlay Component** (`HailOverlay.tsx`)
+   - Storm toggle panel UI
+   - Visual storm management
+   - Live indicators
+   - Hail size legend
+
+4. **WebMap Updates**
+   - Hail circle overlays with color coding
+   - Interactive hail report popups
+   - Integrated with knock markers
+
+### Technical Decisions:
+- Used WebView overlay approach (no migration needed)
+- Minimal storage footprint (<6MB for 3 storms)
+- Real-time fetch strategy
+- Mock data for MVP testing
+
 ### Nice to Haves (Future):
 - Bulk historical data storage
 - ML damage predictions
@@ -436,6 +471,8 @@ web-build/
 - Weather pattern predictions
 - Competitor activity tracking
 - Offline hail data packages
+- Real GRIB2 parsing for MRMS data
+- Twitter API integration for social validation
 
 ## IMPORTANT: Multi-Agent Debugging Protocol
 For persistent and complex bugs/errors, deploy multiple agents with different perspectives:

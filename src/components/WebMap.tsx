@@ -7,9 +7,11 @@ interface WebMapProps {
   knocks: Knock[];
   userLocation: { lat: number; lng: number } | null;
   onKnockClick?: (knock: Knock) => void;
+  hailData?: any[]; // Hail reports to overlay
+  activeStorms?: string[]; // IDs of storms to display
 }
 
-const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick }, ref) => {
+const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, hailData = [], activeStorms = [] }, ref) => {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -101,6 +103,8 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               
               var markers = [];
               var userMarker = null;
+              var hailCircles = [];
+              var hailHeatLayer = null;
               
               // Function to update knocks
               window.updateKnocks = function(knocksData) {
@@ -181,6 +185,50 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 }
               };
               
+              // Function to get hail color based on size
+              window.getHailColor = function(size) {
+                if (size >= 3) return '#FF0000';      // Red: 3+ inch
+                if (size >= 2) return '#FF6B00';      // Orange: 2-3 inch
+                if (size >= 1) return '#FFD700';      // Yellow: 1-2 inch
+                return '#00FF00';                      // Green: <1 inch
+              };
+              
+              // Function to update hail overlay
+              window.updateHailOverlay = function(hailData) {
+                // Clear existing hail circles
+                hailCircles.forEach(function(circle) {
+                  map.removeLayer(circle);
+                });
+                hailCircles = [];
+                
+                // Add new hail circles
+                hailData.forEach(function(report) {
+                  var color = getHailColor(report.size);
+                  var radius = report.size * 1000; // Convert inches to meters (rough approximation)
+                  
+                  var circle = L.circle([report.latitude, report.longitude], {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.3,
+                    radius: radius,
+                    weight: 2
+                  }).addTo(map);
+                  
+                  var popupContent = '<div style="font-size: 14px;">';
+                  popupContent += '<h4 style="margin: 0 0 8px 0; color: ' + color + ';">Hail Report</h4>';
+                  popupContent += '<p style="margin: 4px 0;"><strong>Size:</strong> ' + report.size.toFixed(1) + ' inches</p>';
+                  popupContent += '<p style="margin: 4px 0;"><strong>Time:</strong> ' + new Date(report.timestamp).toLocaleString() + '</p>';
+                  if (report.city) {
+                    popupContent += '<p style="margin: 4px 0;"><strong>Location:</strong> ' + report.city + '</p>';
+                  }
+                  popupContent += '<p style="margin: 4px 0;"><strong>Confidence:</strong> ' + report.confidence.toFixed(0) + '%</p>';
+                  popupContent += '</div>';
+                  
+                  circle.bindPopup(popupContent);
+                  hailCircles.push(circle);
+                });
+              };
+              
               // Add map click handler for creating new knocks
               map.on('click', function(e) {
                 if (window.ReactNativeWebView) {
@@ -206,6 +254,8 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                     updateUserLocation(data.lat, data.lng);
                   } else if (data.type === 'centerOnUser') {
                     centerOnUser();
+                  } else if (data.type === 'updateHailData') {
+                    updateHailOverlay(data.hailData);
                   }
                 } catch (e) {
                   console.error('Message error:', e);
@@ -253,6 +303,16 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
       }));
     }
   }, [userLocation, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading && webViewRef.current && hailData.length > 0) {
+      // Send hail data to map
+      webViewRef.current.postMessage(JSON.stringify({
+        type: 'updateHailData',
+        hailData: hailData
+      }));
+    }
+  }, [hailData, isLoading]);
 
   const handleMessage = (event: any) => {
     try {
