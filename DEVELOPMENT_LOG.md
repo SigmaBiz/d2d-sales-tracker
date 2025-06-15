@@ -318,7 +318,10 @@ web-build/
    - **New knocks**: Save immediately without success prompt (faster workflow)
    - **Edit knocks**: Show confirmation dialog with Cancel/Update options
    - Button text changes to "Update Knock" when editing
-   - Success message only shown after updates
+   - Removed double success prompt after edit confirmation
+   - Auto-navigate to map view after saving/updating
+   - Map auto-refreshes when returning from knock screen
+   - Changed Follow Up icon from 🔄 to 💬 (conversation icon)
    
 6. **Backup Solution Available**
    - WebMapSimple component available as fallback (simple dots, no emojis)

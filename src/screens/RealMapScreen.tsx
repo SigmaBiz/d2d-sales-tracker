@@ -27,6 +27,15 @@ export default function RealMapScreen({ navigation }: any) {
     return () => clearInterval(interval);
   }, []);
 
+  // Reload knocks when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadKnocks();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const initializeMap = async () => {
     const hasPermission = await LocationService.requestPermissions();
     if (!hasPermission) {

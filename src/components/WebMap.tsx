@@ -86,7 +86,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 no_soliciting: '🚫',
                 lead: '✅',
                 sale: '📝',
-                callback: '🔄',
+                callback: '💬',
                 new_roof: '👼',
                 competitor: '🏗️',
                 renter: '🧟',

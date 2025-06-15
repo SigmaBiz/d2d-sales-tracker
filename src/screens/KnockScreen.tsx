@@ -20,7 +20,7 @@ import ContactForm from '../components/ContactForm';
 const PIPELINE_OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: string; requiresForm: boolean }[] = [
   { value: 'lead', label: '✅ Lead', color: '#10b981', emoji: '✅', requiresForm: true },
   { value: 'inspected', label: '🪜 Inspected', color: '#3b82f6', emoji: '🪜', requiresForm: false },
-  { value: 'callback', label: '🔄 Follow Up', color: '#f59e0b', emoji: '🔄', requiresForm: true },
+  { value: 'callback', label: '💬 Follow Up', color: '#f59e0b', emoji: '💬', requiresForm: true },
   { value: 'sale', label: '📝 Signed', color: '#22c55e', emoji: '📝', requiresForm: true },
 ];
 
@@ -41,7 +41,7 @@ const OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: stri
   { value: 'revisit', label: '👀 Revisit', color: '#3b82f6', emoji: '👀' },
 ];
 
-export default function KnockScreen({ route }: any) {
+export default function KnockScreen({ route, navigation }: any) {
   const [selectedOutcome, setSelectedOutcome] = useState<KnockOutcome | null>(null);
   const [notes, setNotes] = useState('');
   const [address, setAddress] = useState('');
@@ -185,7 +185,7 @@ export default function KnockScreen({ route }: any) {
     setNotes(contactNotes);
     
     // Save the knock with the combined notes
-    const knockId = await saveKnock(true, contactNotes); // Pass true to indicate we're saving with a form
+    const knockId = await saveKnock(contactNotes);
     
     // Save the contact form
     if (knockId) {
@@ -200,9 +200,12 @@ export default function KnockScreen({ route }: any) {
     }
     
     setShowContactForm(false);
+    
+    // Navigate to map after contact form submission
+    navigation.navigate('Map');
   };
 
-  const saveKnock = async (skipAlert = false, overrideNotes?: string): Promise<string | null> => {
+  const saveKnock = async (overrideNotes?: string): Promise<string | null> => {
     if (!selectedOutcome) {
       Alert.alert('Error', 'Please select an outcome');
       return null;
@@ -259,25 +262,13 @@ export default function KnockScreen({ route }: any) {
         SupabaseService.syncKnocks().catch(console.error);
       }
 
-      // For new knocks, just reset without alert
-      if (!editingKnockId) {
-        setSelectedOutcome(null);
-        setNotes('');
-        getCurrentLocation();
-      } else {
-        // For edits, show success
-        Alert.alert('Success', 'Knock updated successfully', [
-          {
-            text: 'OK',
-            onPress: () => {
-              setSelectedOutcome(null);
-              setNotes('');
-              setEditingKnockId(null);
-              getCurrentLocation();
-            },
-          },
-        ]);
-      }
+      // Reset state for both new and edited knocks
+      setSelectedOutcome(null);
+      setNotes('');
+      setEditingKnockId(null);
+      
+      // Navigate to map view after save
+      navigation.navigate('Map');
       
       return knockId;
     } catch (error) {
