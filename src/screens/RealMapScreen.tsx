@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // SOLUTION SWITCHER: Comment/uncomment to try different solutions
-import WebMap from '../components/WebMap'; // Solution 1: Stabilized with useMemo
+import WebMap from '../components/WebMap'; // Original version
+// import WebMap from '../components/WebMapFixed'; // Fixed version with proper message queuing
 // import WebMap from '../components/WebMapSimple'; // Solution 2: Simple dots (no emojis)
 // import TestWebView from '../components/TestWebView'; // Test WebView
 import { LocationService } from '../services/locationService';
@@ -10,6 +11,7 @@ import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
 import { MRMSService, StormEvent, HailReport } from '../services/mrmsService';
 import { HailAlertService } from '../services/hailAlertService';
+import { SimpleContourService } from '../services/simpleContourService';
 import HailOverlay from '../components/HailOverlay';
 import { Knock } from '../types';
 
@@ -20,6 +22,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [activeStorms, setActiveStorms] = useState<StormEvent[]>([]);
   const [hailData, setHailData] = useState<HailReport[]>([]);
+  const [hailContours, setHailContours] = useState<any>(null);
   const webMapRef = useRef<any>(null);
 
   useEffect(() => {
@@ -45,6 +48,11 @@ export default function RealMapScreen({ navigation }: any) {
 
     return unsubscribe;
   }, [navigation]);
+
+  // Monitor hailContours state changes
+  useEffect(() => {
+    console.log('RealMapScreen - hailContours state updated:', hailContours);
+  }, [hailContours]);
 
   const initializeMap = async () => {
     const hasPermission = await LocationService.requestPermissions();
@@ -153,6 +161,14 @@ export default function RealMapScreen({ navigation }: any) {
         }
       });
       setHailData(allReports);
+      
+      // Generate contours from reports
+      if (allReports.length > 0) {
+        const contourData = SimpleContourService.generateSimpleContours(allReports);
+        setHailContours(contourData);
+      } else {
+        setHailContours(null);
+      }
     } catch (error) {
       console.error('Error loading hail data:', error);
     }
@@ -177,7 +193,7 @@ export default function RealMapScreen({ navigation }: any) {
         knocks={knocks}
         userLocation={userLocation}
         onKnockClick={handleMapClick}
-        hailData={hailData}
+        hailContours={hailContours}
         activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
       />
       

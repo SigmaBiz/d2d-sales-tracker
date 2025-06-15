@@ -44,12 +44,6 @@ export default function HailOverlay({
     loadStorms();
   };
 
-  const getHailSizeColor = (size: number) => {
-    if (size >= 3) return '#FF0000';      // Red: 3+ inch
-    if (size >= 2) return '#FF6B00';      // Orange: 2-3 inch
-    if (size >= 1) return '#FFD700';      // Yellow: 1-2 inch
-    return '#00FF00';                     // Green: <1 inch
-  };
 
   const getHailSizeEmoji = (size: number) => {
     if (size >= 3) return '🔴';
@@ -125,6 +119,14 @@ export default function HailOverlay({
                 <Text style={styles.stormDetails}>
                   {storm.reports.length} reports • {storm.startTime.toLocaleTimeString()}
                 </Text>
+                
+                {storm.reports.length > 0 && (
+                  <Text style={styles.confidenceText}>
+                    Avg confidence: {Math.round(
+                      storm.reports.reduce((sum, r) => sum + r.confidence, 0) / storm.reports.length
+                    )}%
+                  </Text>
+                )}
                 
                 {storm.enabled && storm.reports.length > 0 && (
                   <Text style={styles.liveIndicator}>
@@ -294,5 +296,11 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: '#6b7280',
+  },
+  confidenceText: {
+    fontSize: 11,
+    color: '#10b981',
+    fontWeight: '500',
+    marginTop: 2,
   },
 });

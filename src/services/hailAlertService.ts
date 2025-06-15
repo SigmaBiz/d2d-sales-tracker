@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { MRMSService, HailReport, StormEvent } from './mrmsService';
 import { StorageService } from './storageService';
+import { ConfidenceScoring } from './confidenceScoring';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -14,6 +15,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -181,7 +184,17 @@ export class HailAlertService {
     } else {
       // Create new storm event
       alertType = 'initial';
-      const sizeEmoji = report.size >= 2 ? '🚨' : '⚠️';
+      
+      // Choose emoji based on both size and confidence
+      let sizeEmoji = '⚠️';
+      if (report.confidence >= 85 && report.size >= 1.5) {
+        sizeEmoji = '🚨'; // High confidence + large hail
+      } else if (report.size >= 2) {
+        sizeEmoji = '🚨'; // Very large hail
+      } else if (report.confidence >= 70) {
+        sizeEmoji = '⚠️'; // High confidence
+      }
+      
       message = `${sizeEmoji} Hail detected in ${report.city || 'Oklahoma'} - ${report.size.toFixed(1)}" hail`;
       
       const newStorm = await MRMSService.groupIntoStormEvents([report]);
@@ -213,10 +226,30 @@ export class HailAlertService {
     report: HailReport,
     type: 'initial' | 'escalation' | 'expansion'
   ): Promise<void> {
+    // Get confidence level for enhanced messaging
+    const confidenceLevel = ConfidenceScoring.getConfidenceLevel(report.confidence);
+    
+    // Enhance message with confidence info
+    const enhancedMessage = `${message} (${report.confidence}% confidence)`;
+    
+    // Set priority based on confidence
+    let priority = Notifications.AndroidNotificationPriority.HIGH;
+    if (report.confidence >= 85) {
+      priority = Notifications.AndroidNotificationPriority.MAX;
+    } else if (report.confidence < 50) {
+      priority = Notifications.AndroidNotificationPriority.DEFAULT;
+    }
+    
+    // Create body with recommendation
+    let body = 'Tap to view hail map and start canvassing';
+    if (report.confidence >= 70) {
+      body = `${confidenceLevel.recommendation}. Tap to view map.`;
+    }
+    
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: message,
-        body: 'Tap to view hail map and start canvassing',
+        title: enhancedMessage,
+        body: body,
         data: {
           type: 'hail_alert',
           alertType: type,
@@ -225,8 +258,11 @@ export class HailAlertService {
           latitude: report.latitude,
           longitude: report.longitude,
           hailSize: report.size,
+          confidence: report.confidence,
+          confidenceFactors: report.confidenceFactors,
         },
         categoryIdentifier: 'hail_alert',
+        priority: priority,
       },
       trigger: null, // Send immediately
     });

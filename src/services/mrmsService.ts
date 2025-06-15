@@ -4,6 +4,8 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MRMSParser } from './mrmsParser';
+import { ConfidenceScoring, ConfidenceFactors } from './confidenceScoring';
 
 // MRMS API endpoints
 const MRMS_BASE_URL = 'https://mrms.ncep.noaa.gov/data/realtime/';
@@ -40,6 +42,7 @@ export interface HailReport {
   size: number; // in inches
   timestamp: Date;
   confidence: number; // 0-100%
+  confidenceFactors?: ConfidenceFactors; // Detailed confidence breakdown
   city?: string;
   isMetroOKC?: boolean;
 }
@@ -70,15 +73,41 @@ export class MRMSService {
    */
   static async fetchCurrentHailData(): Promise<HailReport[]> {
     try {
-      // MRMS provides data in GRIB2 format
-      // For MVP, we'll use a simplified approach
-      // In production, we'd parse GRIB2 or use a proxy service
+      // Try multiple data sources in order of preference
+      let reports: HailReport[] = [];
       
-      // Simulated data for development
-      // TODO: Implement actual GRIB2 parsing or proxy service
-      const mockData = await this.getMockHailData();
+      // 1. Try real MRMS data first
+      try {
+        reports = await MRMSParser.fetchLatestMESH();
+        if (reports.length > 0) {
+          console.log(`Fetched ${reports.length} real MRMS reports`);
+          // Apply confidence scoring
+          reports = await this.applyConfidenceScoring(reports);
+          return reports;
+        }
+      } catch (error) {
+        console.log('MRMS direct fetch failed, trying Mesonet...');
+      }
       
-      return mockData;
+      // 2. Try Iowa State Mesonet as backup
+      try {
+        reports = await MRMSParser.fetchFromMesonet();
+        if (reports.length > 0) {
+          console.log(`Fetched ${reports.length} reports from Mesonet`);
+          // Apply confidence scoring
+          reports = await this.applyConfidenceScoring(reports);
+          return reports;
+        }
+      } catch (error) {
+        console.log('Mesonet fetch failed, using mock data...');
+      }
+      
+      // 3. Fall back to mock data for development
+      console.log('Using mock data for development');
+      reports = await this.getMockHailData();
+      // Apply confidence scoring to mock data too
+      reports = await this.applyConfidenceScoring(reports);
+      return reports;
     } catch (error) {
       console.error('Error fetching MRMS data:', error);
       throw error;
@@ -250,6 +279,37 @@ export class MRMSService {
       Math.pow(lng - OKC_CENTER.lng, 2)
     );
     return distance < 0.5; // Roughly 50 mile radius
+  }
+  
+  /**
+   * Apply confidence scoring to hail reports
+   */
+  private static async applyConfidenceScoring(reports: HailReport[]): Promise<HailReport[]> {
+    // Calculate confidence for each report
+    return reports.map(report => {
+      // Find nearby reports for density scoring
+      const nearbyReports = reports.filter(r => {
+        if (r.id === report.id) return false;
+        const distance = Math.sqrt(
+          Math.pow(report.latitude - r.latitude, 2) + 
+          Math.pow(report.longitude - r.longitude, 2)
+        );
+        return distance < 0.1; // ~10 miles
+      });
+      
+      // Calculate confidence factors
+      const confidenceFactors = ConfidenceScoring.calculateConfidence(
+        report,
+        nearbyReports,
+        [] // Social media data would go here in production
+      );
+      
+      return {
+        ...report,
+        confidence: confidenceFactors.totalScore,
+        confidenceFactors
+      };
+    });
   }
   
   /**

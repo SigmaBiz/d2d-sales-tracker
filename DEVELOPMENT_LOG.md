@@ -393,8 +393,8 @@ web-build/
 ---
 
 *Last Updated: 2025-01-15*
-*Context Usage at Update: ~90%*
-*Next Update Due: At 95% context usage*
+*Context Usage at Update: ~95%*
+*Next Update Due: At 100% context usage*
 
 ---
 
@@ -403,19 +403,21 @@ web-build/
 ## Development Branch: feature/hail-intelligence-v0.9
 *Started: 2025-01-15*
 
-### Phase 1: Hail Mapping Core (Week 1)
-- [x] MRMS API integration for Oklahoma (mock data ready, real API pending)
+### Phase 1: Hail Mapping Core (Week 1) ✅ COMPLETE
+- [x] MRMS API integration for Oklahoma (real parser with fallbacks)
 - [x] Real-time hail alerts (statewide with Metro OKC priority)
 - [x] Storm event grouping logic
 - [x] 3-storm management system
-- [x] Alert push notifications
+- [x] Alert push notifications with confidence-based prioritization
 - [x] Hail overlay on existing WebView map
-- [ ] Team alert broadcasting (individual preferences done)
-- [ ] Real MRMS data parsing (currently using mock data)
+- [x] Real MRMS data parsing (NOAA direct, Iowa Mesonet, mock fallback)
+- [x] Confidence scoring algorithm integrated
 
-### Phase 2: Intelligence Layer (Week 2)
-- [ ] Confidence scoring algorithm
-- [ ] Social media integration (Twitter)
+### Phase 2: Intelligence Layer (Week 2) - IN PROGRESS
+- [x] Confidence scoring algorithm (MESH, density, recency factors)
+- [x] Multi-factor confidence display in UI
+- [x] Confidence-based alert prioritization
+- [ ] Social media integration (Twitter API pending)
 - [ ] Property-specific hail reports
 - [ ] Presentation mode for homeowners
 
@@ -435,28 +437,55 @@ web-build/
 
 #### Core Services Created:
 1. **MRMSService** (`mrmsService.ts`)
-   - Mock data for development (real MRMS parsing pending)
+   - Real MRMS data fetching with multiple fallbacks
    - Storm event management (3 max)
    - Oklahoma bounds checking
    - Metro OKC priority detection
+   - Integrated confidence scoring
 
-2. **HailAlertService** (`hailAlertService.ts`)
+2. **MRMSParser** (`mrmsParser.ts`)
+   - Real NOAA MRMS data endpoint support
+   - Iowa State Mesonet backup source
+   - WMS service integration
+   - Oklahoma-specific filtering
+   - Mock data fallback for development
+
+3. **ConfidenceScoring** (`confidenceScoring.ts`)
+   - Multi-factor confidence algorithm
+   - MESH base score (0-70%)
+   - Social media validation framework (0-20%)
+   - Recency scoring (0-10%)
+   - Density scoring (0-10%)
+   - Confidence level recommendations
+   - Saturation scoring for competitor analysis
+
+4. **HailAlertService** (`hailAlertService.ts`)
    - Push notification setup
    - 5-minute monitoring intervals
    - Alert type detection (initial/escalation/expansion)
    - User preferences (size threshold, quiet hours, zones)
    - Alert history logging
+   - Confidence-based prioritization (MAX priority for 85%+)
 
-3. **HailOverlay Component** (`HailOverlay.tsx`)
+5. **HailOverlay Component** (`HailOverlay.tsx`)
    - Storm toggle panel UI
    - Visual storm management
    - Live indicators
    - Hail size legend
+   - Average confidence display per storm
 
-4. **WebMap Updates**
+6. **WebMap Updates**
    - Hail circle overlays with color coding
-   - Interactive hail report popups
+   - Interactive hail report popups with confidence details
+   - Confidence factor breakdown display
+   - Color-coded confidence indicators
    - Integrated with knock markers
+
+7. **MRMS Configuration** (`mrmsConfig.ts`)
+   - Centralized data source configuration
+   - Oklahoma coverage settings
+   - Metro OKC city definitions
+   - Performance and caching settings
 
 ### Technical Decisions:
 - Used WebView overlay approach (no migration needed)

@@ -7,13 +7,15 @@ interface WebMapProps {
   knocks: Knock[];
   userLocation: { lat: number; lng: number } | null;
   onKnockClick?: (knock: Knock) => void;
-  hailData?: any[]; // Hail reports to overlay
+  hailContours?: any; // GeoJSON FeatureCollection
   activeStorms?: string[]; // IDs of storms to display
 }
 
-const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, hailData = [], activeStorms = [] }, ref) => {
+const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, hailContours = null, activeStorms = [] }, ref) => {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  console.log('WebMap render - hailContours prop:', hailContours);
 
   // Expose WebView methods to parent
   React.useImperativeHandle(ref, () => webViewRef.current as WebView);
@@ -35,9 +37,24 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       <script>
+        // Override console.log to send to React Native
+        var originalLog = console.log;
+        console.log = function() {
+          originalLog.apply(console, arguments);
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'console',
+              message: Array.from(arguments).join(' ')
+            }));
+          }
+        };
+        
         // Wait a bit for Leaflet to load
+        console.log('Waiting for Leaflet to load...');
         setTimeout(function() {
+          console.log('Checking if Leaflet loaded...');
           if (typeof L !== 'undefined') {
+            console.log('Leaflet loaded successfully!');
             try {
               var map = L.map('map').setView([35.4676, -97.5164], 13);
               
@@ -103,8 +120,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               
               var markers = [];
               var userMarker = null;
-              var hailCircles = [];
-              var hailHeatLayer = null;
+              var hailContourLayer = null;
               
               // Function to update knocks
               window.updateKnocks = function(knocksData) {
@@ -185,49 +201,52 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 }
               };
               
-              // Function to get hail color based on size
-              window.getHailColor = function(size) {
-                if (size >= 3) return '#FF0000';      // Red: 3+ inch
-                if (size >= 2) return '#FF6B00';      // Orange: 2-3 inch
-                if (size >= 1) return '#FFD700';      // Yellow: 1-2 inch
-                return '#00FF00';                      // Green: <1 inch
+              // Function to update hail contours
+              window.updateHailContours = function(contourData) {
+                console.log('updateHailContours called with:', contourData);
+                
+                // Clear existing contours
+                if (hailContourLayer) {
+                  map.removeLayer(hailContourLayer);
+                  hailContourLayer = null;
+                }
+                
+                if (!contourData || !contourData.features || contourData.features.length === 0) {
+                  console.log('No contour features to display');
+                  return;
+                }
+                
+                console.log('Adding', contourData.features.length, 'contour features to map');
+                
+                // Add contour layer
+                hailContourLayer = L.geoJSON(contourData, {
+                  style: function(feature) {
+                    return {
+                      fillColor: feature.properties.color,
+                      fillOpacity: 0.4,
+                      color: feature.properties.color,
+                      weight: 1,
+                      opacity: 0.7
+                    };
+                  },
+                  onEachFeature: function(feature, layer) {
+                    var props = feature.properties;
+                    var popupContent = '<div style="font-size: 14px;">';
+                    popupContent += '<h4 style="margin: 0 0 8px 0; color: ' + props.color + ';">Hail Zone</h4>';
+                    popupContent += '<p style="margin: 4px 0;"><strong>Size:</strong> ' + props.level.toFixed(1) + '"+ hail</p>';
+                    popupContent += '<p style="margin: 4px 0;"><strong>Description:</strong> ' + props.description + '</p>';
+                    popupContent += '<p style="margin: 4px 0; font-style: italic; color: #6b7280;">Click anywhere in this zone to start canvassing</p>';
+                    popupContent += '</div>';
+                    
+                    layer.bindPopup(popupContent);
+                  }
+                }).addTo(map);
+                
+                // Bring contours to back so knock markers are on top
+                hailContourLayer.bringToBack();
+                console.log('Hail contour layer added to map');
               };
               
-              // Function to update hail overlay
-              window.updateHailOverlay = function(hailData) {
-                // Clear existing hail circles
-                hailCircles.forEach(function(circle) {
-                  map.removeLayer(circle);
-                });
-                hailCircles = [];
-                
-                // Add new hail circles
-                hailData.forEach(function(report) {
-                  var color = getHailColor(report.size);
-                  var radius = report.size * 1000; // Convert inches to meters (rough approximation)
-                  
-                  var circle = L.circle([report.latitude, report.longitude], {
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.3,
-                    radius: radius,
-                    weight: 2
-                  }).addTo(map);
-                  
-                  var popupContent = '<div style="font-size: 14px;">';
-                  popupContent += '<h4 style="margin: 0 0 8px 0; color: ' + color + ';">Hail Report</h4>';
-                  popupContent += '<p style="margin: 4px 0;"><strong>Size:</strong> ' + report.size.toFixed(1) + ' inches</p>';
-                  popupContent += '<p style="margin: 4px 0;"><strong>Time:</strong> ' + new Date(report.timestamp).toLocaleString() + '</p>';
-                  if (report.city) {
-                    popupContent += '<p style="margin: 4px 0;"><strong>Location:</strong> ' + report.city + '</p>';
-                  }
-                  popupContent += '<p style="margin: 4px 0;"><strong>Confidence:</strong> ' + report.confidence.toFixed(0) + '%</p>';
-                  popupContent += '</div>';
-                  
-                  circle.bindPopup(popupContent);
-                  hailCircles.push(circle);
-                });
-              };
               
               // Add map click handler for creating new knocks
               map.on('click', function(e) {
@@ -246,16 +265,19 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               
               // Listen for messages from React Native
               window.addEventListener('message', function(event) {
+                console.log('WebView received message:', event.data ? event.data.substring(0, 100) + '...' : 'empty');
                 try {
                   var data = JSON.parse(event.data);
+                  console.log('Parsed message type:', data.type);
                   if (data.type === 'updateKnocks') {
                     updateKnocks(data.knocks);
                   } else if (data.type === 'updateUserLocation') {
                     updateUserLocation(data.lat, data.lng);
                   } else if (data.type === 'centerOnUser') {
                     centerOnUser();
-                  } else if (data.type === 'updateHailData') {
-                    updateHailOverlay(data.hailData);
+                  } else if (data.type === 'updateHailContours') {
+                    console.log('Received updateHailContours message');
+                    updateHailContours(data.contourData);
                   }
                 } catch (e) {
                   console.error('Message error:', e);
@@ -264,26 +286,42 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               
               // Add custom styles
               var style = document.createElement('style');
-              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } .leaflet-top.leaflet-right { top: 80px !important; } .custom-div-icon { background: transparent !important; border: none !important; }';
+              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } .leaflet-control-layers { position: fixed !important; right: 16px !important; bottom: 240px !important; top: auto !important; margin: 0 !important; } .custom-div-icon { background: transparent !important; border: none !important; }';
               document.head.appendChild(style);
               
               // Send ready message
+              console.log('Map initialized, sending ready message');
               if (window.ReactNativeWebView) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapReady' }));
               }
             } catch (e) {
+              console.error('Error initializing map:', e);
               document.body.innerHTML = '<div style="padding: 20px;">Error: ' + e.message + '</div>';
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                  type: 'mapError', 
+                  error: e.message 
+                }));
+              }
             }
           } else {
+            console.log('Leaflet not loaded');
             document.body.innerHTML = '<div style="padding: 20px;">Leaflet failed to load. Try refreshing.</div>';
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ 
+                type: 'mapError', 
+                error: 'Leaflet library not loaded' 
+              }));
+            }
           }
-        }, 2000);
+        }, 1000);
       </script>
     </body>
     </html>
   `, []);
 
   useEffect(() => {
+    console.log('WebMap knocks useEffect - isLoading:', isLoading, 'knocks count:', knocks.length);
     if (!isLoading && webViewRef.current) {
       // Send knocks data to map
       webViewRef.current.postMessage(JSON.stringify({
@@ -304,20 +342,59 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
     }
   }, [userLocation, isLoading]);
 
+  // Track if we have pending contours to send
+  const [pendingContours, setPendingContours] = useState<any>(null);
+
   useEffect(() => {
-    if (!isLoading && webViewRef.current && hailData.length > 0) {
-      // Send hail data to map
-      webViewRef.current.postMessage(JSON.stringify({
-        type: 'updateHailData',
-        hailData: hailData
-      }));
+    console.log('WebMap hailContours useEffect - isLoading:', isLoading, 'webViewRef.current:', !!webViewRef.current, 'hailContours:', hailContours);
+    if (!isLoading && webViewRef.current && hailContours) {
+      console.log('Sending hail contours to WebView:', hailContours);
+      try {
+        // Send hail contours to map
+        const message = JSON.stringify({
+          type: 'updateHailContours',
+          contourData: hailContours
+        });
+        console.log('Stringified message length:', message.length);
+        webViewRef.current.postMessage(message);
+        setPendingContours(null); // Clear pending
+      } catch (error) {
+        console.error('Error stringifying hail contours:', error);
+      }
+    } else if (isLoading && hailContours) {
+      console.log('Map still loading, storing hail contours as pending');
+      setPendingContours(hailContours);
     }
-  }, [hailData, isLoading]);
+  }, [hailContours, isLoading]);
+
+  // Send pending contours when map becomes ready
+  useEffect(() => {
+    if (!isLoading && webViewRef.current && pendingContours) {
+      console.log('Map now ready, sending pending contours:', pendingContours);
+      try {
+        const message = JSON.stringify({
+          type: 'updateHailContours',
+          contourData: pendingContours
+        });
+        console.log('Sending pending contours, message length:', message.length);
+        webViewRef.current.postMessage(message);
+        setPendingContours(null);
+      } catch (error) {
+        console.error('Error stringifying pending contours:', error);
+      }
+    }
+  }, [isLoading, pendingContours]);
 
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'mapReady') {
+      if (data.type === 'console') {
+        console.log('[WebView]:', data.message);
+      } else if (data.type === 'mapReady') {
+        console.log('WebMap received mapReady message');
+        setIsLoading(false);
+      } else if (data.type === 'mapError') {
+        console.error('WebMap error:', data.error);
         setIsLoading(false);
       } else if (data.type === 'mapClick') {
         // Handle map click - pass to parent if handler provided
