@@ -321,7 +321,11 @@ web-build/
    - Removed double success prompt after edit confirmation
    - Auto-navigate to map view after saving/updating
    - Map auto-refreshes when returning from knock screen
-   - Changed Follow Up icon from 🔄 to 💬 (conversation icon)
+   - Added new "Conversation" outcome with 💬 icon (for when someone answers)
+   - Reverted Follow Up icon back to 🔄
+   - Reduced map tag size from 36px to 24px for better house proportion
+   - Removed default white background from map markers
+   - Cleaner map appearance with smaller, more precise tags
    
 6. **Backup Solution Available**
    - WebMapSimple component available as fallback (simple dots, no emojis)

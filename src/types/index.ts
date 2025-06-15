@@ -1,11 +1,12 @@
 export type KnockOutcome = 
   // Primary outcomes
   | 'not_home'        // 👻 Nobody answered
+  | 'convo'           // 💬 Had conversation
   | 'inspected'       // 🪜 Roof inspected
   | 'no_soliciting'   // 🚫 No soliciting sign
   | 'lead'            // ✅ Interested prospect
   | 'sale'            // 📝 Contract signed
-  | 'callback'        // 💬 Follow up needed
+  | 'callback'        // 🔄 Follow up needed
   // Property status
   | 'new_roof'        // 👼 Recently replaced roof
   | 'competitor'      // 🏗️ Another company working

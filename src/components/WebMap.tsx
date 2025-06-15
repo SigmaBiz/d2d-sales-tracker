@@ -65,6 +65,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               // Define colors and emojis
               var colors = {
                 not_home: '#6b7280',
+                convo: '#3b82f6',
                 inspected: '#3b82f6', 
                 no_soliciting: '#ef4444',
                 lead: '#10b981',
@@ -86,7 +87,8 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 no_soliciting: '🚫',
                 lead: '✅',
                 sale: '📝',
-                callback: '💬',
+                callback: '🔄',
+                convo: '💬',
                 new_roof: '👼',
                 competitor: '🏗️',
                 renter: '🧟',
@@ -114,9 +116,10 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   var emoji = emojis[knock.outcome] || '📍';
                   
                   var icon = L.divIcon({
-                    html: '<div style="background-color: ' + color + '; width: 36px; height: 36px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 20px;">' + emoji + '</div>',
-                    iconSize: [36, 36],
-                    iconAnchor: [18, 18]
+                    html: '<div style="background-color: ' + color + '; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px;">' + emoji + '</div>',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                    className: 'custom-div-icon'
                   });
                   
                   var popupContent = '<div style="font-size: 14px;"><h4 style="margin: 0 0 8px 0; color: #1e40af;">' + emoji + ' ' + knock.outcome.replace(/_/g, ' ').toUpperCase() + '</h4>';
@@ -211,7 +214,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               
               // Add custom styles
               var style = document.createElement('style');
-              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } .leaflet-top.leaflet-right { top: 80px !important; }';
+              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } .leaflet-top.leaflet-right { top: 80px !important; } .custom-div-icon { background: transparent !important; border: none !important; }';
               document.head.appendChild(style);
               
               // Send ready message

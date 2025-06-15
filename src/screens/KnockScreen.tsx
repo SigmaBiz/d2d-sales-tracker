@@ -20,13 +20,14 @@ import ContactForm from '../components/ContactForm';
 const PIPELINE_OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: string; requiresForm: boolean }[] = [
   { value: 'lead', label: '✅ Lead', color: '#10b981', emoji: '✅', requiresForm: true },
   { value: 'inspected', label: '🪜 Inspected', color: '#3b82f6', emoji: '🪜', requiresForm: false },
-  { value: 'callback', label: '💬 Follow Up', color: '#f59e0b', emoji: '💬', requiresForm: true },
+  { value: 'callback', label: '🔄 Follow Up', color: '#f59e0b', emoji: '🔄', requiresForm: true },
   { value: 'sale', label: '📝 Signed', color: '#22c55e', emoji: '📝', requiresForm: true },
 ];
 
 const OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: string }[] = [
   // Primary outcomes
   { value: 'not_home', label: '👻 Not Home', color: '#6b7280', emoji: '👻' },
+  { value: 'convo', label: '💬 Conversation', color: '#3b82f6', emoji: '💬' },
   { value: 'no_soliciting', label: '🚫 No Soliciting', color: '#ef4444', emoji: '🚫' },
   
   // Property status
