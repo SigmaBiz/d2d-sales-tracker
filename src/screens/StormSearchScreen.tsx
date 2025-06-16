@@ -365,6 +365,52 @@ export default function StormSearchScreen({ navigation }: any) {
         >
           <Text style={styles.significantDateText}>Sept 24, 2024 - Major OKC Metro Event</Text>
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.significantDateButton}
+          onPress={async () => {
+            const may15 = new Date(2024, 4, 15);
+            setSelectedDate(may15);
+            setSearchType('date');
+            setLoading(true);
+            try {
+              const results = await WeatherHistoryService.searchStorms({ date: may15 });
+              setSearchResults(results);
+              if (results.length === 0) {
+                Alert.alert('No Storms Found', 'No data available for this date.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to search storm history');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          <Text style={styles.significantDateText}>May 15, 2024 - Severe storms Central OK</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.significantDateButton}
+          onPress={async () => {
+            const june14 = new Date(2023, 5, 14);
+            setSelectedDate(june14);
+            setSearchType('date');
+            setLoading(true);
+            try {
+              const results = await WeatherHistoryService.searchStorms({ date: june14 });
+              setSearchResults(results);
+              if (results.length === 0) {
+                Alert.alert('No Storms Found', 'No data available for this date.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to search storm history');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          <Text style={styles.significantDateText}>June 14, 2023 - Significant hail Norman</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Note about capabilities */}

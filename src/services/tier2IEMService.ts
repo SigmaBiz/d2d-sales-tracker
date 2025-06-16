@@ -63,17 +63,27 @@ export class IEMArchiveService {
    */
   private static async fetchAlternativeIEM(date: Date): Promise<HailReport[]> {
     try {
-      // First try using the MRMS proxy for historical data
-      console.log('[TIER 2] Using MRMS proxy for historical data:', date.toISOString());
+      // Use the new IEM Archive Service for real historical MESH data
+      console.log('[TIER 2] Using IEM Archive Service for historical data:', date.toISOString());
+      const { IEMArchiveService } = await import('./iemArchiveService');
+      const meshReports = await IEMArchiveService.fetchHistoricalMESH(date);
+      
+      if (meshReports && meshReports.length > 0) {
+        console.log('[TIER 2] Got', meshReports.length, 'MESH reports from IEM Archive');
+        return meshReports;
+      }
+      
+      // Fallback to mock proxy if IEM has no data
+      console.log('[TIER 2] No IEM data, trying mock proxy as fallback');
       const { MRMSProxyService } = await import('./mrmsProxyService');
       const proxyReports = await MRMSProxyService.fetchHistoricalMRMS(date);
       
       if (proxyReports && proxyReports.length > 0) {
-        console.log('[TIER 2] Got', proxyReports.length, 'reports from proxy');
+        console.log('[TIER 2] Got', proxyReports.length, 'reports from mock proxy');
         return proxyReports;
       }
       
-      // If proxy returns no data, return empty array
+      // If no data from either source
       console.log('[TIER 2] No data available for date:', date.toISOString());
       return [];
     } catch (error) {

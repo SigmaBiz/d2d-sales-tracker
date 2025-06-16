@@ -239,19 +239,34 @@ export class WeatherHistoryService {
   static getSignificantStormDates(): { date: Date; name: string; description: string }[] {
     return [
       {
-        date: new Date('2024-09-24'),
+        date: new Date(2024, 8, 24), // Sept 24, 2024 in local time
         name: 'September 24, 2024',
         description: 'Major hail event - Oklahoma City Metro'
       },
       {
-        date: new Date('2024-05-15'),
+        date: new Date(2024, 4, 15), // May 15, 2024
         name: 'May 15, 2024',
         description: 'Severe storms - Central Oklahoma'
       },
       {
-        date: new Date('2023-06-14'),
+        date: new Date(2023, 5, 14), // June 14, 2023
         name: 'June 14, 2023',
         description: 'Significant hail - Norman area'
+      },
+      {
+        date: new Date(2024, 3, 27), // April 27, 2024
+        name: 'April 27, 2024',
+        description: 'Widespread hail - OKC to Tulsa'
+      },
+      {
+        date: new Date(2023, 4, 2), // May 2, 2023
+        name: 'May 2, 2023',
+        description: 'Supercell storms - Moore/Norman'
+      },
+      {
+        date: new Date(2022, 4, 4), // May 4, 2022
+        name: 'May 4, 2022',
+        description: 'Historic hail outbreak - Statewide'
       }
     ];
   }
