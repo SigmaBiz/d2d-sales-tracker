@@ -101,7 +101,7 @@ export class MRMSProxyService {
       confidence: report.confidence || 85,
       city: report.city || 'Unknown',
       isMetroOKC: this.isMetroOKC(report.lat || report.latitude, report.lon || report.longitude),
-      source: 'MRMS Proxy',
+      source: 'IEM Archive', // Historical data from IEM via proxy
       meshValue: report.mesh_mm || (report.mesh_inches ? report.mesh_inches * 25.4 : 25)
     }));
   }
