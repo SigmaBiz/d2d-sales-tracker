@@ -93,8 +93,9 @@ export default function StormSearchScreen({ navigation }: any) {
       const storm = await MRMSService.groupIntoStormEvents(event.reports);
       
       // Use the event date directly to avoid timezone confusion
-      // The event.date is already the correct local date from the search
-      storm.startTime = new Date(event.date);
+      // Create a proper local date to ensure correct display
+      const eventDate = new Date(event.date);
+      storm.startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), 12, 0, 0);
       
       // Format the date consistently (MM/DD/YYYY) to avoid timezone display issues
       const month = storm.startTime.getMonth() + 1;
@@ -110,6 +111,7 @@ export default function StormSearchScreen({ navigation }: any) {
         name: storm.name,
         source: storm.source,
         startTime: storm.startTime,
+        eventDate: event.date,
         reports: storm.reports.length
       });
       
@@ -331,14 +333,16 @@ export default function StormSearchScreen({ navigation }: any) {
         <TouchableOpacity
           style={styles.significantDateButton}
           onPress={async () => {
-            setSelectedDate(new Date('2024-09-24'));
+            // Create date in local timezone to avoid UTC conversion issues
+            const sept24 = new Date(2024, 8, 24); // Month is 0-indexed, so 8 = September
+            setSelectedDate(sept24);
             setSearchType('date');
             // Automatically search for this date
             setLoading(true);
             try {
               console.log('[StormSearch] Quick searching for Sept 24, 2024');
               const results = await WeatherHistoryService.searchStorms({
-                date: new Date('2024-09-24')
+                date: sept24
               });
               console.log('[StormSearch] Search complete. Results:', results);
               console.log('[StormSearch] Found', results.length, 'storm events for Sept 24');
