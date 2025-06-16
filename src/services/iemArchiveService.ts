@@ -29,6 +29,7 @@ export class IEMArchiveService {
       }
 
       // Format date for proxy server
+      console.log('[IEM Archive] Input date:', date.toISOString(), 'Local:', date.toString());
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -38,6 +39,7 @@ export class IEMArchiveService {
       const PROXY_URL = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'http://localhost:3001';
       const url = `${PROXY_URL}/api/mesh/${dateStr}`;
       
+      console.log('[IEM Archive] Formatted date string:', dateStr);
       console.log('[IEM Archive] Fetching from proxy:', url);
       
       try {
