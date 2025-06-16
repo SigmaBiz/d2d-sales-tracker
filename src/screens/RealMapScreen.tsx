@@ -44,10 +44,11 @@ export default function RealMapScreen({ navigation }: any) {
     };
   }, []);
 
-  // Reload knocks when screen comes into focus
+  // Reload knocks and hail data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadKnocks();
+      loadHailData(); // Also reload hail data to show newly added storms
     });
 
     return unsubscribe;
@@ -261,9 +262,8 @@ export default function RealMapScreen({ navigation }: any) {
           onStormFocus={handleStormFocus}
           onClose={() => setShowStormPanel(false)}
           dataSource={
-            hailData.length > 0 
-              ? hailData[0].source?.includes('NCEP') || hailData[0].source?.includes('MRMS') ? 'MRMS' :
-                hailData[0].source?.includes('IEM') ? 'IEM' : 'Mock'
+            activeStorms.length > 0 && activeStorms[0].source
+              ? activeStorms[0].source
               : undefined
           }
         />

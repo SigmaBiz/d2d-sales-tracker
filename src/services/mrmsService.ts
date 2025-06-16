@@ -32,6 +32,12 @@ export interface StormEvent {
   reports: HailReport[];
   maxSize: number;
   center: { lat: number; lon: number };
+  bounds?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
   isActive: boolean;
   enabled?: boolean;
   source: 'MRMS' | 'IEM' | 'Mock';
@@ -162,12 +168,15 @@ export class MRMSService {
     // Calculate storm center
     const center = this.calculateCenter(reports);
     
+    // Calculate bounds
+    const bounds = this.calculateBounds(reports);
+    
     // Calculate average confidence
     const avgConfidence = reports.reduce((sum, r) => sum + r.confidence, 0) / reports.length;
     
-    // Determine source
-    const source = reports[0]?.source?.includes('NCEP') ? 'MRMS' :
-                  reports[0]?.source?.includes('IEM') ? 'IEM' : 'Mock';
+    // Determine source more accurately
+    const source = reports[0]?.source?.includes('NCEP') || reports[0]?.source?.includes('MRMS') ? 'MRMS' :
+                  reports[0]?.source?.includes('IEM') || reports[0]?.source?.includes('Archive') ? 'IEM' : 'Mock';
     
     const storm: StormEvent = {
       id: `storm_${Date.now()}`,
@@ -176,6 +185,7 @@ export class MRMSService {
       reports: reports,
       maxSize: Math.max(...reports.map(r => r.size)),
       center: center,
+      bounds: bounds,
       isActive: true,
       enabled: true,
       source: source,
@@ -197,6 +207,25 @@ export class MRMSService {
     return {
       lat: sum.lat / reports.length,
       lon: sum.lon / reports.length
+    };
+  }
+
+  /**
+   * Calculate bounds of reports
+   */
+  private static calculateBounds(reports: HailReport[]): { north: number; south: number; east: number; west: number } {
+    if (reports.length === 0) {
+      return { north: 0, south: 0, east: 0, west: 0 };
+    }
+    
+    const lats = reports.map(r => r.latitude);
+    const lons = reports.map(r => r.longitude);
+    
+    return {
+      north: Math.max(...lats),
+      south: Math.min(...lats),
+      east: Math.max(...lons),
+      west: Math.min(...lons)
     };
   }
 
