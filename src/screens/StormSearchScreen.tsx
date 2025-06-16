@@ -102,6 +102,17 @@ export default function StormSearchScreen({ navigation }: any) {
       const year = storm.startTime.getFullYear();
       storm.name = `${event.location.name} - ${month}/${day}/${year}`;
       
+      // Ensure source is properly set for historical data
+      storm.source = 'IEM';
+      
+      // Log for debugging
+      console.log('[StormSearch] Saving storm:', {
+        name: storm.name,
+        source: storm.source,
+        startTime: storm.startTime,
+        reports: storm.reports.length
+      });
+      
       // Save the storm event
       await MRMSService.saveStormEvent(storm);
       
@@ -291,7 +302,32 @@ export default function StormSearchScreen({ navigation }: any) {
 
       {/* Significant Storm Dates */}
       <View style={styles.significantDatesContainer}>
-        <Text style={styles.significantDatesTitle}>Known Storm Dates</Text>
+        <View style={styles.significantDatesHeader}>
+          <Text style={styles.significantDatesTitle}>Known Storm Dates</Text>
+          <TouchableOpacity
+            style={styles.clearStormsButton}
+            onPress={async () => {
+              Alert.alert(
+                'Clear All Storms',
+                'This will remove all saved storm data from the map. Continue?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Clear', 
+                    style: 'destructive',
+                    onPress: async () => {
+                      await MRMSService.clearAllStorms();
+                      Alert.alert('Success', 'All storm data has been cleared.');
+                    }
+                  }
+                ]
+              );
+            }}
+          >
+            <Ionicons name="trash-outline" size={16} color="#dc2626" />
+            <Text style={styles.clearStormsText}>Clear All</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={styles.significantDateButton}
           onPress={async () => {
@@ -526,11 +562,30 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 8,
   },
+  significantDatesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   significantDatesTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 12,
+  },
+  clearStormsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#fee2e2',
+    borderRadius: 6,
+  },
+  clearStormsText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontWeight: '500',
   },
   significantDateButton: {
     backgroundColor: '#f3f4f6',

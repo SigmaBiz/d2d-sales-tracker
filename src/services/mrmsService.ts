@@ -48,7 +48,7 @@ export class MRMSService {
   private static STORAGE_KEY = '@mrms_storms';
   private static LAST_UPDATE_KEY = '@mrms_last_update';
   private static MAX_STORMS = 3;
-  private static UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private static UPDATE_INTERVAL = 4 * 60 * 60 * 1000; // 4 hours
 
   /**
    * Fetch current hail data - NOAA MRMS ONLY
