@@ -18,7 +18,10 @@
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs location access to track your door knocks and territory.",
         "NSLocationWhenInUseUsageDescription": "This app needs location access to track your door knocks.",
-        "UIBackgroundModes": ["location", "fetch"]
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ]
       }
     },
     "android": {
@@ -31,7 +34,9 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -44,6 +49,11 @@
           "locationAlwaysAndWhenInUsePermission": "Allow D2D Sales Tracker to use your location to track door knocks and territory coverage."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ffdec8ec-db31-4b46-ad99-d4434a5e5115"
+      }
+    }
   }
 }

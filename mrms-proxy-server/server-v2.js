@@ -278,6 +278,72 @@ function getHistoricalMESHData(date) {
         isMetroOKC: true,
         source: 'Historical MESH Data'
       }
+    ],
+    '2023-05-02': [
+      {
+        id: 'hist_mesh_401',
+        latitude: 35.3395,
+        longitude: -97.4867,
+        size: 2.75,
+        meshValue: 69.85,
+        timestamp: new Date('2023-05-02T19:45:00Z'),
+        confidence: 95,
+        city: 'Moore',
+        isMetroOKC: true,
+        source: 'Historical MESH Data',
+        description: 'Significant supercell - Moore/Norman area'
+      },
+      {
+        id: 'hist_mesh_402',
+        latitude: 35.2226,
+        longitude: -97.4395,
+        size: 2.0,
+        meshValue: 50.8,
+        timestamp: new Date('2023-05-02T20:00:00Z'),
+        confidence: 90,
+        city: 'Norman',
+        isMetroOKC: true,
+        source: 'Historical MESH Data'
+      }
+    ],
+    '2022-05-04': [
+      {
+        id: 'hist_mesh_501',
+        latitude: 35.4676,
+        longitude: -97.5164,
+        size: 3.0,
+        meshValue: 76.2,
+        timestamp: new Date('2022-05-04T21:00:00Z'),
+        confidence: 96,
+        city: 'Oklahoma City',
+        isMetroOKC: true,
+        source: 'Historical MESH Data',
+        description: 'Historic hail outbreak - Statewide'
+      },
+      {
+        id: 'hist_mesh_502',
+        latitude: 35.6528,
+        longitude: -97.4781,
+        size: 2.5,
+        meshValue: 63.5,
+        timestamp: new Date('2022-05-04T21:30:00Z'),
+        confidence: 94,
+        city: 'Edmond',
+        isMetroOKC: true,
+        source: 'Historical MESH Data'
+      },
+      {
+        id: 'hist_mesh_503',
+        latitude: 36.1540,
+        longitude: -95.9928,
+        size: 2.25,
+        meshValue: 57.15,
+        timestamp: new Date('2022-05-04T22:00:00Z'),
+        confidence: 92,
+        city: 'Tulsa',
+        isMetroOKC: false,
+        source: 'Historical MESH Data'
+      }
     ]
   };
   
