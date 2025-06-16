@@ -42,6 +42,21 @@
 - **App runs on physical device via Expo Go**
 - **Check existing terminal for logs**
 
+### 🔧 TEMPORARY DEVELOPMENT SETTINGS - MUST RESTORE BEFORE PRODUCTION 🔧
+**These settings have been modified to reduce console logs during development:**
+
+1. **MRMS Update Interval** (src/services/mrmsService.ts:51)
+   - Current: `4 * 60 * 60 * 1000` (4 hours)
+   - Production: `5 * 60 * 1000` (5 minutes)
+   - Reason: Reduce console spam during development
+
+2. **GPS Location Updates** (src/screens/RealMapScreen.tsx:20)
+   - Current: `DEV_DISABLE_GPS_UPDATES = true`
+   - Production: `DEV_DISABLE_GPS_UPDATES = false`
+   - Reason: Disable frequent location updates during development
+
+**REMEMBER: Before production deployment, restore these settings to their original values!**
+
 ### Current Branch Status
 - **Branch**: feature/hail-intelligence-v0.9 (detached at 5feb54d)
 - **Unpushed**: 9 commits ahead of origin

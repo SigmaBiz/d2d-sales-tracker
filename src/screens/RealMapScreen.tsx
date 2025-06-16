@@ -16,6 +16,9 @@ import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
 import { Knock } from '../types';
 
+// DEVELOPMENT FLAGS - REMEMBER TO RESTORE BEFORE PRODUCTION
+const DEV_DISABLE_GPS_UPDATES = true; // Set to false for production
+
 export default function RealMapScreen({ navigation }: any) {
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -35,11 +38,18 @@ export default function RealMapScreen({ navigation }: any) {
     loadHailData();
     initializeHailAlerts();
     
-    // Set up location watching
-    const interval = setInterval(updateLocation, 5000); // Update every 5 seconds
+    // Set up location watching (disabled in development)
+    let interval: NodeJS.Timeout | null = null;
+    if (!DEV_DISABLE_GPS_UPDATES) {
+      interval = setInterval(updateLocation, 5000); // Update every 5 seconds
+    } else {
+      console.log('[DEV] GPS updates disabled for development');
+      // Get location once for initial position
+      updateLocation();
+    }
     
     return () => {
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
       HailAlertService.stopMonitoring();
     };
   }, []);
