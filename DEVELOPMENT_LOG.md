@@ -17,6 +17,7 @@
 - 15%: Fixed IEM service CORS errors, updated to use MRMS proxy (commit 2989053)
 - 20%: Fixed storm date search proxy conversion, verified Sept 24 data available (commit 65e80b3)
 - 25%: Storm search fully functional, dates display correctly, pushed to origin (commit 90ed7a0)
+- 30%: Tier 2 mock implementation complete with IEMArchiveService (commit 188d706)
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -439,12 +440,12 @@ Data Flow: NOAA MRMS Real-Time → MESH Processing → Live Overlays → Alerts
 ```
 
 #### **TIER 2: Historical Data Archive** ⚡ **CURRENT FOCUS**
-- [ ] Access Iowa Environmental Mesonet (IEM) archive
+- [x] Access Iowa Environmental Mesonet (IEM) archive (URL structure done)
 - [x] Create IEMArchiveService for historical MESH data
-- [ ] Implement GRIB2 file processing
+- [ ] Implement GRIB2 file processing (needs proxy server)
 - [ ] Extract MESH values from meteorological format
-- [ ] Enable September 24, 2024 storm data access
-- [ ] Support date range: October 2019 - Present
+- [x] Enable September 24, 2024 storm data access (mock data working)
+- [ ] Support date range: October 2019 - Present (structure ready, needs real data)
 
 ```
 Data Flow: IEM Archive → Historical MESH → Sept 2024 Data → Territory Planning
