@@ -422,15 +422,54 @@ web-build/
 
 ## Handoff Context
 
+### 🎯 CORNERSTONE: Professional-Grade Hail Intelligence System 🎯
+**Replace fake "MRMS" (WeatherAPI.com) with real NOAA MRMS/MESH data**
+
+### 📍 MILESTONES - Three-Tier Data Flow Architecture 📍
+
+#### **TIER 1: Real-Time Storm Detection**
+- [ ] Remove WeatherAPI.com dependencies completely
+- [ ] Implement NCEP MRMS real-time feed (GRIB2 format)
+- [ ] Process MESH values every 2 minutes
+- [ ] Create live hail overlays with confidence scoring
+- [ ] Push immediate alerts for active storms
+
+```
+Data Flow: NOAA MRMS Real-Time → MESH Processing → Live Overlays → Alerts
+```
+
+#### **TIER 2: Historical Data Archive** ⚡ **CURRENT FOCUS**
+- [ ] Access Iowa Environmental Mesonet (IEM) archive
+- [x] Create IEMArchiveService for historical MESH data
+- [ ] Implement GRIB2 file processing
+- [ ] Extract MESH values from meteorological format
+- [ ] Enable September 24, 2024 storm data access
+- [ ] Support date range: October 2019 - Present
+
+```
+Data Flow: IEM Archive → Historical MESH → Sept 2024 Data → Territory Planning
+```
+
+#### **TIER 3: Ground Truth Validation**
+- [ ] Integrate NOAA Storm Events Database
+- [ ] Compare predictions with actual damage reports
+- [ ] Build accuracy scoring system
+- [ ] Create feedback loop for algorithm improvement
+- [ ] Generate professional credibility metrics
+
+```
+Data Flow: Storm Events DB → Actual Reports → Validation → Accuracy Improvement
+```
+
 ### Current Session Summary (Updated per Tier 1 Protocol)
-**Context Usage**: ~10% (Last checkpoint completed)
-**Branch State**: Detached HEAD at 5feb54d with uncommitted fixes
+**Context Usage**: ~25% (Last checkpoint completed)
+**Branch State**: Detached HEAD at ba4a68f
 **Session Progress**:
-- Reverted to stable commit after SearchScreen implementation was missing
-- Fixed critical HailOverlay crash (peakSize → maxSize)
-- Added missing MRMSService methods (toggleStorm, deleteStorm, focusOnStorm)
-- Identified 9 unpushed local commits from previous sessions
-- App now stable with Active Storms panel working
+- Storm search and display fully functional
+- Fixed date display issues with local timezone
+- Added "Clear All Storms" button
+- Disabled GPS updates for development
+- Created IEMArchiveService for Tier 2 implementation
 
 ### Critical Files to Review
 1. `App.tsx` - Entry point
