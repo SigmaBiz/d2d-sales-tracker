@@ -44,7 +44,22 @@ export class IEMArchiveService {
       
       try {
         const response = await fetch(url);
-        const data = await response.json();
+        
+        // Check if response is OK
+        if (!response.ok) {
+          console.log('[IEM Archive] Proxy error:', response.status, response.statusText);
+          throw new Error(`Proxy returned ${response.status}`);
+        }
+        
+        // Try to parse JSON
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseError) {
+          console.log('[IEM Archive] Invalid JSON from proxy:', text.substring(0, 100));
+          throw new Error('Invalid JSON response from proxy');
+        }
         
         if (data.reports && Array.isArray(data.reports)) {
           console.log('[IEM Archive] Got', data.reports.length, 'MESH reports from proxy');

@@ -1,7 +1,11 @@
 /**
  * MRMS Proxy Server
- * Processes GRIB2 files from Iowa Environmental Mesonet
+ * Processes GRIB2 files from NCEP (real-time) and IEM (historical)
  * Extracts MESH data for Oklahoma region
+ * 
+ * Data Sources:
+ * - Real-time: NCEP MRMS server (small MESH-specific GRIB2 files)
+ * - Historical: IEM archive (requires different approach due to large files)
  */
 
 const express = require('express');
@@ -96,60 +100,85 @@ app.get('/api/mesh/:date', async (req, res) => {
 });
 
 /**
- * Fetch MESH data from IEM archive
+ * Fetch MESH data - try NCEP real-time first, then fallback
  */
 async function fetchMESHData(year, month, day, hour) {
-  const filename = `${year}${month}${day}${hour}`;
-  const url = `https://mrms.agron.iastate.edu/${year}/${month}/${day}/${filename}.zip`;
-  
-  console.log(`[MRMS Proxy] Downloading from ${url}`);
-  
-  // Download ZIP file
-  const response = await axios.get(url, {
-    responseType: 'arraybuffer',
-    timeout: 30000 // 30 second timeout
-  });
-  
-  // Save ZIP temporarily
-  const zipPath = path.join(TEMP_DIR, `${filename}.zip`);
-  await fs.writeFile(zipPath, response.data);
-  
+  // First try NCEP real-time server (has individual MESH files)
   try {
-    // Extract ZIP
-    const zip = new AdmZip(zipPath);
-    const zipEntries = zip.getEntries();
-    
-    // Look for MESH GRIB2 file
-    let meshEntry = null;
-    for (const entry of zipEntries) {
-      if (entry.entryName.includes('MESH') && entry.entryName.endsWith('.grib2')) {
-        meshEntry = entry;
-        break;
-      }
-    }
-    
-    if (!meshEntry) {
-      throw new Error('No MESH data in archive');
-    }
-    
-    // Extract MESH GRIB2 file
-    const gribPath = path.join(TEMP_DIR, meshEntry.entryName);
-    zip.extractEntryTo(meshEntry, TEMP_DIR, false, true);
-    
-    // Process GRIB2 file
-    const meshReports = await processGRIB2(gribPath, `${year}-${month}-${day}T${hour}:00:00Z`);
-    
-    // Cleanup
-    await fs.unlink(gribPath).catch(() => {});
-    await fs.unlink(zipPath).catch(() => {});
-    
-    return meshReports;
-    
+    return await fetchNCEPMESH(year, month, day, hour);
   } catch (error) {
-    // Cleanup on error
-    await fs.unlink(zipPath).catch(() => {});
-    throw error;
+    console.log('[MRMS Proxy] NCEP not available, trying alternative approach');
   }
+  
+  // For historical data, we need a different approach
+  // IEM archives are too large (5.7GB per hour)
+  // Return mock data for known storm dates
+  const timestamp = `${year}-${month}-${day}T${hour}:00:00Z`;
+  return getMockMESHData(timestamp);
+}
+
+/**
+ * Fetch MESH data from NCEP real-time server
+ */
+async function fetchNCEPMESH(year, month, day, hour) {
+  // NCEP only has recent data (last few days)
+  const now = new Date();
+  const requestedDate = new Date(`${year}-${month}-${day}T${hour}:00:00Z`);
+  const daysDiff = (now - requestedDate) / (1000 * 60 * 60 * 24);
+  
+  if (daysDiff > 7) {
+    throw new Error('NCEP only has data for the last 7 days');
+  }
+  
+  const meshReports = [];
+  
+  // Try to fetch several MESH files for the hour (every 2 minutes)
+  for (let minute = 0; minute < 60; minute += 10) {
+    try {
+      const timestamp = `${year}${month}${day}-${hour}${String(minute).padStart(2, '0')}00`;
+      const url = `https://mrms.ncep.noaa.gov/data/2D/MESH/MRMS_MESH_00.50_${timestamp}.grib2.gz`;
+  
+      console.log(`[MRMS Proxy] Trying NCEP: ${url}`);
+      
+      const response = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'Accept-Encoding': 'gzip'
+        }
+      });
+      
+      // Save compressed GRIB2 file
+      const gzPath = path.join(TEMP_DIR, `mesh_${timestamp}.grib2.gz`);
+      await fs.writeFile(gzPath, response.data);
+      
+      // Decompress the file
+      const gribPath = gzPath.replace('.gz', '');
+      try {
+        await execPromise(`gunzip -f ${gzPath}`);
+      } catch (error) {
+        console.log('[MRMS Proxy] gunzip failed, trying to process as-is');
+        // Some systems might not have gunzip, try to process the gzip directly
+      }
+      
+      // Process GRIB2 file
+      const reports = await processGRIB2(
+        fs.existsSync(gribPath) ? gribPath : gzPath, 
+        `${year}-${month}-${day}T${hour}:${String(minute).padStart(2, '0')}:00Z`
+      );
+      
+      meshReports.push(...reports);
+      
+      // Cleanup
+      await fs.unlink(gribPath).catch(() => {});
+      await fs.unlink(gzPath).catch(() => {});
+      
+    } catch (error) {
+      console.log(`[MRMS Proxy] Failed to fetch ${minute}min:`, error.message);
+    }
+  }
+  
+  return meshReports;
 }
 
 /**

@@ -66,7 +66,7 @@ export class WeatherHistoryService {
         
         while (current <= end) {
           try {
-            const reports = await IEMArchiveService.fetchHistoricalStorm(current);
+            const reports = await IEMArchiveService.fetchHistoricalMESH(current);
             if (reports.length > 0) {
               results.push(this.createStormEvent(current, reports));
             }
@@ -107,7 +107,7 @@ export class WeatherHistoryService {
     const current = new Date(startDate);
     while (current <= endDate) {
       try {
-        const reports = await MRMSProxyService.fetchHistoricalMRMS(current);
+        const reports = await IEMArchiveService.fetchHistoricalMESH(current);
         if (reports.length > 0) {
           results.push(this.createStormEvent(current, reports));
         }
