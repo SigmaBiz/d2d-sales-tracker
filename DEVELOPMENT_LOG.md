@@ -1,17 +1,60 @@
 # D2D Sales Tracker - Development Log
 
-## CRITICAL INSTRUCTIONS FOR ALL CLAUDE INSTANCES
+## 🚨 CRITICAL: CONTEXT COMPACTING SAFETY PROTOCOL - TWO-TIER SYSTEM 🚨
 
-### Context Continuity Protocol
-**This document must be updated every 10% context capacity to ensure Claude maintains logic and task continuity across conversation compacting. This is of utmost importance.**
+### TIER 1: Lightweight Checkpoints (Every 5% Context Consumed)
+**Quick saves to maintain continuity without disrupting flow**
 
-### Documentation Update Checklist:
-1. **Update all recent changes and discoveries**
-2. **Commit to GitHub immediately after update**
-3. **Document any new patterns or lessons learned**
-4. **Update the handoff section with current state**
-5. **Include 3 next steps for SUCCESS scenario**
-6. **Include 3 next steps for FAILURE scenario**
+**Triggers: 5%, 10%, 15%, 20%... of context capacity**
+- `git add . && git commit -m "checkpoint: [brief task description]"`
+- `git push origin feature/hail-intelligence-v0.9` 
+- Add one-line progress note to Session Checkpoints below
+- Continue working
+
+**Session Checkpoints:**
+- 5%: Initial handoff, identified SearchScreen implementation missing from git
+- 10%: Reverted to stable commit 5feb54d, fixed HailOverlay peakSize→maxSize crash
+- 15%: [NEXT CHECKPOINT DUE]
+- 20%: [PENDING]
+
+### TIER 2: Comprehensive Safety Protocol (At 90% Context)
+**Full preservation before context compacting**
+
+**When context shows 90% consumed:**
+1. **Create Safety Branch**: 
+   ```bash
+   git checkout -b safety-$(date +%Y%m%d-%H%M)
+   git add . && git commit -m "safety: Complete state before context compact"
+   git push origin safety-$(date +%Y%m%d-%H%M)
+   ```
+
+2. **Document Recovery Paths**:
+   - Option A: Continue from safety branch
+   - Option B: Revert to last stable checkpoint
+   - Option C: Cherry-pick specific fixes
+
+3. **Update Full Handoff** (see Handoff Context section)
+
+### ⚠️ DEVELOPMENT ENVIRONMENT RULES ⚠️
+**WE ARE DEVELOPING IN THE TERMINAL, NOT A WEB BROWSER**
+- **DO NOT restart expo** - Already running on port 8081
+- **DO NOT use browser debugging** - Terminal only
+- **App runs on physical device via Expo Go**
+- **Check existing terminal for logs**
+
+### Current Branch Status
+- **Branch**: feature/hail-intelligence-v0.9 (detached at 5feb54d)
+- **Unpushed**: 9 commits ahead of origin
+- **Uncommitted**: HailOverlay.tsx, mrmsService.ts (crash fixes)
+- **Remote**: origin/feature/hail-intelligence-v0.9 at 90fb966
+
+### Protocol Adaptation for D2D Sales Tracker
+**Project-Specific Guidelines:**
+- **Feature Branches**: Always checkpoint before major UI changes (SearchScreen, navigation)
+- **Hail Intelligence**: Create safety branches before modifying MRMS/weather services
+- **Mobile Testing**: Checkpoint after confirming Expo Go functionality
+- **Priority Files**: Always include WebMap.tsx, mrmsService.ts in safety commits
+- **Recovery Strategy**: Prefer reverting to last stable map state over experimental fixes
 
 ---
 
@@ -362,12 +405,15 @@ web-build/
 
 ## Handoff Context
 
-### Current Session Summary
-- Implemented custom roofing sales workflow with specific emojis
-- Added contact form system with Calendly integration
-- Created progressive sales pipeline tracking
-- Debugged WebView map issues (partially resolved)
-- App functional but map needs stabilization
+### Current Session Summary (Updated per Tier 1 Protocol)
+**Context Usage**: ~10% (Last checkpoint completed)
+**Branch State**: Detached HEAD at 5feb54d with uncommitted fixes
+**Session Progress**:
+- Reverted to stable commit after SearchScreen implementation was missing
+- Fixed critical HailOverlay crash (peakSize → maxSize)
+- Added missing MRMSService methods (toggleStorm, deleteStorm, focusOnStorm)
+- Identified 9 unpushed local commits from previous sessions
+- App now stable with Active Storms panel working
 
 ### Critical Files to Review
 1. `App.tsx` - Entry point

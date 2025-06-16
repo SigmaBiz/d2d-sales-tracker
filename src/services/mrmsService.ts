@@ -33,6 +33,7 @@ export interface StormEvent {
   maxSize: number;
   center: { lat: number; lon: number };
   isActive: boolean;
+  enabled?: boolean;
   source: 'MRMS' | 'IEM' | 'Mock';
   confidence: number;
 }
@@ -176,6 +177,7 @@ export class MRMSService {
       maxSize: Math.max(...reports.map(r => r.size)),
       center: center,
       isActive: true,
+      enabled: true,
       source: source,
       confidence: avgConfidence
     };
@@ -277,6 +279,37 @@ export class MRMSService {
       }
       await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(storms));
     }
+  }
+
+  /**
+   * Toggle storm enabled status (for display on map)
+   */
+  static async toggleStorm(stormId: string, enabled: boolean): Promise<void> {
+    const storms = await this.getActiveStorms();
+    const storm = storms.find(s => s.id === stormId);
+    
+    if (storm) {
+      // Add enabled property if it doesn't exist
+      (storm as any).enabled = enabled;
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(storms));
+    }
+  }
+
+  /**
+   * Delete a storm
+   */
+  static async deleteStorm(stormId: string): Promise<void> {
+    const storms = await this.getActiveStorms();
+    const filteredStorms = storms.filter(s => s.id !== stormId);
+    await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(filteredStorms));
+  }
+
+  /**
+   * Focus on a specific storm (placeholder for future implementation)
+   */
+  static async focusOnStorm(stormId: string): Promise<void> {
+    // This will be implemented to center the map on the storm
+    console.log(`Focusing on storm: ${stormId}`);
   }
 
   /**

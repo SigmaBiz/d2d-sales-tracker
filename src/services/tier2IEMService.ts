@@ -72,24 +72,8 @@ export class IEMArchiveService {
    */
   private static async fetchArchiveData(url: string, date: Date): Promise<any> {
     try {
-      // In production, this would:
-      // 1. Download ZIP file through proxy
-      // 2. Extract GRIB2 files
-      // 3. Parse MESH data
-      // 4. Generate polygons
-      
-      // For now, use alternative JSON endpoint
-      const jsonUrl = `${this.BASE_URL}/json/ridge.php?` +
-        `product=mesh&` +
-        `year=${date.getFullYear()}&` +
-        `month=${date.getMonth() + 1}&` +
-        `day=${date.getDate()}&` +
-        `hour=${date.getHours()}`;
-
-      const response = await fetch(jsonUrl);
-      if (!response.ok) throw new Error('Failed to fetch IEM data');
-      
-      return await response.json();
+      // Direct fetch will fail due to CORS, throw error to trigger alternative
+      throw new Error('Direct fetch not available - use proxy');
     } catch (error) {
       console.error('[TIER 2] Archive fetch error:', error);
       throw error;
@@ -101,20 +85,19 @@ export class IEMArchiveService {
    */
   private static async fetchAlternativeIEM(date: Date): Promise<HailReport[]> {
     try {
-      // Use IEM's GeoJSON service
-      const dateStr = date.toISOString().split('T')[0];
-      const url = `${this.BASE_URL}/geojson/mesh.php?` +
-        `valid=${dateStr}&` +
-        `fmt=geojson`;
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        // Return empty array if no data
-        return [];
+      // First try using the MRMS proxy for historical data
+      console.log('[TIER 2] Using MRMS proxy for historical data:', date.toISOString());
+      const { MRMSProxyService } = await import('./mrmsProxyService');
+      const proxyReports = await MRMSProxyService.fetchHistoricalMRMS(date);
+      
+      if (proxyReports && proxyReports.length > 0) {
+        console.log('[TIER 2] Got', proxyReports.length, 'reports from proxy');
+        return proxyReports;
       }
-
-      const geojson = await response.json();
-      return this.processGeoJSON(geojson, date);
+      
+      // If proxy returns no data, return empty array
+      console.log('[TIER 2] No data available for date:', date.toISOString());
+      return [];
     } catch (error) {
       console.error('[TIER 2] Alternative IEM fetch error:', error);
       return [];

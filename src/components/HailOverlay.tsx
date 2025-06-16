@@ -135,10 +135,10 @@ export default function HailOverlay({
                   </Text>
                   <View style={styles.sizeIndicator}>
                     <Text style={styles.sizeEmoji}>
-                      {getHailSizeEmoji(storm.peakSize)}
+                      {getHailSizeEmoji(storm.maxSize)}
                     </Text>
                     <Text style={styles.sizeText}>
-                      {storm.peakSize.toFixed(1)}"
+                      {storm.maxSize.toFixed(1)}"
                     </Text>
                   </View>
                 </View>
