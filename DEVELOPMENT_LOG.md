@@ -14,7 +14,7 @@
 **Session Checkpoints:**
 - 5%: Initial handoff, identified SearchScreen implementation missing from git
 - 10%: Reverted to stable commit 5feb54d, fixed HailOverlay peakSize→maxSize crash
-- 15%: [NEXT CHECKPOINT DUE]
+- 15%: Fixed IEM service CORS errors, updated to use MRMS proxy (commit 2989053)
 - 20%: [PENDING]
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)

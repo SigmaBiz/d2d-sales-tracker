@@ -37,22 +37,34 @@ export class MRMSProxyService {
     // Check cache first
     const cacheKey = `historical_${dateStr}`;
     const cached = await this.getCached(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      console.log('[MRMSProxy] Returning cached data for', dateStr);
+      return cached;
+    }
 
     try {
-      const response = await fetch(
-        `${PROXY_URL}/api/mrms?type=historical&date=${dateStr}`
-      );
+      const url = `${PROXY_URL}/api/mrms?type=historical&date=${dateStr}`;
+      console.log('[MRMSProxy] Fetching from:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
       
+      console.log('[MRMSProxy] Response:', data);
+      
+      if (!data.reports || !Array.isArray(data.reports)) {
+        console.log('[MRMSProxy] No reports in response');
+        return [];
+      }
+      
       const reports = this.convertToHailReports(data.reports);
+      console.log('[MRMSProxy] Converted', reports.length, 'reports');
       
       // Cache the results
       await this.setCached(cacheKey, reports);
       
       return reports;
     } catch (error) {
-      console.error('Historical MRMS error:', error);
+      console.error('[MRMSProxy] Historical MRMS error:', error);
       return [];
     }
   }
@@ -84,11 +96,13 @@ export class MRMSProxyService {
       id: `mrms_${Date.now()}_${index}`,
       latitude: report.lat || report.latitude,
       longitude: report.lon || report.longitude,
-      size: (report.mesh_mm || 25) / 25.4, // Convert mm to inches
+      size: report.mesh_inches || ((report.mesh_mm || 25) / 25.4), // Use mesh_inches if available, otherwise convert mm to inches
       timestamp: new Date(report.timestamp || Date.now()),
       confidence: report.confidence || 85,
       city: report.city || 'Unknown',
-      isMetroOKC: this.isMetroOKC(report.lat, report.lon)
+      isMetroOKC: this.isMetroOKC(report.lat || report.latitude, report.lon || report.longitude),
+      source: 'MRMS Proxy',
+      meshValue: report.mesh_mm || (report.mesh_inches ? report.mesh_inches * 25.4 : 25)
     }));
   }
 

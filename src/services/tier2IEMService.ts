@@ -31,39 +31,17 @@ export class IEMArchiveService {
     try {
       // Validate date range
       if (date < this.MIN_DATE || date > new Date()) {
-        throw new Error('Date must be between October 2019 and today');
+        console.log('[TIER 2] Date out of range:', date.toISOString());
+        return [];
       }
 
-      console.log(`[TIER 2] Fetching IEM Archive data for ${date.toISOString()}`);
+      console.log(`[TIER 2] Fetching historical data for ${date.toISOString()}`);
 
-      // Format date for IEM archive
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hour = String(date.getHours()).padStart(2, '0');
-
-      // IEM Archive URL format
-      // https://mrms.agron.iastate.edu/YYYY/mm/dd/YYYYmmddHH.zip
-      const archiveUrl = `${this.BASE_URL}/${year}/${month}/${day}/${year}${month}${day}${hour}.zip`;
-
-      // Try direct fetch (will need proxy for CORS)
-      const data = await this.fetchArchiveData(archiveUrl, date);
-      
-      // Process and validate MESH data
-      const reports = this.processIEMData(data, date);
-      
-      // Apply historical confidence scoring (70-85%)
-      const validatedReports = this.applyHistoricalConfidence(reports);
-
-      // Cache processed data
-      await this.cacheProcessedData(date, validatedReports);
-
-      return validatedReports;
-    } catch (error) {
-      console.error('[TIER 2] Error fetching IEM Archive:', error);
-      
-      // Try alternative endpoints
+      // Skip direct fetch and go straight to proxy
       return await this.fetchAlternativeIEM(date);
+    } catch (error) {
+      console.error('[TIER 2] Error fetching historical data:', error);
+      return [];
     }
   }
 

@@ -51,9 +51,13 @@ export class WeatherHistoryService {
     try {
       if (params.date) {
         // Single date search using IEM
+        console.log('[WeatherHistory] Searching for date:', params.date.toISOString());
         const reports = await IEMArchiveService.fetchHistoricalStorm(params.date);
+        console.log('[WeatherHistory] IEM returned', reports.length, 'reports');
         if (reports.length > 0) {
-          results.push(this.createStormEvent(params.date, reports));
+          const stormEvent = this.createStormEvent(params.date, reports);
+          console.log('[WeatherHistory] Created storm event:', stormEvent);
+          results.push(stormEvent);
         }
       } else if (params.dateRange) {
         // Date range search
@@ -135,6 +139,7 @@ export class WeatherHistoryService {
    * Create storm event from reports
    */
   private static createStormEvent(date: Date, reports: HailReport[]): HistoricalStormEvent {
+    console.log('[WeatherHistory] Creating storm event from', reports.length, 'reports');
     const maxSize = Math.max(...reports.map(r => r.size));
     const avgConfidence = reports.reduce((sum, r) => sum + r.confidence, 0) / reports.length;
     
@@ -144,6 +149,8 @@ export class WeatherHistoryService {
     
     // Determine city name from reports
     const cityName = reports.find(r => r.city)?.city || 'Oklahoma';
+    
+    console.log('[WeatherHistory] Storm event details - City:', cityName, 'Max size:', maxSize, 'Reports:', reports.length);
     
     return {
       date,

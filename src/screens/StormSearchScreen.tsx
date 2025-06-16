@@ -47,10 +47,12 @@ export default function StormSearchScreen({ navigation }: any) {
 
         case 'date':
           // Search specific date
+          console.log('[StormSearch] Searching for date:', selectedDate.toISOString());
           results = await WeatherHistoryService.searchStorms({
             date: selectedDate,
             location: searchLocation || undefined
           });
+          console.log('[StormSearch] Found', results.length, 'results');
           break;
 
         case 'location':
@@ -79,6 +81,14 @@ export default function StormSearchScreen({ navigation }: any) {
 
   const loadStormData = async (event: HistoricalStormEvent) => {
     try {
+      console.log('[StormSearch] Loading storm data:', event.location.name, event.date);
+      console.log('[StormSearch] Reports count:', event.reports.length);
+      
+      if (!event.reports || event.reports.length === 0) {
+        Alert.alert('No Data', 'This storm event has no hail reports to display.');
+        return;
+      }
+      
       // Create a storm event from historical data
       const storm = await MRMSService.groupIntoStormEvents(event.reports);
       storm.name = `${event.location.name} - ${event.date.toLocaleDateString()}`;
@@ -95,8 +105,8 @@ export default function StormSearchScreen({ navigation }: any) {
         ]
       );
     } catch (error) {
-      console.error('Error loading storm:', error);
-      Alert.alert('Error', 'Failed to load storm data');
+      console.error('[StormSearch] Error loading storm:', error);
+      Alert.alert('Error', `Failed to load storm data: ${error.message}`);
     }
   };
 
@@ -170,13 +180,34 @@ export default function StormSearchScreen({ navigation }: any) {
         </TouchableOpacity>
       )}
 
-      {showDatePicker && (
+      {showDatePicker && Platform.OS === 'ios' && (
+        <View style={styles.iosDatePickerContainer}>
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="spinner"
+            onChange={(event, date) => {
+              if (date) setSelectedDate(date);
+            }}
+            maximumDate={new Date()}
+            minimumDate={new Date('2019-10-01')} // IEM Archives available from October 2019
+          />
+          <TouchableOpacity
+            style={styles.iosDateDoneButton}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <Text style={styles.iosDateDoneText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
           value={selectedDate}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display="default"
           onChange={(event, date) => {
-            setShowDatePicker(Platform.OS === 'android');
+            setShowDatePicker(false);
             if (date) setSelectedDate(date);
           }}
           maximumDate={new Date()}
@@ -254,9 +285,33 @@ export default function StormSearchScreen({ navigation }: any) {
         <Text style={styles.significantDatesTitle}>Known Storm Dates</Text>
         <TouchableOpacity
           style={styles.significantDateButton}
-          onPress={() => {
+          onPress={async () => {
             setSelectedDate(new Date('2024-09-24'));
             setSearchType('date');
+            // Automatically search for this date
+            setLoading(true);
+            try {
+              console.log('[StormSearch] Quick searching for Sept 24, 2024');
+              const results = await WeatherHistoryService.searchStorms({
+                date: new Date('2024-09-24')
+              });
+              console.log('[StormSearch] Search complete. Results:', results);
+              console.log('[StormSearch] Found', results.length, 'storm events for Sept 24');
+              
+              if (results.length > 0) {
+                console.log('[StormSearch] First result has', results[0].reports.length, 'reports');
+              }
+              
+              setSearchResults(results);
+              if (results.length === 0) {
+                Alert.alert('No Storms Found', 'No data available for September 24, 2024.\n\nThis may be due to data source unavailability.');
+              }
+            } catch (error) {
+              console.error('[StormSearch] Error:', error);
+              Alert.alert('Error', `Failed to search storm history: ${error.message}`);
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           <Text style={styles.significantDateText}>Sept 24, 2024 - Major OKC Metro Event</Text>
@@ -478,5 +533,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1e40af',
     fontWeight: '500',
+  },
+  iosDatePickerContainer: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    marginVertical: 12,
+    overflow: 'hidden',
+  },
+  iosDateDoneButton: {
+    backgroundColor: '#1e40af',
+    padding: 12,
+    alignItems: 'center',
+  },
+  iosDateDoneText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
