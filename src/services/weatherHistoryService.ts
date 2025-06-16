@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
-import { IEMArchiveService } from './tier2IEMService';
+import { IEMArchiveService } from './iemArchiveService';
 import { MRMSProxyService } from './mrmsProxyService';
 
 // Cache for search results
