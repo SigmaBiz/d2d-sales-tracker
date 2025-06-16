@@ -18,6 +18,7 @@
 - 20%: Fixed storm date search proxy conversion, verified Sept 24 data available (commit 65e80b3)
 - 25%: Storm search fully functional, dates display correctly, pushed to origin (commit 90ed7a0)
 - 30%: Tier 2 mock implementation complete with IEMArchiveService (commit 188d706)
+- 35%: Tier 2 proxy server created, debugging method name mismatch (commit 9a7adfb)
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -60,11 +61,18 @@
 **REMEMBER: Before production deployment, restore these settings to their original values!**
 
 ### Current Branch Status
-- **Branch**: feature/hail-intelligence-v0.9 (detached HEAD at 90ed7a0)
+- **Branch**: feature/hail-intelligence-v0.9 (detached HEAD at 9a7adfb)
 - **Unpushed**: 0 commits (synced with origin)
 - **Uncommitted**: None (working directory clean)
-- **Remote**: origin/feature/hail-intelligence-v0.9 at 90ed7a0
-- **Latest commit**: 90ed7a0 Fix storm date display using local timezone
+- **Remote**: origin/feature/hail-intelligence-v0.9 at 9a7adfb
+- **Latest commit**: 9a7adfb checkpoint: Tier 2 proxy integration debugging
+
+### Proxy Server Status
+- **Location**: /mrms-proxy-server
+- **Running on**: http://localhost:3001
+- **Device Access**: http://192.168.1.111:3001
+- **Status**: Running with nodemon, receiving requests for 2025 dates
+- **Issue**: Sept 24 searches not reaching proxy due to method name mismatch
 
 ### Protocol Adaptation for D2D Sales Tracker
 **Project-Specific Guidelines:**
@@ -463,14 +471,25 @@ Data Flow: Storm Events DB → Actual Reports → Validation → Accuracy Improv
 ```
 
 ### Current Session Summary (Updated per Tier 1 Protocol)
-**Context Usage**: ~25% (Last checkpoint completed)
-**Branch State**: Detached HEAD at ba4a68f
+**Context Usage**: ~35% (Last checkpoint completed)
+**Branch State**: Detached HEAD at 9a7adfb
 **Session Progress**:
 - Storm search and display fully functional
 - Fixed date display issues with local timezone
 - Added "Clear All Storms" button
 - Disabled GPS updates for development
 - Created IEMArchiveService for Tier 2 implementation
+- Built MRMS proxy server for GRIB2 processing
+- **DEBUGGING**: Sept 24 searches not routing through proxy (fetchHistoricalStorm vs fetchHistoricalMESH)
+
+### 🐛 Active Debug Issue - Tier 2 Proxy Integration
+**Problem**: Storm searches for Sept 24, 2024 are using mock data instead of proxy
+**Root Cause**: WeatherHistoryService was calling `fetchHistoricalStorm` but IEMArchiveService only has `fetchHistoricalMESH`
+**Status**: Fixed method name, needs testing
+**Next Steps**: 
+1. Reload app and test Sept 24 search
+2. Verify proxy receives request for 2024-09-24
+3. Check date formatting (Sept 24 showing as Sept 23 in some logs)
 
 ### Critical Files to Review
 1. `App.tsx` - Entry point
