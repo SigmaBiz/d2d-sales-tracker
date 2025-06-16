@@ -15,7 +15,7 @@
 - 5%: Initial handoff, identified SearchScreen implementation missing from git
 - 10%: Reverted to stable commit 5feb54d, fixed HailOverlay peakSize→maxSize crash
 - 15%: Fixed IEM service CORS errors, updated to use MRMS proxy (commit 2989053)
-- 20%: [PENDING]
+- 20%: Fixed storm date search proxy conversion, verified Sept 24 data available (commit 65e80b3)
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
