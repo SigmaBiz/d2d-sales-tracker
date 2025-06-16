@@ -52,7 +52,7 @@ export class WeatherHistoryService {
       if (params.date) {
         // Single date search using IEM
         console.log('[WeatherHistory] Searching for date:', params.date.toISOString());
-        const reports = await IEMArchiveService.fetchHistoricalStorm(params.date);
+        const reports = await IEMArchiveService.fetchHistoricalMESH(params.date);
         console.log('[WeatherHistory] IEM returned', reports.length, 'reports');
         if (reports.length > 0) {
           const stormEvent = this.createStormEvent(params.date, reports);
