@@ -144,7 +144,7 @@ export default function HailOverlay({
                 </View>
                 
                 <Text style={styles.stormDetails}>
-                  {storm.reports.length} reports • {storm.startTime.toLocaleTimeString()}
+                  {storm.reports.length} reports • {storm.startTime.toLocaleDateString()} {storm.startTime.toLocaleTimeString()}
                 </Text>
                 
                 {storm.reports.length > 0 && (

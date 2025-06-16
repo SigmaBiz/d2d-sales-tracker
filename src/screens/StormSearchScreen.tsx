@@ -93,6 +93,11 @@ export default function StormSearchScreen({ navigation }: any) {
       const storm = await MRMSService.groupIntoStormEvents(event.reports);
       storm.name = `${event.location.name} - ${event.date.toLocaleDateString()}`;
       
+      // Override the startTime to use the search date instead of report timestamps
+      // This prevents timezone issues where UTC timestamps show as previous day
+      storm.startTime = new Date(event.date);
+      storm.startTime.setHours(12, 0, 0, 0); // Set to noon to avoid timezone edge cases
+      
       // Save the storm event
       await MRMSService.saveStormEvent(storm);
       
