@@ -28,24 +28,38 @@ export class IEMArchiveService {
         return [];
       }
 
-      // Format date for IEM archive URL
+      // Format date for proxy server
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
-      // IEM provides hourly GRIB2 files
-      // For now, let's try to get the peak storm time (usually afternoon)
-      const hour = '20'; // 8 PM UTC = 3 PM CDT (typical storm time)
+      // Use local proxy server (or deployed proxy URL)
+      const PROXY_URL = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'http://localhost:3001';
+      const url = `${PROXY_URL}/api/mesh/${dateStr}`;
       
-      const url = `${this.BASE_URL}/${year}/${month}/${day}/${year}${month}${day}${hour}.zip`;
-      console.log('[IEM Archive] Fetching from:', url);
+      console.log('[IEM Archive] Fetching from proxy:', url);
       
-      // Note: Direct fetch will fail due to CORS
-      // We need a proxy server or to process this server-side
-      console.log('[IEM Archive] Direct fetch not available due to CORS - need proxy implementation');
-      
-      // For now, return mock data to show the data flow
-      return this.getMockHistoricalData(date);
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.reports && Array.isArray(data.reports)) {
+          console.log('[IEM Archive] Got', data.reports.length, 'MESH reports from proxy');
+          return data.reports.map((report: any) => ({
+            ...report,
+            timestamp: new Date(report.timestamp)
+          }));
+        }
+        
+        console.log('[IEM Archive] No reports in proxy response');
+        return [];
+        
+      } catch (fetchError) {
+        console.log('[IEM Archive] Proxy not available, using mock data');
+        // Fallback to mock data if proxy is not running
+        return this.getMockHistoricalData(date);
+      }
     } catch (error) {
       console.error('[IEM Archive] Error fetching historical MESH:', error);
       return [];
