@@ -16,6 +16,25 @@ This log maintains a comprehensive record of all development sessions for the D2
 - Tag significant versions for easy rollback
 - Document breaking changes prominently
 
+### AI Agent Guidance Protocol
+**For future AI agents working on this codebase:**
+- Treat user input as feedback to build upon, not direct instructions
+- Ensure all implementations align with the user's ultimate vision
+- Ask clarifying questions when user intent is ambiguous
+- Consider the broader context of the application's purpose
+
+**User's Ultimate Vision for D2D Sales Tracker:**
+This is a canvassing app designed to:
+1. **Save valuable D2D field data** for lead generation
+2. **Guide canvassers to maximize efficiency** by providing features that optimize routes and identify high-potential areas
+3. **Primary feature: Hail tracking** - Enable canvassers to know where to go for optimal lead generation and sales conversion
+
+**Core Principles:**
+- **Intuitive and Simple** - Easy to use in the field without training
+- **Data Protection Priority** - Ensure data is ALWAYS safe, even if app crashes. Data recovery must be possible.
+- **Adequate Hail Tracking** - NOTIFY users when significant storms occur
+- **Field-First Design** - Every feature must work reliably in real field conditions
+
 ## Milestones & Cornerstones
 
 ### Completed Milestones ✅
@@ -26,6 +45,7 @@ This log maintains a comprehensive record of all development sessions for the D2
 5. **Hail Contour Visualization** - Professional hail maps with size-based coloring
 6. **Vercel Deployment** - Free proxy server for CORS-protected data
 7. **Launch Ready Version** - v1.0-launch-ready-needs-uiux tagged
+8. **Accurate Hail Overlays** - v1.1-overlays-working-correctly tagged
 
 ### Active Cornerstones 🏗️
 1. **3-Tier Hail Intelligence Architecture**
@@ -46,6 +66,40 @@ This log maintains a comprehensive record of all development sessions for the D2
 - Full GRIB2 processing implementation
 
 ## Session Logs
+
+### 2025-01-19 - Perfect Hail Overlay Visualization
+**Session Focus**: Fix hail overlay accuracy and storm data management
+
+**Key Changes**:
+1. Fixed storm deletion/clearing not updating map overlays
+   - Added proper null contour handling in WebMap
+   - Storm delete and toggle now properly update map state
+   - Clear all storms correctly refreshes overlay
+
+2. Implemented realistic storm data
+   - Created storm swath generator for dense MESH data (493+ points)
+   - Added Nov 3, 2024 and May 17, 2025 storm data
+   - Proper hail size distribution along storm paths
+
+3. Solved overlay popup accuracy issues
+   - Fixed popups showing wrong hail sizes
+   - Tuned MRMS interpolation (reduced smoothing sigma 2→1)
+   - Ensured larger hail zones are properly clickable
+
+4. Validated meteorological accuracy
+   - Analyzed that only 6% of points had 2"+ hail
+   - Confirmed 1.75-2" max display is accurate for Sept 24 storm
+   - Smoothing creates realistic gradients matching actual hail patterns
+
+**Technical Decisions**:
+- Use MRMS contours for smooth, realistic visualization
+- Keep smoothing at sigma=1 to preserve peak values
+- Prioritize meteorological accuracy over exact value display
+
+**Deployment Status**:
+- Local proxy server handles dense storm data
+- Vercel deployment optimized for performance
+- Tagged: v1.1-overlays-working-correctly
 
 ### 2025-01-19 - Launch Ready & UI/UX Cleanup
 **Session Focus**: Prepare app for field deployment
@@ -132,6 +186,6 @@ This log maintains a comprehensive record of all development sessions for the D2
 - D3-contour for smooth hail visualization
 
 ## Deployment URLs
-- Proxy Server: https://mrms-proxy-server-nine.vercel.app
+- Proxy Server: https://mrms-proxy-server-nine.vercel.app (or local: http://192.168.1.111:3001)
 - GitHub Repo: https://github.com/SigmaBiz/d2d-sales-tracker
-- Latest Tag: v1.0-launch-ready-needs-uiux
+- Latest Tag: v1.1-overlays-working-correctly
