@@ -22,7 +22,6 @@ const DEV_DISABLE_GPS_UPDATES = true; // Set to false for production
 export default function RealMapScreen({ navigation }: any) {
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeStorms, setActiveStorms] = useState<StormEvent[]>([]);
   const [hailData, setHailData] = useState<HailReport[]>([]);
@@ -86,6 +85,12 @@ export default function RealMapScreen({ navigation }: any) {
         lat: location.coords.latitude,
         lng: location.coords.longitude,
       });
+    } else {
+      // Default to Oklahoma City if no location permission
+      setUserLocation({
+        lat: 35.4676,
+        lng: -97.5164,
+      });
     }
   };
 
@@ -114,15 +119,6 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
-  const toggleTracking = async () => {
-    if (isTracking) {
-      await LocationService.stopBackgroundLocationTracking();
-      setIsTracking(false);
-    } else {
-      await LocationService.startBackgroundLocationTracking();
-      setIsTracking(true);
-    }
-  };
 
   const centerOnUser = () => {
     updateLocation();
@@ -374,19 +370,6 @@ export default function RealMapScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity 
-        style={[styles.trackingButton, isTracking && styles.trackingActive]} 
-        onPress={toggleTracking}
-      >
-        <Ionicons 
-          name={isTracking ? "pause-circle" : "play-circle"} 
-          size={20} 
-          color="white" 
-        />
-        <Text style={styles.trackingText}>
-          {isTracking ? 'Stop' : 'Track'}
-        </Text>
-      </TouchableOpacity>
       
     </View>
   );
@@ -473,30 +456,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-  },
-  trackingButton: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(30, 64, 175, 0.9)', // Semi-transparent blue
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  trackingActive: {
-    backgroundColor: 'rgba(220, 38, 38, 0.9)', // Semi-transparent red
-  },
-  trackingText: {
-    color: 'white',
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

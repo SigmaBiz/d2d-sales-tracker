@@ -30,6 +30,12 @@
           <string>com.yourcompany.d2dsalestracker</string>
         </array>
       </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+d2d-sales-tracker</string>
+        </array>
+      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>

@@ -17,15 +17,8 @@ export class MRMSProxyService {
    * Fetch real-time MRMS data through free proxy
    */
   static async fetchRealtimeMRMS(): Promise<HailReport[]> {
-    try {
-      const response = await fetch(`${PROXY_URL}/api/mrms?type=realtime`);
-      const data = await response.json();
-      
-      return this.convertToHailReports(data.reports);
-    } catch (error) {
-      console.error('MRMS proxy error:', error);
-      return [];
-    }
+    // Real-time not implemented yet - return empty
+    return [];
   }
 
   /**
@@ -42,31 +35,8 @@ export class MRMSProxyService {
       return cached;
     }
 
-    try {
-      const url = `${PROXY_URL}/api/mrms?type=historical&date=${dateStr}`;
-      console.log('[MRMSProxy] Fetching from:', url);
-      
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      console.log('[MRMSProxy] Response:', data);
-      
-      if (!data.reports || !Array.isArray(data.reports)) {
-        console.log('[MRMSProxy] No reports in response');
-        return [];
-      }
-      
-      const reports = this.convertToHailReports(data.reports);
-      console.log('[MRMSProxy] Converted', reports.length, 'reports');
-      
-      // Cache the results
-      await this.setCached(cacheKey, reports);
-      
-      return reports;
-    } catch (error) {
-      console.error('[MRMSProxy] Historical MRMS error:', error);
-      return [];
-    }
+    // This old proxy is deprecated - return empty
+    return [];
   }
 
   /**

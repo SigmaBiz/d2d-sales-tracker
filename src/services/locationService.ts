@@ -18,6 +18,13 @@ export class LocationService {
 
   static async getCurrentLocation(): Promise<Location.LocationObject | null> {
     try {
+      // Check permissions first
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission not granted, skipping location update');
+        return null;
+      }
+
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });

@@ -34,18 +34,9 @@ export class NCEPMRMSService {
   static async startRealTimeMonitoring(): Promise<void> {
     console.log('[TIER 1] Starting NCEP MRMS real-time monitoring...');
     
-    // Clear any existing interval
-    if (this.monitoringInterval) {
-      clearInterval(this.monitoringInterval);
-    }
-
-    // Initial check
-    await this.checkForNewStorms();
-
-    // Set up 2-minute interval
-    this.monitoringInterval = setInterval(async () => {
-      await this.checkForNewStorms();
-    }, this.UPDATE_INTERVAL);
+    // Disabled for now - Tier 1 not implemented yet
+    // Will enable when we have real NCEP access
+    return;
   }
 
   /**
