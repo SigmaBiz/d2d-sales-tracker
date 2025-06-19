@@ -198,8 +198,8 @@ function generateRealisticStormSwath(config) {
           meshValue: finalSize * 25.4,
           timestamp: new Date(`${date}T${time}Z`),
           confidence: 85 + Math.random() * 10,
-          city: 'OKC Metro',  // Simplified to avoid performance issues
-          isMetroOKC: true,    // All points are in metro for this storm
+          city: getClosestCity(lat, lon),
+          isMetroOKC: isMetroOKC(lat, lon),
           source: 'Historical MESH Data'
         });
       }
@@ -229,9 +229,11 @@ function getHistoricalMESHData(date) {
           { lat: 35.5514, lon: -97.4781, size: 2.0 },   // North OKC
           { lat: 35.6528, lon: -97.4781, size: 1.75 }   // Edmond
         ],
-        swathWidth: 0.12, // ~12km wide swath
-        pointDensity: 0.03 // Point every ~3km
+        swathWidth: 0.15, // ~15km wide swath
+        pointDensity: 0.02 // Point every ~2km
       });
+      console.log(`[MRMS Proxy V2] Successfully generated ${swathData.length} storm points`);
+      return swathData;
     } catch (error) {
       console.error('[MRMS Proxy V2] Error generating storm swath:', error.message);
       console.error('[MRMS Proxy V2] Full error:', error);

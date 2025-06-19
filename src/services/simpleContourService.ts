@@ -17,21 +17,39 @@ export class SimpleContourService {
     }
     
     console.log(`SimpleContourService: Processing ${reports.length} hail reports`);
+    
+    // Log all report sizes for debugging
+    console.log('Report sizes:', reports.map(r => ({ id: r.id, size: r.size, city: r.city })));
 
-    // Group reports by size ranges
+    // Group reports by size ranges - ORDER MATTERS! Smallest first, so larger zones render on top
     const sizeRanges = [
-      { min: 3.0, max: 999, color: 'rgba(139, 0, 0, 0.5)', label: '3"+ (Baseball+)' },
-      { min: 2.0, max: 3.0, color: 'rgba(255, 0, 0, 0.5)', label: '2-3" (Egg-Baseball)' },
-      { min: 1.5, max: 2.0, color: 'rgba(255, 140, 0, 0.5)', label: '1.5-2" (Walnut-Egg)' },
-      { min: 1.0, max: 1.5, color: 'rgba(255, 215, 0, 0.5)', label: '1-1.5" (Quarter-Walnut)' },
-      { min: 0.5, max: 1.0, color: 'rgba(173, 255, 47, 0.5)', label: '0.5-1" (Penny-Quarter)' }
+      { min: 0.5, max: 1.0, color: 'rgba(173, 255, 47, 0.6)', label: '0.5-1" (Penny-Quarter)', inclusive: true },
+      { min: 1.0, max: 1.5, color: 'rgba(255, 215, 0, 0.6)', label: '1-1.5" (Quarter-Walnut)', inclusive: false },
+      { min: 1.5, max: 2.0, color: 'rgba(255, 140, 0, 0.6)', label: '1.5-2" (Walnut-Egg)', inclusive: false },
+      { min: 2.0, max: 3.0, color: 'rgba(255, 0, 0, 0.6)', label: '2-3" (Egg-Baseball)', inclusive: false },
+      { min: 3.0, max: 999, color: 'rgba(139, 0, 0, 0.6)', label: '3"+ (Baseball+)', inclusive: false }
     ];
 
     const features: any[] = [];
 
+    // Process size ranges in reverse order (largest first) for proper layering
+    const reversedRanges = [...sizeRanges].reverse();
+    
     // Create a polygon for each size range that has reports
-    sizeRanges.forEach(range => {
-      const rangeReports = reports.filter(r => r.size >= range.min && r.size < range.max);
+    reversedRanges.forEach(range => {
+      // Use <= for max comparison on the first range to include 1.0" reports
+      const rangeReports = reports.filter(r => {
+        if (range.inclusive) {
+          return r.size >= range.min && r.size <= range.max;
+        } else {
+          return r.size >= range.min && r.size < range.max;
+        }
+      });
+      
+      console.log(`Range ${range.label}: found ${rangeReports.length} reports`);
+      if (rangeReports.length > 0) {
+        console.log(`  - Reports in this range:`, rangeReports.map(r => ({ size: r.size, city: r.city })));
+      }
       
       if (rangeReports.length >= 3) { // Need at least 3 points for a polygon
         // Create a convex hull around the points
@@ -57,7 +75,7 @@ export class SimpleContourService {
       } else if (rangeReports.length > 0) {
         // For fewer points, create circles around each point
         rangeReports.forEach(report => {
-          const circle = this.createCircle(report.longitude, report.latitude, 0.05); // ~5km radius
+          const circle = this.createCircle(report.longitude, report.latitude, 0.02); // ~2km radius
           
           features.push({
             type: 'Feature',
@@ -75,6 +93,14 @@ export class SimpleContourService {
       }
     });
 
+    // Sort features by size (smallest first) so larger zones render on top
+    features.sort((a, b) => a.properties.level - b.properties.level);
+    
+    console.log(`Generated ${features.length} contour features`);
+    features.forEach(f => {
+      console.log(`  - Feature: ${f.properties.description}, type: ${f.geometry.type}`);
+    });
+    
     return {
       type: 'FeatureCollection',
       features: features

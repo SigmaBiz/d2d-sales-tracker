@@ -228,23 +228,40 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 
                 console.log('Adding', contourData.features.length, 'contour features to map');
                 
+                // Log each feature's properties for debugging
+                contourData.features.forEach(function(feature, index) {
+                  console.log('Feature ' + index + ':', {
+                    description: feature.properties.description,
+                    color: feature.properties.color,
+                    level: feature.properties.level,
+                    geometryType: feature.geometry.type
+                  });
+                });
+                
                 // Add contour layer
-                hailContourLayer = L.geoJSON(contourData, {
+                // Sort features by level (descending) so larger zones render first
+                var sortedFeatures = contourData.features.sort(function(a, b) {
+                  return b.properties.level - a.properties.level;
+                });
+                
+                hailContourLayer = L.geoJSON({
+                  type: 'FeatureCollection',
+                  features: sortedFeatures
+                }, {
                   style: function(feature) {
                     return {
                       fillColor: feature.properties.color,
-                      fillOpacity: 0.4,
+                      fillOpacity: 0.3,
                       color: feature.properties.color,
-                      weight: 1,
-                      opacity: 0.7
+                      weight: 2,
+                      opacity: 0.8
                     };
                   },
                   onEachFeature: function(feature, layer) {
                     var props = feature.properties;
                     var popupContent = '<div style="font-size: 14px;">';
                     popupContent += '<h4 style="margin: 0 0 8px 0; color: ' + props.color + ';">Hail Zone</h4>';
-                    popupContent += '<p style="margin: 4px 0;"><strong>Size:</strong> ' + props.level.toFixed(1) + '"+ hail</p>';
-                    popupContent += '<p style="margin: 4px 0;"><strong>Description:</strong> ' + props.description + '</p>';
+                    popupContent += '<p style="margin: 4px 0;"><strong>Size Range:</strong> ' + props.description + '</p>';
                     popupContent += '<p style="margin: 4px 0; font-style: italic; color: #6b7280;">Click anywhere in this zone to start canvassing</p>';
                     popupContent += '</div>';
                     
@@ -436,19 +453,22 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
 
   useEffect(() => {
     console.log('WebMap hailContours useEffect - isLoading:', isLoading, 'webViewRef.current:', !!webViewRef.current, 'hailContours:', hailContours);
-    if (!isLoading && webViewRef.current && hailContours) {
-      console.log('Sending hail contours to WebView:', hailContours);
-      try {
-        // Send hail contours to map
-        const message = JSON.stringify({
-          type: 'updateHailContours',
-          contourData: hailContours
-        });
-        console.log('Stringified message length:', message.length);
-        webViewRef.current.postMessage(message);
-        setPendingContours(null); // Clear pending
-      } catch (error) {
-        console.error('Error stringifying hail contours:', error);
+    if (!isLoading && webViewRef.current) {
+      // Send update even if hailContours is null (to clear the overlay)
+      if (hailContours !== undefined) {
+        console.log('Sending hail contours to WebView:', hailContours);
+        try {
+          // Send hail contours to map (or null to clear)
+          const message = JSON.stringify({
+            type: 'updateHailContours',
+            contourData: hailContours
+          });
+          console.log('Stringified message length:', message.length);
+          webViewRef.current.postMessage(message);
+          setPendingContours(null); // Clear pending
+        } catch (error) {
+          console.error('Error stringifying hail contours:', error);
+        }
       }
     } else if (isLoading && hailContours) {
       console.log('Map still loading, storing hail contours as pending');
@@ -458,7 +478,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
 
   // Send pending contours when map becomes ready
   useEffect(() => {
-    if (!isLoading && webViewRef.current && pendingContours) {
+    if (!isLoading && webViewRef.current && pendingContours !== null) {
       console.log('Map now ready, sending pending contours:', pendingContours);
       try {
         const message = JSON.stringify({

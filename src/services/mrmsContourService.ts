@@ -123,13 +123,21 @@ export class MRMSContourService {
 
     // Log interpolation results
     const maxInterpolatedValue = Math.max(...values.flat());
-    console.log(`Interpolation complete: max value before smoothing = ${maxInterpolatedValue}`);
+    const minInterpolatedValue = Math.min(...values.flat().filter(v => v > 0));
+    console.log(`Interpolation complete: min = ${minInterpolatedValue.toFixed(2)}, max = ${maxInterpolatedValue.toFixed(2)}`);
     
     // Apply Gaussian smoothing for professional appearance
-    const smoothed = this.gaussianSmooth(values, 2);
+    // Reduced sigma from 2 to 1 to preserve peak hail values
+    const smoothed = this.gaussianSmooth(values, 1);
     
     const maxSmoothedValue = Math.max(...smoothed.flat());
-    console.log(`After smoothing: max value = ${maxSmoothedValue}`);
+    const minSmoothedValue = Math.min(...smoothed.flat().filter(v => v > 0));
+    console.log(`After smoothing: min = ${minSmoothedValue.toFixed(2)}, max = ${maxSmoothedValue.toFixed(2)}`);
+    
+    // Count how many grid cells have values > 2.0
+    const above2Count = smoothed.flat().filter(v => v >= 2.0).length;
+    const above15Count = smoothed.flat().filter(v => v >= 1.5).length;
+    console.log(`Grid cells: ${above2Count} cells >= 2.0", ${above15Count} cells >= 1.5"`);
 
     return { values: smoothed, width, height, bounds };
   }
@@ -219,6 +227,11 @@ export class MRMSContourService {
     // Generate contours
     const contourFeatures = contourGenerator(flatValues);
     console.log(`Generated ${contourFeatures.length} contour features`);
+    
+    // Debug: Log which thresholds actually have contours
+    contourFeatures.forEach((feature: any) => {
+      console.log(`Contour threshold ${feature.value}: ${feature.coordinates.length} polygons`);
+    });
 
     // Convert to GeoJSON with proper coordinates
     const features = contourFeatures.map((feature: any, index: number) => {
@@ -276,15 +289,16 @@ export class MRMSContourService {
    * Get human-readable size description
    */
   private static getSizeDescription(size: number): string {
-    if (size >= 4.00) return 'Softball size hail';
-    if (size >= 3.00) return 'Baseball size hail';
-    if (size >= 2.50) return 'Tennis ball size hail';
-    if (size >= 2.00) return 'Hen egg size hail';
-    if (size >= 1.75) return 'Golf ball size hail';
-    if (size >= 1.50) return 'Walnut size hail';
-    if (size >= 1.25) return 'Half dollar size hail';
-    if (size >= 1.00) return 'Quarter size hail';
-    return 'Penny size hail';
+    if (size >= 4.00) return '4.0"+ (Softball+)';
+    if (size >= 3.00) return '3.0"+ (Baseball+)';
+    if (size >= 2.50) return '2.5"+ (Tennis ball+)';
+    if (size >= 2.00) return '2.0-2.5" (Egg to Tennis ball)';
+    if (size >= 1.75) return '1.75-2.0" (Golf ball to Egg)';
+    if (size >= 1.50) return '1.5-1.75" (Walnut to Golf ball)';
+    if (size >= 1.25) return '1.25-1.5" (Half dollar to Walnut)';
+    if (size >= 1.00) return '1.0-1.25" (Quarter to Half dollar)';
+    if (size >= 0.75) return '0.75-1.0" (Penny to Quarter)';
+    return '0.5-0.75" (Dime to Penny)';
   }
 
   /**

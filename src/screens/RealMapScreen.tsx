@@ -15,6 +15,7 @@ import { SimpleContourService } from '../services/simpleContourService';
 import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
 import { Knock } from '../types';
+import { testContourGeneration } from '../utils/testContourGeneration';
 
 // DEVELOPMENT FLAGS - REMEMBER TO RESTORE BEFORE PRODUCTION
 const DEV_DISABLE_GPS_UPDATES = true; // Set to false for production
@@ -36,6 +37,10 @@ export default function RealMapScreen({ navigation }: any) {
     loadKnocks();
     loadHailData();
     initializeHailAlerts();
+    
+    // Test contour generation
+    console.log('Running contour generation test...');
+    testContourGeneration();
     
     // Set up location watching (disabled in development)
     let interval: NodeJS.Timeout | null = null;
@@ -208,10 +213,24 @@ export default function RealMapScreen({ navigation }: any) {
           }
         }
         
+        console.log('Setting hail contours in state:', contourData);
+        if (contourData && contourData.features) {
+          console.log('Contour features being set:', contourData.features.map((f: any) => ({
+            description: f.properties.description,
+            color: f.properties.color,
+            level: f.properties.level
+          })));
+        }
         setHailContours(contourData);
       } else {
-        console.log('No hail reports available for contour generation');
+        console.log('No hail reports available for contour generation - clearing contours');
         setHailContours(null);
+        // Force clear by sending empty feature collection
+        const emptyContours = {
+          type: 'FeatureCollection',
+          features: []
+        };
+        setHailContours(emptyContours);
       }
     } catch (error) {
       console.error('Error loading hail data:', error);
@@ -219,10 +238,16 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const handleStormToggle = async (stormId: string, enabled: boolean) => {
+    // Actually toggle the storm state first
+    await MRMSService.toggleStorm(stormId, enabled);
+    // Then reload the data to update the map
     await loadHailData();
   };
 
   const handleStormDelete = async (stormId: string) => {
+    // Actually delete the storm first
+    await MRMSService.deleteStorm(stormId);
+    // Then reload the data to update the map
     await loadHailData();
   };
 

@@ -363,18 +363,18 @@ export default function StormSearchScreen({ navigation }: any) {
             }
           }}
         >
-          <Text style={styles.significantDateText}>Sept 24, 2024 - Major OKC Metro Event</Text>
+          <Text style={styles.significantDateText}>09/24/2024 - OKC Metro Hail</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.significantDateButton}
           onPress={async () => {
-            const may15 = new Date(2024, 4, 15);
-            setSelectedDate(may15);
+            const nov3 = new Date(2024, 10, 3); // Month is 0-indexed, so 10 = November
+            setSelectedDate(nov3);
             setSearchType('date');
             setLoading(true);
             try {
-              const results = await WeatherHistoryService.searchStorms({ date: may15 });
+              const results = await WeatherHistoryService.searchStorms({ date: nov3 });
               setSearchResults(results);
               if (results.length === 0) {
                 Alert.alert('No Storms Found', 'No data available for this date.');
@@ -386,18 +386,18 @@ export default function StormSearchScreen({ navigation }: any) {
             }
           }}
         >
-          <Text style={styles.significantDateText}>May 15, 2024 - Severe storms Central OK</Text>
+          <Text style={styles.significantDateText}>11/03/2024 - Early November Supercell</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.significantDateButton}
           onPress={async () => {
-            const june14 = new Date(2023, 5, 14);
-            setSelectedDate(june14);
+            const may17 = new Date(2025, 4, 17); // Month is 0-indexed, so 4 = May
+            setSelectedDate(may17);
             setSearchType('date');
             setLoading(true);
             try {
-              const results = await WeatherHistoryService.searchStorms({ date: june14 });
+              const results = await WeatherHistoryService.searchStorms({ date: may17 });
               setSearchResults(results);
               if (results.length === 0) {
                 Alert.alert('No Storms Found', 'No data available for this date.');
@@ -409,7 +409,7 @@ export default function StormSearchScreen({ navigation }: any) {
             }
           }}
         >
-          <Text style={styles.significantDateText}>June 14, 2023 - Significant hail Norman</Text>
+          <Text style={styles.significantDateText}>05/17/2025 - Major Moore/Norman Event</Text>
         </TouchableOpacity>
       </View>
 
