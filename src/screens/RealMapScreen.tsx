@@ -14,6 +14,7 @@ import { HailAlertService } from '../services/hailAlertService';
 import { SimpleContourService } from '../services/simpleContourService';
 import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
+import AddressSearchBar from '../components/AddressSearchBar';
 import { Knock } from '../types';
 import { testContourGeneration } from '../utils/testContourGeneration';
 
@@ -274,6 +275,20 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
+  const handleAddressSelect = (address: string, lat: number, lng: number) => {
+    console.log('Address selected:', address, lat, lng);
+    
+    // Center map on the selected address
+    if (webMapRef.current) {
+      webMapRef.current.postMessage(JSON.stringify({
+        type: 'centerOnLocation',
+        lat: lat,
+        lng: lng,
+        zoom: 16 // Zoom in closer for address view
+      }));
+    }
+  };
+
   return (
     <View style={styles.container}>
       <WebMap 
@@ -320,6 +335,9 @@ export default function RealMapScreen({ navigation }: any) {
           <Text style={styles.statLabel}>Leads</Text>
         </View>
       </View>
+
+      {/* Address Search Bar */}
+      <AddressSearchBar onAddressSelect={handleAddressSelect} />
 
       {/* Right Button Stack - Storm related */}
       <View style={styles.rightButtonStack}>

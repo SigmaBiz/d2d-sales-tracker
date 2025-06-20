@@ -384,6 +384,12 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                     if (window.toggleMapType) {
                       window.toggleMapType();
                     }
+                  } else if (data.type === 'centerOnLocation') {
+                    console.log('Centering on location:', data.lat, data.lng);
+                    if (data.lat && data.lng) {
+                      var zoom = data.zoom || 13;
+                      map.setView([data.lat, data.lng], zoom);
+                    }
                   }
                 } catch (e) {
                   console.error('Message error:', e);
