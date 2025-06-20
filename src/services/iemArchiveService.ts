@@ -40,6 +40,8 @@ export class IEMArchiveService {
       const url = `${PROXY_URL}/api/mesh/${dateStr}`;
       
       console.log('[IEM Archive] Formatted date string:', dateStr);
+      console.log('[IEM Archive] Proxy URL from env:', process.env.EXPO_PUBLIC_MRMS_PROXY_URL);
+      console.log('[IEM Archive] Using proxy URL:', PROXY_URL);
       console.log('[IEM Archive] Fetching from proxy:', url);
       
       try {
@@ -63,6 +65,8 @@ export class IEMArchiveService {
         
         if (data.reports && Array.isArray(data.reports)) {
           console.log('[IEM Archive] Got', data.reports.length, 'MESH reports from proxy');
+          console.log('[IEM Archive] First report:', data.reports[0]);
+          console.log('[IEM Archive] Last report:', data.reports[data.reports.length - 1]);
           return data.reports.map((report: any) => ({
             ...report,
             timestamp: new Date(report.timestamp)
@@ -73,9 +77,12 @@ export class IEMArchiveService {
         return [];
         
       } catch (fetchError) {
-        console.log('[IEM Archive] Proxy not available, using mock data');
+        console.log('[IEM Archive] Proxy error details:', fetchError);
+        console.log('[IEM Archive] Proxy not available, using mock data for date:', dateStr);
         // Fallback to mock data if proxy is not running
-        return this.getMockHistoricalData(date);
+        const mockData = this.getMockHistoricalData(date);
+        console.log('[IEM Archive] Returning', mockData.length, 'mock reports');
+        return mockData;
       }
     } catch (error) {
       console.error('[IEM Archive] Error fetching historical MESH:', error);
@@ -137,6 +144,118 @@ export class IEMArchiveService {
           timestamp: new Date('2024-09-24T21:00:00Z'),
           confidence: 85,
           city: 'Norman',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 38.1
+        }
+      ],
+      '2024-11-03': [
+        {
+          id: 'iem_2024110318_001',
+          latitude: 35.4676,
+          longitude: -97.5164,
+          size: 1.75,
+          timestamp: new Date('2024-11-03T18:30:00Z'),
+          confidence: 88,
+          city: 'Oklahoma City',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 44.45
+        },
+        {
+          id: 'iem_2024110318_002',
+          latitude: 35.6528,
+          longitude: -97.4781,
+          size: 2.0,
+          timestamp: new Date('2024-11-03T18:45:00Z'),
+          confidence: 90,
+          city: 'Edmond',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 50.8
+        },
+        {
+          id: 'iem_2024110319_003',
+          latitude: 35.5514,
+          longitude: -97.4079,
+          size: 1.5,
+          timestamp: new Date('2024-11-03T19:00:00Z'),
+          confidence: 85,
+          city: 'Edmond',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 38.1
+        },
+        {
+          id: 'iem_2024110319_004',
+          latitude: 35.4934,
+          longitude: -97.2891,
+          size: 1.25,
+          timestamp: new Date('2024-11-03T19:15:00Z'),
+          confidence: 82,
+          city: 'Midwest City',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 31.75
+        }
+      ],
+      '2025-05-17': [
+        {
+          id: 'iem_2025051720_001',
+          latitude: 35.3395,
+          longitude: -97.4867,
+          size: 3.0,
+          timestamp: new Date('2025-05-17T20:00:00Z'),
+          confidence: 95,
+          city: 'Moore',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 76.2
+        },
+        {
+          id: 'iem_2025051720_002',
+          latitude: 35.2226,
+          longitude: -97.4395,
+          size: 2.5,
+          timestamp: new Date('2025-05-17T20:15:00Z'),
+          confidence: 93,
+          city: 'Norman',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 63.5
+        },
+        {
+          id: 'iem_2025051720_003',
+          latitude: 35.4676,
+          longitude: -97.5164,
+          size: 2.25,
+          timestamp: new Date('2025-05-17T20:30:00Z'),
+          confidence: 92,
+          city: 'Oklahoma City',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 57.15
+        },
+        {
+          id: 'iem_2025051720_004',
+          latitude: 35.3053,
+          longitude: -97.4766,
+          size: 1.75,
+          timestamp: new Date('2025-05-17T20:45:00Z'),
+          confidence: 88,
+          city: 'Newcastle',
+          isMetroOKC: true,
+          source: 'IEM Archive MESH',
+          meshValue: 44.45
+        },
+        {
+          id: 'iem_2025051721_005',
+          latitude: 35.2606,
+          longitude: -97.4476,
+          size: 1.5,
+          timestamp: new Date('2025-05-17T21:00:00Z'),
+          confidence: 85,
+          city: 'Moore',
           isMetroOKC: true,
           source: 'IEM Archive MESH',
           meshValue: 38.1

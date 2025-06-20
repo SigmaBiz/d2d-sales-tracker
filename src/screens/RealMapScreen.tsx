@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // SOLUTION SWITCHER: Comment/uncomment to try different solutions
 import WebMap from '../components/WebMap'; // Original version
@@ -31,7 +31,10 @@ export default function RealMapScreen({ navigation }: any) {
   const [useSmoothContours, setUseSmoothContours] = useState(true); // Default to smooth MRMS contours
   const [showStormPanel, setShowStormPanel] = useState(false);
   const [mapType, setMapType] = useState<'street' | 'satellite'>('street');
+  const [isGeneratingContours, setIsGeneratingContours] = useState(false);
+  const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
   const webMapRef = useRef<any>(null);
+  const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     initializeMap();
@@ -55,6 +58,7 @@ export default function RealMapScreen({ navigation }: any) {
     
     return () => {
       if (interval) clearInterval(interval);
+      if (contourGenerationTimeout.current) clearTimeout(contourGenerationTimeout.current);
       HailAlertService.stopMonitoring();
     };
   }, []);
@@ -172,69 +176,88 @@ export default function RealMapScreen({ navigation }: any) {
       
       // Combine all enabled storm reports
       const allReports: HailReport[] = [];
+      const verified: HailReport[] = [];
       storms.forEach(storm => {
         if (storm.enabled) {
           allReports.push(...storm.reports);
+          // Extract verified reports
+          const verifiedInStorm = storm.reports.filter(r => r.groundTruth);
+          verified.push(...verifiedInStorm);
         }
       });
       setHailData(allReports);
+      setVerifiedReports(verified);
+      console.log(`Found ${verified.length} verified reports to display as markers`);
       
-      // Generate contours from reports
-      if (allReports.length > 0) {
-        // Generate contours directly from the collected reports
-        console.log(`Generating contours from ${allReports.length} hail reports`);
-        
-        let contourData = null;
-        
-        // Use user preference or fall back gracefully
-        if (useSmoothContours) {
-          // Try MRMS contours first for smoother visualization
-          try {
-            console.log('Attempting MRMS contour generation...');
-            contourData = await MRMSContourService.generateContoursFromReports(allReports);
-            console.log('MRMS contours generated successfully:', contourData);
-          } catch (mrmsError) {
-            console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
-            
-            // Fallback to simple contours
+      // Clear any existing timeout
+      if (contourGenerationTimeout.current) {
+        clearTimeout(contourGenerationTimeout.current);
+      }
+      
+      // Debounce contour generation to avoid lag
+      contourGenerationTimeout.current = setTimeout(async () => {
+        // Generate contours from reports
+        if (allReports.length > 0) {
+          setIsGeneratingContours(true);
+          
+          // Generate contours directly from the collected reports
+          console.log(`Generating contours from ${allReports.length} hail reports`);
+          
+          let contourData = null;
+          
+          // Use user preference or fall back gracefully
+          if (useSmoothContours) {
+            // Try MRMS contours first for smoother visualization
+            try {
+              console.log('Attempting MRMS contour generation...');
+              contourData = await MRMSContourService.generateContoursFromReports(allReports);
+              console.log('MRMS contours generated successfully:', contourData);
+            } catch (mrmsError) {
+              console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
+              
+              // Fallback to simple contours
+              try {
+                contourData = SimpleContourService.generateSimpleContours(allReports);
+                console.log('Simple contours generated as fallback:', contourData);
+              } catch (simpleError) {
+                console.error('Both contour methods failed:', simpleError);
+              }
+            }
+          } else {
+            // User prefers simple contours
             try {
               contourData = SimpleContourService.generateSimpleContours(allReports);
-              console.log('Simple contours generated as fallback:', contourData);
+              console.log('Simple contours generated:', contourData);
             } catch (simpleError) {
-              console.error('Both contour methods failed:', simpleError);
+              console.error('Simple contour generation failed:', simpleError);
             }
           }
-        } else {
-          // User prefers simple contours
-          try {
-            contourData = SimpleContourService.generateSimpleContours(allReports);
-            console.log('Simple contours generated:', contourData);
-          } catch (simpleError) {
-            console.error('Simple contour generation failed:', simpleError);
+          
+          console.log('Setting hail contours in state:', contourData);
+          if (contourData && contourData.features) {
+            console.log('Contour features being set:', contourData.features.map((f: any) => ({
+              description: f.properties.description,
+              color: f.properties.color,
+              level: f.properties.level
+            })));
           }
+          setHailContours(contourData);
+          setIsGeneratingContours(false);
+        } else {
+          console.log('No hail reports available for contour generation - clearing contours');
+          setHailContours(null);
+          // Force clear by sending empty feature collection
+          const emptyContours = {
+            type: 'FeatureCollection',
+            features: []
+          };
+          setHailContours(emptyContours);
+          setIsGeneratingContours(false);
         }
-        
-        console.log('Setting hail contours in state:', contourData);
-        if (contourData && contourData.features) {
-          console.log('Contour features being set:', contourData.features.map((f: any) => ({
-            description: f.properties.description,
-            color: f.properties.color,
-            level: f.properties.level
-          })));
-        }
-        setHailContours(contourData);
-      } else {
-        console.log('No hail reports available for contour generation - clearing contours');
-        setHailContours(null);
-        // Force clear by sending empty feature collection
-        const emptyContours = {
-          type: 'FeatureCollection',
-          features: []
-        };
-        setHailContours(emptyContours);
-      }
+      }, 300); // 300ms debounce delay
     } catch (error) {
       console.error('Error loading hail data:', error);
+      setIsGeneratingContours(false);
     }
   };
 
@@ -298,6 +321,7 @@ export default function RealMapScreen({ navigation }: any) {
         onKnockClick={handleMapClick}
         hailContours={hailContours}
         activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
+        verifiedReports={verifiedReports}
       />
       
       {/* Storm Panel - Only show when toggled */}
@@ -362,20 +386,31 @@ export default function RealMapScreen({ navigation }: any) {
           style={styles.actionButton} 
           onPress={() => setShowStormPanel(!showStormPanel)}
         >
-          <Ionicons name="cloud" size={24} color="#1e40af" />
-          {activeStorms.filter(s => s.enabled).length > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {activeStorms.filter(s => s.enabled).length}
-              </Text>
-            </View>
+          {isGeneratingContours ? (
+            <ActivityIndicator size="small" color="#1e40af" />
+          ) : (
+            <>
+              <Ionicons name="cloud" size={24} color="#1e40af" />
+              {activeStorms.filter(s => s.enabled).length > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {activeStorms.filter(s => s.enabled).length}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </TouchableOpacity>
         
         {/* Storm Search Button */}
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={() => navigation.navigate('StormSearch')}
+          onPress={() => {
+            // Use requestAnimationFrame to defer navigation for smoother transition
+            requestAnimationFrame(() => {
+              navigation.navigate('StormSearch');
+            });
+          }}
         >
           <Ionicons name="search" size={24} color="#1e40af" />
         </TouchableOpacity>

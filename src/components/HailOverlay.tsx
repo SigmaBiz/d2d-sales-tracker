@@ -148,11 +148,21 @@ export default function HailOverlay({
                 </Text>
                 
                 {storm.reports.length > 0 && (
-                  <Text style={styles.confidenceText}>
-                    Avg confidence: {Math.round(
-                      storm.reports.reduce((sum, r) => sum + r.confidence, 0) / storm.reports.length
-                    )}%
-                  </Text>
+                  <>
+                    <Text style={styles.confidenceText}>
+                      Avg confidence: {Math.round(
+                        storm.reports.reduce((sum, r) => sum + r.confidence, 0) / storm.reports.length
+                      )}%
+                    </Text>
+                    {storm.reports.some(r => r.groundTruth) && (
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons name="checkmark-circle" size={12} color="#10b981" />
+                        <Text style={styles.verifiedText}>
+                          {storm.reports.filter(r => r.groundTruth).length} verified
+                        </Text>
+                      </View>
+                    )}
+                  </>
                 )}
                 
                 {storm.enabled && storm.reports.length > 0 && (
@@ -356,6 +366,17 @@ const styles = StyleSheet.create({
   dataSourceText: {
     fontSize: 10,
     color: '#6b7280',
+    fontWeight: '500',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 2,
+  },
+  verifiedText: {
+    fontSize: 11,
+    color: '#10b981',
     fontWeight: '500',
   },
 });

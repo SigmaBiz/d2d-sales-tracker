@@ -114,15 +114,25 @@ export default function StormSearchScreen({ navigation }: any) {
         eventDate: event.date,
         reports: storm.reports.length
       });
+      console.log('[StormSearch] Storm object reports array length:', storm.reports.length);
+      console.log('[StormSearch] First few reports:', storm.reports.slice(0, 3));
+      const groundTruthReports = storm.reports.filter(r => r.groundTruth);
+      console.log('[StormSearch] Ground truth reports:', groundTruthReports.length);
+      console.log('[StormSearch] Ground truth report details:', groundTruthReports);
       
       // Save the storm event
       await MRMSService.saveStormEvent(storm);
+      console.log('[StormSearch] Storm saved successfully');
       
       Alert.alert(
         'Storm Loaded',
         `Historical storm data from ${event.location.name} has been loaded to the map.`,
         [
-          { text: 'View on Map', onPress: () => navigation.navigate('Map') },
+          { text: 'View on Map', onPress: () => {
+            // Navigate back to main tab navigator, then to Map tab
+            navigation.goBack(); // Go back to main tabs
+            navigation.navigate('Main', { screen: 'Map' }); // Navigate to Map tab
+          }},
           { text: 'OK' }
         ]
       );

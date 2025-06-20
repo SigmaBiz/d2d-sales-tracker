@@ -9,9 +9,10 @@ interface WebMapProps {
   onKnockClick?: (knock: Knock) => void;
   hailContours?: any; // GeoJSON FeatureCollection
   activeStorms?: string[]; // IDs of storms to display
+  verifiedReports?: any[]; // Verified ground truth reports
 }
 
-const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, hailContours = null, activeStorms = [] }, ref) => {
+const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, hailContours = null, activeStorms = [], verifiedReports = [] }, ref) => {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -131,6 +132,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               var markers = [];
               var userMarker = null;
               var hailContourLayer = null;
+              var verifiedMarkers = [];
               
               // Function to update knocks
               window.updateKnocks = function(knocksData) {
@@ -209,6 +211,58 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                     knockId: knockId
                   }));
                 }
+              };
+              
+              // Function to update verified reports
+              window.updateVerifiedReports = function(reports) {
+                console.log('updateVerifiedReports called with', reports.length, 'reports');
+                
+                // Clear existing verified markers
+                verifiedMarkers.forEach(function(marker) {
+                  map.removeLayer(marker);
+                });
+                verifiedMarkers = [];
+                
+                // Add markers for each verified report
+                reports.forEach(function(report) {
+                  // Create a special icon for verified reports
+                  var icon = L.divIcon({
+                    html: '<div style="background-color: #10b981; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; position: relative;">' +
+                          '<div style="font-size: 18px; color: white;">✓</div>' +
+                          '<div style="position: absolute; bottom: -4px; right: -4px; background-color: white; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">' +
+                          '<div style="font-size: 12px;">🧊</div>' +
+                          '</div>' +
+                          '</div>',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16],
+                    className: 'verified-marker'
+                  });
+                  
+                  var popupContent = '<div style="font-size: 14px;">';
+                  popupContent += '<h4 style="margin: 0 0 8px 0; color: #10b981;">✓ Verified Hail Report</h4>';
+                  popupContent += '<p style="margin: 4px 0;"><strong>Size:</strong> ' + report.size.toFixed(2) + ' inches</p>';
+                  popupContent += '<p style="margin: 4px 0;"><strong>Time:</strong> ' + new Date(report.timestamp).toLocaleString() + '</p>';
+                  popupContent += '<p style="margin: 4px 0;"><strong>Location:</strong> ' + (report.city || 'Unknown') + '</p>';
+                  popupContent += '<p style="margin: 4px 0;"><strong>Source:</strong> ' + (report.source || 'NOAA Storm Events') + '</p>';
+                  popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; color: #10b981; font-style: italic;">This is a verified ground truth report from the NOAA Storm Events Database</div>';
+                  popupContent += '</div>';
+                  
+                  var marker = L.marker([report.latitude, report.longitude], {icon: icon})
+                    .bindPopup(popupContent)
+                    .addTo(map);
+                  
+                  // Add pulsing effect on hover
+                  marker.on('mouseover', function() {
+                    this.getElement().style.transform = 'scale(1.1)';
+                  });
+                  marker.on('mouseout', function() {
+                    this.getElement().style.transform = 'scale(1)';
+                  });
+                  
+                  verifiedMarkers.push(marker);
+                });
+                
+                console.log('Added', verifiedMarkers.length, 'verified report markers');
               };
               
               // Function to update hail contours
@@ -390,6 +444,9 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                       var zoom = data.zoom || 13;
                       map.setView([data.lat, data.lng], zoom);
                     }
+                  } else if (data.type === 'updateVerifiedReports') {
+                    console.log('Received updateVerifiedReports message');
+                    updateVerifiedReports(data.reports);
                   }
                 } catch (e) {
                   console.error('Message error:', e);
@@ -398,7 +455,10 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
               
               // Add custom styles
               var style = document.createElement('style');
-              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } .leaflet-control-layers { position: fixed !important; right: 16px !important; bottom: 240px !important; top: auto !important; margin: 0 !important; } .custom-div-icon { background: transparent !important; border: none !important; }';
+              style.textContent = '@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2); opacity: 0; } } ' +
+                '.leaflet-control-layers { position: fixed !important; right: 16px !important; bottom: 240px !important; top: auto !important; margin: 0 !important; } ' +
+                '.custom-div-icon { background: transparent !important; border: none !important; } ' +
+                '.verified-marker { background: transparent !important; border: none !important; transition: transform 0.2s ease; }';
               document.head.appendChild(style);
               
               // Send ready message
@@ -499,6 +559,23 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
       }
     }
   }, [isLoading, pendingContours]);
+
+  // Send verified reports when they change
+  useEffect(() => {
+    console.log('WebMap verifiedReports useEffect - isLoading:', isLoading, 'verifiedReports count:', verifiedReports.length);
+    if (!isLoading && webViewRef.current && verifiedReports) {
+      console.log('Sending verified reports to WebView:', verifiedReports);
+      try {
+        const message = JSON.stringify({
+          type: 'updateVerifiedReports',
+          reports: verifiedReports
+        });
+        webViewRef.current.postMessage(message);
+      } catch (error) {
+        console.error('Error sending verified reports:', error);
+      }
+    }
+  }, [verifiedReports, isLoading]);
 
   const handleMessage = (event: any) => {
     try {

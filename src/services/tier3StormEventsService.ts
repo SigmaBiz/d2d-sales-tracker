@@ -30,9 +30,11 @@ export interface ValidationMetrics {
 }
 
 export class StormEventsService {
-  // NOAA Storm Events Database endpoints
-  private static readonly BASE_URL = 'https://www.ncdc.noaa.gov/stormevents';
-  private static readonly API_TOKEN = 'CDGJHfvqrDDqVCDC';  // Example token
+  // NOAA Storm Events Database endpoints - Using public FTP data
+  private static readonly BASE_URL = 'https://www.ncei.noaa.gov/pub/data/swdi/stormevents';
+  private static readonly SEARCH_API = 'https://www.ncdc.noaa.gov/stormevents/csv';
+  
+  // No API token needed for public data
   
   // Sync frequency: Weekly
   private static readonly SYNC_INTERVAL = 7 * 24 * 60 * 60 * 1000;  // 1 week
@@ -114,26 +116,45 @@ export class StormEventsService {
    */
   static async fetchStormEvents(startDate: Date, endDate: Date): Promise<StormEventReport[]> {
     try {
-      // Format dates for API
-      const format = (date: Date) => date.toISOString().split('T')[0];
+      console.log('[TIER 3] Fetching Storm Events from', startDate.toISOString(), 'to', endDate.toISOString());
       
-      // NOAA Storm Events API endpoint
-      const url = `${this.BASE_URL}/json?` +
-        `token=${this.API_TOKEN}&` +
-        `eventType=Hail&` +
-        `state=OK&` +  // Oklahoma focus
-        `beginDate=${format(startDate)}&` +
-        `endDate=${format(endDate)}`;
-
+      // Try to fetch from NOAA Storm Events Database
+      // The NOAA Storm Events Database provides CSV downloads
+      const year = startDate.getFullYear();
+      
+      // Storm Events are available at:
+      // https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/
+      // Format: StormEvents_details-ftp_v1.0_dYYYY_cYYYYMMDD.csv.gz
+      
+      // For now, use our proxy server to fetch and process the data
+      const proxyUrl = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'http://localhost:3001';
+      const url = `${proxyUrl}/api/storm-events?` +
+        `startDate=${startDate.toISOString().split('T')[0]}&` +
+        `endDate=${endDate.toISOString().split('T')[0]}&` +
+        `state=OK&` +
+        `eventType=Hail`;
+      
+      console.log('[TIER 3] Fetching from proxy:', url);
+      
       const response = await fetch(url);
       
       if (!response.ok) {
-        // Fallback to CSV endpoint
-        return await this.fetchStormEventsCSV(startDate, endDate);
+        console.log('[TIER 3] Proxy error:', response.status);
+        throw new Error(`Proxy returned ${response.status}`);
       }
 
-      const data = await response.json();
-      return this.parseStormEvents(data);
+      const text = await response.text();
+      console.log('[TIER 3] Raw response:', text.substring(0, 200));
+      
+      const data = JSON.parse(text);
+      
+      if (data.events && Array.isArray(data.events)) {
+        console.log('[TIER 3] Got', data.events.length, 'storm events from proxy');
+        return data.events.map((event: any) => this.parseStormEvent(event));
+      }
+      
+      console.log('[TIER 3] No events in response, using mock data');
+      return this.getMockStormEvents(startDate, endDate);
     } catch (error) {
       console.error('[TIER 3] Error fetching Storm Events:', error);
       
@@ -143,83 +164,94 @@ export class StormEventsService {
   }
 
   /**
-   * Alternative CSV fetch for Storm Events
+   * Parse individual storm event from proxy response
    */
-  private static async fetchStormEventsCSV(startDate: Date, endDate: Date): Promise<StormEventReport[]> {
-    try {
-      const year = startDate.getFullYear();
-      const csvUrl = `${this.BASE_URL}/csv?` +
-        `eventType=Hail&` +
-        `beginDate=${startDate.toISOString().split('T')[0]}&` +
-        `endDate=${endDate.toISOString().split('T')[0]}`;
-
-      const response = await fetch(csvUrl);
-      const csvText = await response.text();
-      
-      // Parse CSV (simplified)
-      const lines = csvText.split('\n');
-      const headers = lines[0].split(',');
-      const reports: StormEventReport[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',');
-        if (values.length > 10) {
-          reports.push({
-            eventId: values[0],
-            state: values[1],
-            eventType: 'Hail',
-            beginDate: new Date(values[3]),
-            beginLocation: {
-              lat: parseFloat(values[7]) || 0,
-              lon: parseFloat(values[8]) || 0
-            },
-            magnitude: parseFloat(values[9]) || 0,
-            source: values[10],
-            injuries: parseInt(values[11]) || 0,
-            deaths: parseInt(values[12]) || 0,
-            propertyDamage: values[13],
-            narrativeComments: values[14]
-          });
-        }
+  private static parseStormEvent(event: any): StormEventReport {
+    // Handle coordinates - they might be strings with directional indicators
+    const parseLat = (lat: any): number => {
+      if (typeof lat === 'number') return lat;
+      if (typeof lat === 'string') {
+        const cleaned = lat.replace(/[^0-9.-]/g, '');
+        return parseFloat(cleaned) || 0;
       }
-
-      return reports;
-    } catch (error) {
-      console.error('[TIER 3] CSV fetch error:', error);
-      return [];
-    }
+      return 0;
+    };
+    
+    const parseLon = (lon: any): number => {
+      if (typeof lon === 'number') return lon;
+      if (typeof lon === 'string') {
+        let cleaned = lon.replace(/[^0-9.-]/g, '');
+        // West longitudes are negative
+        if (lon.includes('W') && !cleaned.startsWith('-')) {
+          cleaned = '-' + cleaned;
+        }
+        return parseFloat(cleaned) || 0;
+      }
+      return 0;
+    };
+    
+    return {
+      eventId: event.event_id || event.eventId || `SE_${Date.now()}`,
+      state: event.state || 'OK',
+      eventType: 'Hail',
+      beginDate: new Date(event.begin_date_time || event.beginDate),
+      beginLocation: {
+        lat: parseLat(event.begin_lat || event.latitude),
+        lon: parseLon(event.begin_lon || event.longitude)
+      },
+      magnitude: parseFloat(event.magnitude) || 0,
+      source: event.source || 'Unknown',
+      injuries: parseInt(event.injuries_direct) || 0,
+      deaths: parseInt(event.deaths_direct) || 0,
+      propertyDamage: event.damage_property || '$0',
+      narrativeComments: event.event_narrative || event.comments || ''
+    };
   }
 
   /**
-   * Parse Storm Events JSON response
+   * Geocode location descriptions to coordinates
+   * Many Storm Events only have location descriptions, not coordinates
    */
-  private static parseStormEvents(data: any): StormEventReport[] {
-    const reports: StormEventReport[] = [];
-
-    if (data.events && Array.isArray(data.events)) {
-      data.events.forEach((event: any) => {
-        if (event.event_type === 'Hail') {
-          reports.push({
-            eventId: event.event_id,
-            state: event.state,
-            eventType: event.event_type,
-            beginDate: new Date(event.begin_date_time),
-            beginLocation: {
-              lat: parseFloat(event.begin_lat) || 0,
-              lon: parseFloat(event.begin_lon) || 0
-            },
-            magnitude: parseFloat(event.magnitude) || 0,
-            source: event.source,
-            injuries: event.injuries_direct || 0,
-            deaths: event.deaths_direct || 0,
-            propertyDamage: event.damage_property,
-            narrativeComments: event.event_narrative
-          });
+  static async geocodeLocation(location: string, state: string = 'OK'): Promise<{ lat: number; lon: number } | null> {
+    try {
+      // Clean up location string
+      const cleanLocation = location
+        .replace(/\d+\s*(N|S|E|W)\s+/gi, '') // Remove distance/direction
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Try geocoding with Nominatim
+      const query = `${cleanLocation}, ${state}, USA`;
+      const url = `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(query)}&` +
+        `format=json&` +
+        `limit=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'D2D-Sales-Tracker/1.0'
         }
       });
+      
+      if (!response.ok) {
+        console.log('[TIER 3] Geocoding error:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lon: parseFloat(data[0].lon)
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[TIER 3] Geocoding error:', error);
+      return null;
     }
-
-    return reports;
   }
 
   /**
@@ -520,5 +552,66 @@ export class StormEventsService {
     }
 
     return reliability;
+  }
+  
+  /**
+   * Convert Storm Events to HailReports for visualization
+   */
+  static async convertToHailReports(events: StormEventReport[]): Promise<HailReport[]> {
+    console.log('[TIER 3] Converting', events.length, 'storm events to hail reports');
+    const reports: HailReport[] = [];
+    
+    for (const event of events) {
+      // Skip events without valid coordinates
+      if (!event.beginLocation.lat || !event.beginLocation.lon) {
+        // Try to geocode if we have location info in comments
+        if (event.narrativeComments) {
+          const coords = await this.geocodeLocation(event.narrativeComments, event.state);
+          if (coords) {
+            event.beginLocation = coords;
+          } else {
+            console.log('[TIER 3] Skipping event without coordinates:', event.eventId);
+            continue;
+          }
+        } else {
+          continue;
+        }
+      }
+      
+      const report = {
+        id: `SE_${event.eventId}`,
+        latitude: event.beginLocation.lat,
+        longitude: event.beginLocation.lon,
+        size: event.magnitude,
+        timestamp: event.beginDate,
+        confidence: 100, // Ground truth has 100% confidence
+        city: event.narrativeComments.split(' ')[0] || 'Unknown',
+        isMetroOKC: this.isInMetroOKC(event.beginLocation.lat, event.beginLocation.lon),
+        source: `Storm Events - ${event.source}`,
+        meshValue: event.magnitude * 25.4, // Convert inches to mm
+        groundTruth: true // Mark as verified ground truth
+      };
+      
+      console.log('[TIER 3] Created ground truth report:', report);
+      reports.push(report);
+    }
+    
+    return reports;
+  }
+  
+  /**
+   * Check if coordinates are in OKC Metro area
+   */
+  private static isInMetroOKC(lat: number, lon: number): boolean {
+    // OKC Metro approximate bounds
+    const bounds = {
+      north: 35.7,
+      south: 35.2,
+      east: -97.1,
+      west: -97.7
+    };
+    
+    return lat >= bounds.south && lat <= bounds.north &&
+           lon >= bounds.west && lon <= bounds.east;
   }
 }

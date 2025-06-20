@@ -22,6 +22,7 @@ export interface HailReport {
   source?: string;
   meshValue?: number; // Raw MESH value in mm
   polygon?: number[][]; // For contour data
+  groundTruth?: boolean; // True if verified by Storm Events Database
 }
 
 export interface StormEvent {

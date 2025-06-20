@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
 import { IEMArchiveService } from './iemArchiveService';
 import { MRMSProxyService } from './mrmsProxyService';
+import { StormEventsService } from './tier3StormEventsService';
 
 // Cache for search results
 const SEARCH_CACHE_KEY = '@weather_search_cache';
@@ -50,12 +51,24 @@ export class WeatherHistoryService {
 
     try {
       if (params.date) {
-        // Single date search using IEM
+        // Single date search using IEM and Storm Events
         console.log('[WeatherHistory] Searching for date:', params.date.toISOString());
-        const reports = await IEMArchiveService.fetchHistoricalMESH(params.date);
-        console.log('[WeatherHistory] IEM returned', reports.length, 'reports');
-        if (reports.length > 0) {
-          const stormEvent = this.createStormEvent(params.date, reports);
+        
+        // Fetch both IEM data and ground truth Storm Events
+        const [iemReports, stormEvents] = await Promise.all([
+          IEMArchiveService.fetchHistoricalMESH(params.date),
+          StormEventsService.fetchStormEvents(params.date, params.date)
+        ]);
+        
+        console.log('[WeatherHistory] IEM returned', iemReports.length, 'reports');
+        console.log('[WeatherHistory] Storm Events returned', stormEvents.length, 'verified reports');
+        
+        // Convert Storm Events to HailReports and merge with IEM data
+        const groundTruthReports = await StormEventsService.convertToHailReports(stormEvents);
+        const allReports = [...iemReports, ...groundTruthReports];
+        
+        if (allReports.length > 0) {
+          const stormEvent = this.createStormEvent(params.date, allReports);
           console.log('[WeatherHistory] Created storm event:', stormEvent);
           results.push(stormEvent);
         }

@@ -67,34 +67,6 @@ This is a canvassing app designed to:
 
 ## Session Logs
 
-### 2025-01-20 - Address Search Implementation
-**Session Focus**: Add address search functionality to map view
-
-**Key Changes**:
-1. Created AddressSearchBar component
-   - Uses OpenStreetMap Nominatim geocoding API (free, no API key)
-   - Debounced search with 500ms delay
-   - Shows up to 5 results prioritized for Oklahoma
-   - Clean UI with loading states and clear button
-
-2. Integrated search into RealMapScreen
-   - Positioned below stats bar for easy access
-   - Connected to map centering functionality
-   - Zooms to level 16 when address selected
-
-3. Updated WebMap for address navigation
-   - Added centerOnLocation message handler
-   - Smooth map centering with custom zoom levels
-
-**Technical Decisions**:
-- Chose Nominatim for free geocoding without API keys
-- Prioritized Oklahoma results but allowed nationwide search
-- Positioned search bar for optimal mobile UX
-
-**Deployment Status**:
-- Tagged: v1.2-address-search
-- Feature immediately available in development
-
 ### 2025-01-19 - Perfect Hail Overlay Visualization
 **Session Focus**: Fix hail overlay accuracy and storm data management
 
