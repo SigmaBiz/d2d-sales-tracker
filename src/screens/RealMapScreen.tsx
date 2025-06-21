@@ -19,7 +19,7 @@ import { Knock } from '../types';
 import { testContourGeneration } from '../utils/testContourGeneration';
 
 // DEVELOPMENT FLAGS - REMEMBER TO RESTORE BEFORE PRODUCTION
-const DEV_DISABLE_GPS_UPDATES = true; // Set to false for production
+const DEV_DISABLE_GPS_UPDATES = __DEV__; // Automatically false in production builds
 
 export default function RealMapScreen({ navigation }: any) {
   const [knocks, setKnocks] = useState<Knock[]>([]);

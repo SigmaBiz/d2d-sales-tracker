@@ -27,7 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.yourcompany.d2dsalestracker</string>
+          <string>com.sigmabiz.d2dsalestracker</string>
         </array>
       </dict>
       <dict>

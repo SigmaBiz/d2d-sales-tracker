@@ -127,7 +127,7 @@ export class StormEventsService {
       // Format: StormEvents_details-ftp_v1.0_dYYYY_cYYYYMMDD.csv.gz
       
       // For now, use our proxy server to fetch and process the data
-      const proxyUrl = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'http://localhost:3001';
+      const proxyUrl = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'https://d2d-sales-tracker.vercel.app';
       const url = `${proxyUrl}/api/storm-events?` +
         `startDate=${startDate.toISOString().split('T')[0]}&` +
         `endDate=${endDate.toISOString().split('T')[0]}&` +
