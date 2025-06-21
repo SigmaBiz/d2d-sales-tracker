@@ -192,10 +192,12 @@ export class IntegratedHailIntelligence {
   static async getStormTracker(): Promise<any> {
     const storms = await MRMSService.getActiveStorms();
     const realTimeAlerts = await AsyncStorage.getItem('@tier1_latest_alerts');
+    const progressions = await NCEPMRMSService.getAllStormProgressions();
     
     return {
       activeStorms: storms,
       latestAlerts: realTimeAlerts ? JSON.parse(realTimeAlerts) : null,
+      progressions: progressions,
       meshOverlay: storms.map(storm => ({
         id: storm.id,
         reports: storm.reports,
@@ -205,7 +207,8 @@ export class IntegratedHailIntelligence {
           lat: r.latitude,
           lon: r.longitude,
           size: r.size
-        }))
+        })),
+        timeline: progressions[storm.id] || null
       }))
     };
   }

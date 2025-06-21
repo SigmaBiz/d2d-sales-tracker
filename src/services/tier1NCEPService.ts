@@ -221,12 +221,46 @@ export class NCEPMRMSService {
    */
   static async getStormTimeline(stormId: string): Promise<any[]> {
     try {
+      // Try to get from real-time server first
+      const serverUrl = __DEV__ 
+        ? `http://localhost:3003/api/storms/progression/${stormId}`
+        : `https://your-production-server.com/api/storms/progression/${stormId}`;
+        
+      const response = await fetch(serverUrl);
+      if (response.ok) {
+        const data = await response.json();
+        return data.timeline || [];
+      }
+      
+      // Fallback to local storage
       const timelineKey = `@storm_timeline_${stormId}`;
       const stored = await AsyncStorage.getItem(timelineKey);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
       console.error('[TIER 1] Error getting storm timeline:', error);
       return [];
+    }
+  }
+  
+  /**
+   * Get all active storm progressions
+   */
+  static async getAllStormProgressions(): Promise<any> {
+    try {
+      const serverUrl = __DEV__ 
+        ? 'http://localhost:3003/api/storms/progressions'
+        : 'https://your-production-server.com/api/storms/progressions';
+        
+      const response = await fetch(serverUrl);
+      if (response.ok) {
+        const data = await response.json();
+        return data.storms || {};
+      }
+      
+      return {};
+    } catch (error) {
+      console.error('[TIER 1] Error getting storm progressions:', error);
+      return {};
     }
   }
 

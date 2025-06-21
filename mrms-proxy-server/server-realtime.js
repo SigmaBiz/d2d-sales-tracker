@@ -54,6 +54,7 @@ let monitoringActive = false;
 let monitoringInterval = null;
 let lastProcessedTime = null;
 let testStorms = []; // Store test storms temporarily
+let stormHistory = new Map(); // Track storm progression over time
 
 // Ensure directories exist
 async function ensureDirectories() {
@@ -163,6 +164,42 @@ app.get('/api/storms/current', async (req, res) => {
       details: error.message 
     });
   }
+});
+
+/**
+ * Get storm progression timeline
+ */
+app.get('/api/storms/progression/:stormId', (req, res) => {
+  const { stormId } = req.params;
+  const history = stormHistory.get(stormId) || [];
+  
+  res.json({
+    stormId,
+    timeline: history,
+    duration: history.length > 0 ? 
+      (history[history.length - 1].timestamp - history[0].timestamp) / 1000 / 60 : 0, // minutes
+    currentStatus: history.length > 0 ? history[history.length - 1] : null
+  });
+});
+
+/**
+ * Get all active storm progressions
+ */
+app.get('/api/storms/progressions', (req, res) => {
+  const progressions = {};
+  
+  stormHistory.forEach((timeline, stormId) => {
+    progressions[stormId] = {
+      timeline: timeline,
+      duration: timeline.length > 0 ? 
+        (timeline[timeline.length - 1].timestamp - timeline[0].timestamp) / 1000 / 60 : 0
+    };
+  });
+  
+  res.json({
+    storms: progressions,
+    count: stormHistory.size
+  });
 });
 
 /**
@@ -314,6 +351,29 @@ async function checkForCurrentStorms() {
     
     if (metroStorms.length > 0) {
       console.log(`[REALTIME] Found ${metroStorms.length} active storms in metro area`);
+      
+      // Track storm progression
+      metroStorms.forEach(storm => {
+        const stormKey = `${storm.latitude.toFixed(2)}_${storm.longitude.toFixed(2)}`;
+        
+        if (!stormHistory.has(stormKey)) {
+          stormHistory.set(stormKey, []);
+        }
+        
+        const history = stormHistory.get(stormKey);
+        history.push({
+          timestamp: new Date(),
+          latitude: storm.latitude,
+          longitude: storm.longitude,
+          size: storm.size,
+          confidence: storm.confidence,
+          intensity: getIntensityLevel(storm.size)
+        });
+        
+        // Keep only last 2 hours of history
+        const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+        stormHistory.set(stormKey, history.filter(h => h.timestamp > twoHoursAgo));
+      });
       
       // Check for alert-level storms
       const alertStorms = metroStorms.filter(s => s.size >= CONFIG.ALERT_THRESHOLD);
@@ -489,6 +549,18 @@ function calculateRealtimeConfidence(sizeInches) {
   else if (sizeInches >= 1.5) confidence = 75; // Ping pong+
   
   return confidence;
+}
+
+/**
+ * Get intensity level description
+ */
+function getIntensityLevel(sizeInches) {
+  if (sizeInches >= 4.0) return 'extreme';     // Softball+
+  if (sizeInches >= 2.75) return 'severe';     // Baseball+
+  if (sizeInches >= 2.0) return 'significant'; // Golf ball+
+  if (sizeInches >= 1.5) return 'moderate';    // Ping pong+
+  if (sizeInches >= 1.0) return 'notable';     // Quarter+
+  return 'minor';
 }
 
 /**

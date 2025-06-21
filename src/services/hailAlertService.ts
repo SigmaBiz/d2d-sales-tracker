@@ -5,6 +5,7 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MRMSService, HailReport, StormEvent } from './mrmsService';
 import { StorageService } from './storageService';
 import { ConfidenceScoring } from './confidenceScoring';
@@ -26,6 +27,14 @@ export interface AlertConfig {
   quietHoursEnd?: number; // 24hr format (e.g., 6 for 6am)
   alertZones: string[]; // cities to monitor
   teamBroadcast: boolean;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  phone?: string;
+  pushToken?: string;
+  active: boolean;
 }
 
 export class HailAlertService {
@@ -294,6 +303,12 @@ export class HailAlertService {
       },
       trigger: null, // Send immediately
     });
+    
+    // Handle team broadcast if enabled
+    const settings = await StorageService.getSettings();
+    if (settings.teamBroadcast) {
+      await this.broadcastToTeam(message, report, type);
+    }
   }
   
   /**
@@ -361,5 +376,105 @@ export class HailAlertService {
       ...settings,
       ...config,
     });
+  }
+  
+  /**
+   * Broadcast alert to all team members
+   */
+  private static async broadcastToTeam(
+    message: string,
+    report: HailReport,
+    type: 'initial' | 'escalation' | 'expansion'
+  ): Promise<void> {
+    try {
+      // Get team members from storage
+      const teamData = await AsyncStorage.getItem('@team_members');
+      if (!teamData) return;
+      
+      const teamMembers: TeamMember[] = JSON.parse(teamData);
+      const activeMembers = teamMembers.filter(m => m.active && m.pushToken);
+      
+      console.log(`[HailAlert] Broadcasting to ${activeMembers.length} team members`);
+      
+      // Send notifications to all active team members
+      const notifications = activeMembers.map(member => ({
+        to: member.pushToken,
+        title: `Team Alert: ${message}`,
+        body: `${member.name}, a storm has been detected. Check the app for details.`,
+        data: {
+          type: 'team_broadcast',
+          alertType: type,
+          reportId: report.id,
+          latitude: report.latitude,
+          longitude: report.longitude,
+          memberName: member.name
+        },
+        priority: 'high',
+      }));
+      
+      // Send all notifications (in production, use Expo's push notification service)
+      // For now, just log them
+      console.log('[HailAlert] Team broadcast notifications prepared:', notifications.length);
+      
+      // TODO: Implement actual push notification sending via Expo Push Service
+      // await Notifications.sendPushNotificationsAsync(notifications);
+      
+    } catch (error) {
+      console.error('[HailAlert] Error broadcasting to team:', error);
+    }
+  }
+  
+  /**
+   * Add team member for broadcasts
+   */
+  static async addTeamMember(member: Omit<TeamMember, 'id'>): Promise<void> {
+    try {
+      const teamData = await AsyncStorage.getItem('@team_members');
+      const team: TeamMember[] = teamData ? JSON.parse(teamData) : [];
+      
+      const newMember: TeamMember = {
+        ...member,
+        id: `member_${Date.now()}`
+      };
+      
+      team.push(newMember);
+      await AsyncStorage.setItem('@team_members', JSON.stringify(team));
+      
+      console.log(`[HailAlert] Team member added: ${newMember.name}`);
+    } catch (error) {
+      console.error('[HailAlert] Error adding team member:', error);
+    }
+  }
+  
+  /**
+   * Get all team members
+   */
+  static async getTeamMembers(): Promise<TeamMember[]> {
+    try {
+      const teamData = await AsyncStorage.getItem('@team_members');
+      return teamData ? JSON.parse(teamData) : [];
+    } catch (error) {
+      console.error('[HailAlert] Error getting team members:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Update team member status
+   */
+  static async updateTeamMember(memberId: string, updates: Partial<TeamMember>): Promise<void> {
+    try {
+      const teamData = await AsyncStorage.getItem('@team_members');
+      const team: TeamMember[] = teamData ? JSON.parse(teamData) : [];
+      
+      const memberIndex = team.findIndex(m => m.id === memberId);
+      if (memberIndex >= 0) {
+        team[memberIndex] = { ...team[memberIndex], ...updates };
+        await AsyncStorage.setItem('@team_members', JSON.stringify(team));
+        console.log(`[HailAlert] Team member updated: ${memberId}`);
+      }
+    } catch (error) {
+      console.error('[HailAlert] Error updating team member:', error);
+    }
   }
 }
