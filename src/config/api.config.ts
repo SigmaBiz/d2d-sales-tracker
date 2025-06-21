@@ -16,9 +16,9 @@ const DEV_CONFIG: ApiConfig = {
 };
 
 const PROD_CONFIG: ApiConfig = {
-  realTimeServer: process.env.EXPO_PUBLIC_REALTIME_SERVER || 'https://d2d-realtime.railway.app',
-  historicalServer: process.env.EXPO_PUBLIC_HISTORICAL_SERVER || 'https://mrms-proxy-server-nine.vercel.app',
-  proxyServer: process.env.EXPO_PUBLIC_PROXY_SERVER || 'https://mrms-proxy-server-nine.vercel.app'
+  realTimeServer: process.env.EXPO_PUBLIC_REALTIME_SERVER || 'https://d2d-realtime-server.onrender.com',
+  historicalServer: process.env.EXPO_PUBLIC_HISTORICAL_SERVER || 'https://d2d-dynamic-server.onrender.com',
+  proxyServer: process.env.EXPO_PUBLIC_PROXY_SERVER || 'https://d2d-dynamic-server.onrender.com'
 };
 
 export const API_CONFIG = __DEV__ ? DEV_CONFIG : PROD_CONFIG;

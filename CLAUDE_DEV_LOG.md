@@ -350,6 +350,45 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
 - Updated metro bounds in all server versions
 - Test data files verified correct storm data
 
+### 2025-06-21 - Tier 2 Integration Fixed & Timezone Handling
+**Session Focus**: Fix Tier 2 app integration and timezone issues
+
+**Key Fixes at 35% Context**:
+1. **Fixed Tier 2 Integration Issue**
+   - App was showing only 5 reports instead of 426 for Sept 24
+   - Root cause: weatherHistoryService was using wrong service method
+   - Fixed by changing from IEMArchiveService to Tier2Service
+   - Added timestamp conversion for server responses
+   - Now correctly displays all 426 real hail reports
+
+2. **Removed Mock Data Fallbacks**
+   - tier3StormEventsService no longer returns mock data
+   - iemArchiveService returns empty arrays instead of mock data
+   - Aligns with "no mock data" principle - only show real data
+
+3. **Fixed Timezone Handling**
+   - Created /api/mesh/local/:date endpoint for Oklahoma local dates
+   - Properly handles evening storms that span UTC days
+   - Example: May 17 evening storm (8 PM CDT) appears in May 18 UTC file
+   - New endpoint combines both days and removes duplicates
+   - May 17 now shows 783 reports (was split as 58 + 725)
+
+4. **Fixed Test Storm Notifications**
+   - Added filter to exclude test storms from triggering alerts
+   - Only real storms trigger push notifications now
+
+5. **Technical Details**
+   - Fixed deprecated shouldShowAlert warning in notifications
+   - Added confidence property to fix TypeScript errors
+   - Server properly combines UTC days for local date queries
+
+**User Feedback**: Confirmed May 17, 2025 storm data now correctly shows with proper timezone handling
+
+**Next Steps**:
+- Deploy servers to production
+- Complete Tier 3 ground truth implementation
+- Test full 3-tier integration
+
 ### 2025-06-21 - Tier 1 Real-Time Implementation
 **Session Focus**: Implement Tier 1 real-time storm detection with NCEP MRMS
 
