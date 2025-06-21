@@ -1011,3 +1011,85 @@ Enhancing Tier 1 to provide SOP rigor and maximize field efficiency through syst
 - Route optimization for efficient canvassing
 
 **Next Implementation Phase: Top 5 features from priority matrix**
+
+## Commercial Scaling Strategy (45% Context)
+
+### 80/20 Analysis for Commercial Launch
+
+#### The 20% That Delivers 80% Value:
+
+1. **Data Isolation (CRITICAL)**
+   - Add `companyId` to all database operations
+   - Implement Supabase Row Level Security (RLS)
+   - One-time setup prevents all data mixups
+   ```sql
+   CREATE POLICY "Company data isolation" ON knocks
+   FOR ALL USING (auth.jwt() ->> 'company_id' = company_id);
+   ```
+
+2. **Error Monitoring & Recovery**
+   - Sentry integration for real-time error tracking
+   - Graceful fallbacks with cached data
+   - Feature flags for emergency disabling
+
+3. **Simple Infrastructure**
+   - Status page (BetterUptime) - $29/month
+   - Stripe Checkout for subscriptions
+   - Daily automated backups
+
+#### Minimum Viable Commercial Stack:
+- ✅ Supabase RLS (data isolation)
+- ✅ Sentry (error tracking)
+- ✅ Feature flags (quick disable)
+- ✅ Status page (customer self-service)
+- ✅ Simple $49/month pricing
+
+#### Cost Structure (100 users):
+- Servers: $50-100/month
+- Database: $25/month
+- SMS/Email: $50-100/month
+- Total: ~$150-250/month
+- Revenue potential: $4,900/month
+
+### Emergency Playbook (No AI Dependency):
+```bash
+# 1. Check health
+curl https://d2d-dynamic-server.onrender.com/health
+
+# 2. Toggle features
+UPDATE settings SET realtime_enabled = false;
+
+# 3. Clear cache
+DELETE FROM cache WHERE created_at < NOW() - INTERVAL '1 hour';
+
+# 4. Restart servers via Render dashboard
+# 5. Rollback: git revert HEAD && git push
+```
+
+## Legal Protection Strategy
+
+### Standard Liability Limitations:
+```
+LIMITATION OF LIABILITY
+1. Service provided "as is" and "as available"
+2. Maximum liability = 12 months of fees paid
+3. Pro-rated refunds for 24+ hour outages only
+4. No consequential damages (lost profits, sales, etc.)
+```
+
+### Service Level Agreement (SLA):
+- Target: 95% uptime
+- Credits: 10-50% based on downtime
+- No cash refunds, only service credits
+
+### Essential Legal Stack:
+1. Terms of Service (liability caps)
+2. Privacy Policy (CCPA/GDPR)
+3. E&O Insurance (~$600/year)
+4. LLC formation ($200-500)
+5. Acceptable Use Policy
+
+### Hail Data Disclaimer:
+"Historical and real-time hail data is provided for informational purposes only. Users must verify information independently. We are not responsible for data accuracy or business outcomes."
+
+**This is industry standard - Salesforce, HubSpot, Slack all limit liability similarly**
