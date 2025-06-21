@@ -309,105 +309,88 @@ async function extractOKCMetroData(gribPath, date) {
     console.log('[DYNAMIC] Extracting OKC Metro data...');
     console.log('[DYNAMIC] Looking for data in bounds:', CONFIG.OKC_METRO_BOUNDS);
     
-    // First check if file exists
-    const stats = await fs.stat(gribPath);
-    console.log(`[DYNAMIC] Processing GRIB2 file: ${gribPath} (${stats.size} bytes)`);
+    // Use spawn to handle large data streams
+    const { spawn } = require('child_process');
+    const gribProcess = spawn('grib_get_data', [gribPath]);
     
-    // Use a two-step approach: first extract just OKC area to a temp file
-    const tempOutput = gribPath + '.okc.txt';
+    const reports = [];
+    let buffer = '';
+    let headerSkipped = false;
+    let totalPoints = 0;
+    let pointsInBounds = 0;
+    let pointsWithHail = 0;
     
-    try {
-      // Extract data and filter for OKC area in one command
-      console.log('[DYNAMIC] Extracting OKC area data...');
-      const { stdout: extractResult } = await execPromise(
-        `grib_get_data ${gribPath} | awk 'NR==1 || ($1 >= 35.1 && $1 <= 35.7 && $2 >= 262.2 && $2 <= 262.9)' > ${tempOutput}`,
-        { maxBuffer: 10 * 1024 * 1024 }
-      );
-      
-      // Now read the filtered file
-      const filteredData = await fs.readFile(tempOutput, 'utf8');
-      const lines = filteredData.split('\n');
-      
-      const reports = [];
-      let headerSkipped = false;
-      let totalPoints = 0;
-      let pointsInBounds = 0;
-      let pointsWithHail = 0;
-      
-      console.log(`[DYNAMIC] Processing ${lines.length} filtered lines...`);
-      
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
+    return new Promise((resolve, reject) => {
+      gribProcess.stdout.on('data', (chunk) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Keep incomplete line in buffer
         
-        // Skip header line
-        if (!headerSkipped) {
-          if (trimmed.includes('Latitude') || trimmed.includes('lat')) {
-            headerSkipped = true;
-          }
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      // Skip header line
+      if (!headerSkipped) {
+        if (trimmed.includes('Latitude') || trimmed.includes('lat')) {
+          headerSkipped = true;
+        }
+        continue;
+      }
+      
+      // Parse: latitude longitude value
+      const parts = trimmed.split(/\s+/);
+      if (parts.length >= 3) {
+        totalPoints++;
+        const lat = parseFloat(parts[0]);
+        const lon = parseFloat(parts[1]) - 360; // Convert from 0-360 to -180-180
+        const meshValue = parseFloat(parts[2]); // in mm
+        
+        // Skip invalid or zero values
+        if (isNaN(lat) || isNaN(lon) || isNaN(meshValue) || meshValue <= 0) {
           continue;
         }
         
-        // Parse: latitude longitude value
-        const parts = trimmed.split(/\s+/);
-        if (parts.length >= 3) {
-          totalPoints++;
-          const lat = parseFloat(parts[0]);
-          const lon = parseFloat(parts[1]) - 360; // Convert from 0-360 to -180-180
-          const meshValue = parseFloat(parts[2]); // in mm
+        // Check if in OKC Metro bounds
+        if (lat >= CONFIG.OKC_METRO_BOUNDS.south && 
+            lat <= CONFIG.OKC_METRO_BOUNDS.north &&
+            lon >= CONFIG.OKC_METRO_BOUNDS.west && 
+            lon <= CONFIG.OKC_METRO_BOUNDS.east) {
           
-          // Skip invalid or zero values
-          if (isNaN(lat) || isNaN(lon) || isNaN(meshValue) || meshValue <= 0) {
-            continue;
-          }
+          pointsInBounds++;
+          const sizeInches = meshValue / 25.4;
           
-          // Double-check bounds (should already be filtered)
-          if (lat >= CONFIG.OKC_METRO_BOUNDS.south && 
-              lat <= CONFIG.OKC_METRO_BOUNDS.north &&
-              lon >= CONFIG.OKC_METRO_BOUNDS.west && 
-              lon <= CONFIG.OKC_METRO_BOUNDS.east) {
-            
-            pointsInBounds++;
-            const sizeInches = meshValue / 25.4;
-            
-            // Only include significant hail
-            if (sizeInches >= CONFIG.MIN_HAIL_SIZE) {
-              pointsWithHail++;
-              reports.push({
-                id: `mesh_${date.getTime()}_${reports.length}`,
-                latitude: lat,
-                longitude: lon,
-                size: Math.round(sizeInches * 100) / 100,
-                timestamp: date.toISOString(),
-                confidence: calculateConfidence(sizeInches),
-                city: getCityName(lat, lon),
-                source: 'IEM MRMS Archive',
-                meshValue: meshValue
-              });
-            }
+          // Only include significant hail
+          if (sizeInches >= CONFIG.MIN_HAIL_SIZE) {
+            pointsWithHail++;
+            reports.push({
+              id: `mesh_${date.getTime()}_${reports.length}`,
+              latitude: lat,
+              longitude: lon,
+              size: Math.round(sizeInches * 100) / 100,
+              timestamp: date.toISOString(),
+              confidence: calculateConfidence(sizeInches),
+              city: getCityName(lat, lon),
+              source: 'IEM MRMS Archive',
+              meshValue: meshValue
+            });
           }
         }
       }
-      
-      console.log(`[DYNAMIC] Processed ${totalPoints} total points`);
-      console.log(`[DYNAMIC] Found ${pointsInBounds} points in OKC Metro bounds`);
-      console.log(`[DYNAMIC] Found ${pointsWithHail} points with hail >= ${CONFIG.MIN_HAIL_SIZE}"`);
-      console.log(`[DYNAMIC] Returning ${reports.length} hail reports`);
-      
-      // Clean up temp file
-      await fs.unlink(tempOutput).catch(() => {});
-      
-      return reports;
-      
-    } catch (error) {
-      // Clean up on error
-      await fs.unlink(tempOutput).catch(() => {});
-      throw error;
     }
+    
+    console.log(`[DYNAMIC] Processed ${totalPoints} total points`);
+    console.log(`[DYNAMIC] Found ${pointsInBounds} points in OKC Metro bounds`);
+    console.log(`[DYNAMIC] Found ${pointsWithHail} points with hail >= ${CONFIG.MIN_HAIL_SIZE}"`);
+    console.log(`[DYNAMIC] Returning ${reports.length} hail reports`);
+    return reports;
     
   } catch (error) {
     console.error('[DYNAMIC] Error extracting data:', error);
-    console.error('[DYNAMIC] Error details:', error.message);
     return [];
   }
 }
