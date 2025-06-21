@@ -90,6 +90,14 @@ export class HailAlertService {
   }
   
   /**
+   * Manually trigger a hail check (for testing)
+   */
+  static async checkNow(): Promise<void> {
+    console.log('[HailAlert] Manual check triggered');
+    await this.checkForHail();
+  }
+  
+  /**
    * Check for new hail reports
    */
   private static async checkForHail(): Promise<void> {
@@ -97,7 +105,7 @@ export class HailAlertService {
       // Get user's alert preferences
       const settings = await StorageService.getSettings();
       const alertConfig: AlertConfig = {
-        minHailSize: settings.minHailSize || 0, // Default: any size
+        minHailSize: settings.minHailSize || 1.0, // Default: 1 inch
         quietHoursStart: settings.quietHoursStart,
         quietHoursEnd: settings.quietHoursEnd,
         alertZones: settings.alertZones || ['all'], // Default: all Oklahoma
@@ -109,8 +117,29 @@ export class HailAlertService {
         return;
       }
       
-      // Fetch current hail data
-      const reports = await MRMSService.fetchCurrentHailData();
+      // Try real-time server first
+      let reports: HailReport[] = [];
+      try {
+        const serverUrl = __DEV__ 
+          ? 'http://localhost:3003/api/storms/current'
+          : 'https://your-production-server.com/api/storms/current';
+        
+        const response = await fetch(serverUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.storms && data.storms.length > 0) {
+            console.log(`[HailAlert] Found ${data.storms.length} storms from real-time server`);
+            reports = data.storms;
+          }
+        }
+      } catch (error) {
+        console.log('[HailAlert] Real-time server unavailable, falling back');
+      }
+      
+      // Fallback to MRMSService if no real-time data
+      if (reports.length === 0) {
+        reports = await MRMSService.fetchCurrentHailData();
+      }
       
       // Filter reports based on preferences
       const relevantReports = reports.filter(report => {
@@ -179,7 +208,7 @@ export class HailAlertService {
       
       // Add report to existing storm
       activeStorm.reports.push(report);
-      activeStorm.peakSize = Math.max(activeStorm.peakSize, report.size);
+      activeStorm.maxSize = Math.max(activeStorm.maxSize, report.size);
       await MRMSService.saveStormEvent(activeStorm);
     } else {
       // Create new storm event
@@ -208,13 +237,12 @@ export class HailAlertService {
     // Send notification
     await this.sendHailAlert(message, report, alertType);
     
-    // Log alert
-    await MRMSService.logAlert({
+    // Log alert to console for now (TODO: implement logAlert in MRMSService)
+    console.log('[HailAlert] Alert triggered:', {
       timestamp: new Date(),
       message,
       hailSize: report.size,
-      location: report.city || 'Unknown',
-      dismissed: false
+      location: report.city || 'Unknown'
     });
   }
   

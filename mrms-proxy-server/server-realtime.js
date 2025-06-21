@@ -53,6 +53,7 @@ const CONFIG = {
 let monitoringActive = false;
 let monitoringInterval = null;
 let lastProcessedTime = null;
+let testStorms = []; // Store test storms temporarily
 
 // Ensure directories exist
 async function ensureDirectories() {
@@ -175,7 +176,7 @@ app.get('/api/alerts/active', async (req, res) => {
     res.json({
       timestamp: new Date(),
       alerts: alerts,
-      count: alerts.count,
+      count: alerts.length,
       threshold: CONFIG.ALERT_THRESHOLD,
       message: alerts.length > 0 ? 'ACTIVE HAIL ALERTS' : 'No active alerts'
     });
@@ -184,6 +185,58 @@ app.get('/api/alerts/active', async (req, res) => {
     console.error('[REALTIME] Error checking alerts:', error);
     res.status(500).json({ 
       error: 'Failed to check alerts',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * TEST ENDPOINT: Simulate a storm for testing
+ */
+app.post('/api/test/simulate-storm', async (req, res) => {
+  try {
+    console.log('[REALTIME] 🧪 TEST: Simulating storm detection');
+    
+    // Create test storm data
+    testStorms = [
+      {
+        id: `test_storm_${Date.now()}`,
+        latitude: 35.6,      // Edmond area
+        longitude: -97.47,
+        size: 2.5,           // 2.5 inch hail (baseball size)
+        meshValue: 63.5,     // 2.5 * 25.4
+        timestamp: new Date(),
+        confidence: 85,
+        source: 'TEST SIMULATION',
+        isActive: true
+      },
+      {
+        id: `test_storm_${Date.now()}_2`,
+        latitude: 35.45,     // Downtown OKC
+        longitude: -97.51,
+        size: 1.75,          // Golf ball size
+        meshValue: 44.45,
+        timestamp: new Date(),
+        confidence: 80,
+        source: 'TEST SIMULATION',
+        isActive: true
+      }
+    ];
+    
+    // Trigger alerts
+    await triggerAlerts(testStorms);
+    
+    res.json({
+      status: 'success',
+      message: 'Test storm simulation complete',
+      storms: testStorms,
+      alertsTriggered: true
+    });
+    
+  } catch (error) {
+    console.error('[REALTIME] Error in test simulation:', error);
+    res.status(500).json({ 
+      error: 'Test simulation failed',
       details: error.message 
     });
   }
@@ -233,6 +286,12 @@ async function checkForCurrentStorms() {
   try {
     console.log('[REALTIME] Checking for current storms...');
     lastProcessedTime = new Date();
+    
+    // Return test storms if available
+    if (testStorms.length > 0) {
+      console.log('[REALTIME] Returning test storms');
+      return testStorms;
+    }
     
     // Get latest MESH data file
     const latestFile = await getLatestMESHFile();

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { IntegratedHailIntelligence } from '../services/integratedHailIntelligence';
+import { HailAlertService } from '../services/hailAlertService';
 import { useNavigation } from '@react-navigation/native';
 
 export default function HailIntelligenceDashboard() {
@@ -72,6 +73,27 @@ export default function HailIntelligenceDashboard() {
         { text: 'OK' }
       ]
     );
+  };
+
+  const testHailAlerts = async () => {
+    try {
+      Alert.alert(
+        'Test Hail Alerts',
+        'This will check for current storms and send notifications if any are detected. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Test', 
+            onPress: async () => {
+              await HailAlertService.checkNow();
+              Alert.alert('Test Complete', 'Check completed. If storms were detected, you should receive notifications.');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to test alerts');
+    }
   };
 
   if (loading) {
@@ -223,13 +245,19 @@ export default function HailIntelligenceDashboard() {
         </View>
       )}
 
+      {/* Test Button */}
+      <TouchableOpacity style={styles.testButton} onPress={testHailAlerts}>
+        <Ionicons name="notifications" size={20} color="#fff" />
+        <Text style={styles.testButtonText}>Test Hail Alerts</Text>
+      </TouchableOpacity>
+
       {/* Feature Highlights */}
       <View style={styles.featuresContainer}>
         <Text style={styles.sectionTitle}>Intelligence Features</Text>
         
         <View style={styles.featureItem}>
           <Ionicons name="notifications" size={20} color="#3b82f6" />
-          <Text style={styles.featureText}>Auto-alerts when MESH >25mm detected</Text>
+          <Text style={styles.featureText}>Auto-alerts when MESH {'>'} 25mm detected</Text>
         </View>
 
         <View style={styles.featureItem}>
@@ -294,6 +322,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3.84,
     elevation: 2,
+  },
+  tierCardActive: {
+    borderWidth: 2,
+    borderColor: '#10b981',
   },
   tierHeader: {
     flexDirection: 'row',
@@ -393,5 +425,21 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginLeft: 12,
     flex: 1,
+  },
+  testButton: {
+    backgroundColor: '#3b82f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 8,
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

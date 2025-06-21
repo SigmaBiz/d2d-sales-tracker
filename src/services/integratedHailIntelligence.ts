@@ -199,7 +199,7 @@ export class IntegratedHailIntelligence {
       meshOverlay: storms.map(storm => ({
         id: storm.id,
         reports: storm.reports,
-        intensity: storm.peakSize,
+        intensity: storm.maxSize,
         progression: storm.reports.map(r => ({
           time: r.timestamp,
           lat: r.latitude,
