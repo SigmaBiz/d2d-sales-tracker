@@ -97,7 +97,12 @@ export default function HailIntelligenceDashboard() {
       {/* System Status Cards */}
       <View style={styles.tierContainer}>
         {/* TIER 1: Real-Time */}
-        <TouchableOpacity style={styles.tierCard} onPress={navigateToDataFlow}>
+        <TouchableOpacity 
+          style={[
+            styles.tierCard, 
+            systemStatus?.tiers?.realTime?.status === 'active' ? styles.tierCardActive : {}
+          ]} 
+          onPress={navigateToDataFlow}>
           <View style={styles.tierHeader}>
             <View style={[styles.tierIcon, { backgroundColor: '#3b82f6' }]}>
               <Ionicons name="flash" size={24} color="#fff" />
@@ -108,11 +113,13 @@ export default function HailIntelligenceDashboard() {
             </View>
             <View style={[
               styles.statusDot,
-              { backgroundColor: systemStatus?.tiers.realTime.status === 'complete' ? '#10b981' : '#f59e0b' }
+              { backgroundColor: systemStatus?.tiers.realTime.status === 'active' ? '#10b981' : 
+                                systemStatus?.tiers.realTime.serverStatus === 'online' ? '#f59e0b' : '#ef4444' }
             ]} />
           </View>
           <Text style={styles.tierDescription}>
-            2-minute updates • Push alerts • {stormTracker?.activeStorms.length || 0} active storms
+            {systemStatus?.tiers.realTime.monitoring ? '🟢 Monitoring Active' : '⚪ Monitoring Paused'} • 
+            2-min updates • {stormTracker?.activeStorms.length || 0} storms
           </Text>
         </TouchableOpacity>
 

@@ -135,7 +135,7 @@ old_postinstall_cmds="chmod 644 \$oldlib~\$RANLIB \$oldlib"
 old_postuninstall_cmds=""
 
 # A C compiler.
-LTCC="gcc"
+LTCC="clang"
 
 # LTCC compiler flags.
 LTCFLAGS="-g -O2"
@@ -184,7 +184,7 @@ extract_expsyms_cmds=""
 
 # Variables whose values should be saved in libtool wrapper scripts and
 # restored at link time.
-variables_saved_for_relink="PATH DYLD_LIBRARY_PATH "
+variables_saved_for_relink="PATH DYLD_LIBRARY_PATH  GCC_EXEC_PREFIX COMPILER_PATH LIBRARY_PATH"
 
 # Do we need the "lib" prefix for modules?
 need_lib_prefix=no
@@ -257,7 +257,7 @@ LD="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolcha
 old_archive_cmds="\$AR \$AR_FLAGS \$oldlib\$oldobjs~\$RANLIB \$oldlib"
 
 # A language specific compiler.
-CC="gcc"
+CC="clang"
 
 # Is the compiler the GNU compiler?
 with_gcc=yes
@@ -8439,25 +8439,25 @@ LD="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolcha
 old_archive_cmds="\$AR \$AR_FLAGS \$oldlib\$oldobjs~\$RANLIB \$oldlib"
 
 # A language specific compiler.
-CC="gfortran"
+CC="gfortran-15"
 
 # Is the compiler the GNU compiler?
-with_gcc=
+with_gcc=yes
 
 # Compiler flag to turn off builtin functions.
 no_builtin_flag=""
 
 # How to pass a linker flag through the compiler.
-wl=""
+wl="-Wl,"
 
 # Additional compiler flags for building library objects.
-pic_flag=""
+pic_flag=" -fno-common"
 
 # Compiler flag to prevent dynamic linking.
 link_static_flag=""
 
 # Does compiler simultaneously support -c and -o options?
-compiler_c_o="no"
+compiler_c_o="yes"
 
 # Whether or not to add -lc for building shared libraries.
 build_libtool_need_lc=no
@@ -8481,13 +8481,13 @@ old_archive_from_new_cmds=""
 old_archive_from_expsyms_cmds=""
 
 # Commands used to build a shared archive.
-archive_cmds=""
-archive_expsym_cmds=""
+archive_cmds="\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring ~\$DSYMUTIL \$lib || :"
+archive_expsym_cmds="sed 's,^,_,' < \$export_symbols > \$output_objdir/\${libname}-symbols.expsym~\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring  \${wl}-exported_symbols_list,\$output_objdir/\${libname}-symbols.expsym~\$DSYMUTIL \$lib || :"
 
 # Commands used to build a loadable module if different from building
 # a shared archive.
-module_cmds=""
-module_expsym_cmds=""
+module_cmds="\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags~\$DSYMUTIL \$lib || :"
+module_expsym_cmds="sed -e 's,^,_,' < \$export_symbols > \$output_objdir/\${libname}-symbols.expsym~\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags \${wl}-exported_symbols_list,\$output_objdir/\${libname}-symbols.expsym~\$DSYMUTIL \$lib || :"
 
 # Whether we are building with GNU ld or not.
 with_gnu_ld="no"
@@ -8588,25 +8588,25 @@ LD="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolcha
 old_archive_cmds="\$AR \$AR_FLAGS \$oldlib\$oldobjs~\$RANLIB \$oldlib"
 
 # A language specific compiler.
-CC="gfortran"
+CC="gfortran-15"
 
 # Is the compiler the GNU compiler?
-with_gcc=no
+with_gcc=yes
 
 # Compiler flag to turn off builtin functions.
 no_builtin_flag=""
 
 # How to pass a linker flag through the compiler.
-wl=""
+wl="-Wl,"
 
 # Additional compiler flags for building library objects.
-pic_flag=""
+pic_flag=" -fno-common"
 
 # Compiler flag to prevent dynamic linking.
 link_static_flag=""
 
 # Does compiler simultaneously support -c and -o options?
-compiler_c_o="no"
+compiler_c_o="yes"
 
 # Whether or not to add -lc for building shared libraries.
 build_libtool_need_lc=no
@@ -8630,13 +8630,13 @@ old_archive_from_new_cmds=""
 old_archive_from_expsyms_cmds=""
 
 # Commands used to build a shared archive.
-archive_cmds=""
-archive_expsym_cmds=""
+archive_cmds="\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring ~\$DSYMUTIL \$lib || :"
+archive_expsym_cmds="sed 's,^,_,' < \$export_symbols > \$output_objdir/\${libname}-symbols.expsym~\$CC -dynamiclib \$allow_undefined_flag -o \$lib \$libobjs \$deplibs \$compiler_flags -install_name \$rpath/\$soname \$verstring  \${wl}-exported_symbols_list,\$output_objdir/\${libname}-symbols.expsym~\$DSYMUTIL \$lib || :"
 
 # Commands used to build a loadable module if different from building
 # a shared archive.
-module_cmds=""
-module_expsym_cmds=""
+module_cmds="\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags~\$DSYMUTIL \$lib || :"
+module_expsym_cmds="sed -e 's,^,_,' < \$export_symbols > \$output_objdir/\${libname}-symbols.expsym~\$CC \$allow_undefined_flag -o \$lib -bundle \$libobjs \$deplibs \$compiler_flags \${wl}-exported_symbols_list,\$output_objdir/\${libname}-symbols.expsym~\$DSYMUTIL \$lib || :"
 
 # Whether we are building with GNU ld or not.
 with_gnu_ld="no"

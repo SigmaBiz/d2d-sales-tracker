@@ -1,5 +1,41 @@
 # Claude Development Log - D2D Sales Tracker
 
+## 🚨 CRITICAL: CONTEXT COMPACTING SAFETY PROTOCOL - TWO-TIER SYSTEM 🚨
+
+### TIER 1: Lightweight Checkpoints (Every 5% Context Consumed)
+**Quick saves to maintain continuity without disrupting flow**
+
+**Triggers: 5%, 10%, 15%, 20%... of context capacity**
+- `git add . && git commit -m "checkpoint: [brief task description]"`
+- `git push origin [current-branch]` 
+- Add one-line progress note to Session Checkpoints below
+- Document next 3 steps for both success and failure scenarios
+- Continue working
+
+**Session Checkpoints:**
+- 5%: Tier 1 implementation started - real-time server verified running, dashboard updated for monitoring status
+- 10%: [To be updated by current session]
+- 15%: [To be updated by current session]
+- 20%: [To be updated by current session]
+
+### TIER 2: Comprehensive Safety Protocol (At 90% Context)
+**Full preservation before context compacting**
+
+**When context shows 90% consumed:**
+1. **Create Safety Branch**: 
+   ```bash
+   git checkout -b safety-$(date +%Y%m%d-%H%M)
+   git add . && git commit -m "safety: Complete state before context compact"
+   git push origin safety-$(date +%Y%m%d-%H%M)
+   ```
+
+2. **Document Recovery Paths**:
+   - Option A: Continue from safety branch
+   - Option B: Revert to last stable checkpoint
+   - Option C: Cherry-pick specific fixes
+
+3. **Update Full Handoff** (see Handoff Context section)
+
 ## Session Protocol
 This log maintains a comprehensive record of all development sessions for the D2D Sales Tracker application.
 
@@ -9,12 +45,14 @@ This log maintains a comprehensive record of all development sessions for the D2
 - Document key changes, decisions, and technical debt
 - Track architectural decisions and their rationale
 - Include deployment status and environment details
+- **UPDATE EVERY 5% CONTEXT INCREMENT** with progress and next steps
 
 ### Commit Protocol
 - Use conventional commits (fix:, feat:, docs:, etc.)
 - Include Claude attribution in commits
 - Tag significant versions for easy rollback
 - Document breaking changes prominently
+- **COMMIT AND PUSH EVERY 5% CONTEXT INCREMENT**
 
 ### AI Agent Guidance Protocol
 **For future AI agents working on this codebase:**
@@ -59,6 +97,47 @@ This is a canvassing app designed to:
 - **Yukon** (west)
 
 This broader definition is critical for hail tracking as storms often affect the entire metro area, and roofing contractors service all these communities.
+
+## 🏗️ 3-TIER HAIL INTELLIGENCE ARCHITECTURE
+
+### Grand Objective
+**Enable canvassers to maximize lead generation efficiency** by providing real-time and historical hail intelligence to identify high-potential areas for roofing sales.
+
+### The Three Tiers
+
+#### TIER 1: Real-Time Storm Detection (Every 2 minutes)
+- **Purpose**: Immediate alerts for active storms
+- **Source**: NCEP MRMS Real-Time Feed  
+- **Trigger**: MESH >25mm (1 inch hail)
+- **Output**: Push notifications → **"GO CANVASS NOW"**
+- **Status**: 🔄 In Progress
+
+#### TIER 2: Historical Data Validation (24-48 hours later)
+- **Purpose**: Validated storm data for territory planning
+- **Source**: IEM Archives (GRIB2 processing with ecCodes)
+- **Output**: Searchable storm database → **"BEST NEIGHBORHOODS TO TARGET"**
+- **Status**: ✅ COMPLETED
+
+#### TIER 3: Ground Truth Validation (Weekly)
+- **Purpose**: Algorithm improvement via real damage reports
+- **Source**: NOAA Storm Events Database
+- **Output**: Accuracy metrics → **"CONTINUOUS IMPROVEMENT"**
+- **Status**: 🔄 Pending
+
+### Data Flow
+```
+TIER 1 (2 min) → IMMEDIATE ALERTS → CANVASSING
+      ↓
+TIER 2 (24-48hr) → VALIDATED DATA → TERRITORY PLANNING  
+      ↓
+TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
+```
+
+### The Vision in Action
+1. **Storm hits OKC Metro** → Tier 1 sends push notification
+2. **Canvasser gets alert** → "2+ inch hail detected in Edmond - GO NOW!"
+3. **48 hours later** → Tier 2 provides refined neighborhood targeting
+4. **Next week** → Tier 3 validates accuracy and improves algorithms
 
 ## Milestones & Cornerstones
 
@@ -268,6 +347,32 @@ This broader definition is critical for hail tracking as storms often affect the
 - `/mrms-proxy-server/server-eccodes-final.js` - Production-ready implementation
 - Updated metro bounds in all server versions
 - Test data files verified correct storm data
+
+### 2025-06-21 - Tier 1 Real-Time Implementation
+**Session Focus**: Implement Tier 1 real-time storm detection with NCEP MRMS
+
+**Current Progress**:
+1. **Real-Time Server Verified**
+   - server-realtime.js already exists and is running on port 3003
+   - ecCodes installed and working
+   - Monitoring active with 2-minute update intervals
+   - OKC Metro bounds properly configured
+
+2. **Client Integration Started**
+   - Updated tier1NCEPService.ts to connect to real-time server
+   - Added development/production URL handling
+   - Updated IntegratedHailIntelligence service with real-time server health checks
+   - Modified dashboard to show real-time monitoring status
+
+**Next 3 Steps (Success Path)**:
+1. Test real-time storm detection with simulated data
+2. Implement push notification integration
+3. Add storm progression tracking UI
+
+**Next 3 Steps (Failure Path)**:
+1. Debug connection issues between app and server
+2. Implement fallback to historical data if real-time fails
+3. Add error recovery and retry logic
 
 ### 2025-01-20 - Address Search Implementation
 **Session Focus**: Add address search functionality to map view

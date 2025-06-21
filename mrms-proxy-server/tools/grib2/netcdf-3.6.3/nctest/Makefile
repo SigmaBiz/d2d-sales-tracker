@@ -109,11 +109,11 @@ AUTOHEADER = ${SHELL} /Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-prox
 AUTOMAKE = ${SHELL} /Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2/netcdf-3.6.3/missing --run automake-1.10
 AWK = awk
 BINFILE_NAME = binary-netcdf-3.6.3_nc3.tar
-CC = gcc
+CC = clang
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
-CPP = gcc -E
-CPPFLAGS =  -I/Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2/include -Wall -Wmissing-prototypes -Wold-style-definition -Werror=format-security -O3 -fPIC -g
+CPP = clang -E
+CPPFLAGS =  -I/Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2/include
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
@@ -129,11 +129,11 @@ ECHO_N =
 ECHO_T = 
 EGREP = /usr/bin/grep -E
 EXEEXT = 
-F77 = gfortran
-FC = gfortran
-FCFLAGS = 
+F77 = gfortran-15
+FC = gfortran-15
+FCFLAGS = -g -O2
 FCFLAGS_f90 = 
-FFLAGS = 
+FFLAGS = -g -O2
 FGREP = /usr/bin/grep -F
 FTPBINDIR = /home/ftp/pub/binary/dummy_system
 GREP = /usr/bin/grep

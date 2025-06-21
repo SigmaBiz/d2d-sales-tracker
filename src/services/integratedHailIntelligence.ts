@@ -30,10 +30,10 @@ export class IntegratedHailIntelligence {
     enableHistorical: true,
     enableValidation: true,
     serviceArea: {
-      north: 37.0,   // Oklahoma bounds
-      south: 33.6,
-      east: -94.4,
-      west: -103.0
+      north: 35.7,    // North of Edmond
+      south: 35.1,    // South of Norman
+      east: -97.1,    // East of Midwest City
+      west: -97.8     // West of Yukon
     },
     alertThreshold: 25  // 1 inch hail
   };
@@ -144,13 +144,32 @@ export class IntegratedHailIntelligence {
     const config = await AsyncStorage.getItem('@hail_intelligence_config');
     const accuracy = await StormEventsService.getAccuracyDashboard();
     
+    // Check real-time server health
+    let realtimeServerStatus = 'offline';
+    let realtimeMonitoring = false;
+    try {
+      const serverUrl = __DEV__ 
+        ? 'http://localhost:3003/health'
+        : 'https://your-production-server.com/health';
+      const response = await fetch(serverUrl);
+      if (response.ok) {
+        const health = await response.json();
+        realtimeServerStatus = health.status === 'ok' ? 'online' : 'error';
+        realtimeMonitoring = health.monitoring || false;
+      }
+    } catch (error) {
+      console.log('[Intelligence] Real-time server unreachable');
+    }
+    
     return {
       config: config ? JSON.parse(config) : this.config,
       tiers: {
         realTime: {
           enabled: this.config.enableRealTime,
-          status: flowState.realtime?.status || 'inactive',
-          lastUpdate: flowState.realtime?.timestamp
+          status: realtimeMonitoring ? 'active' : flowState.realtime?.status || 'inactive',
+          lastUpdate: flowState.realtime?.timestamp,
+          serverStatus: realtimeServerStatus,
+          monitoring: realtimeMonitoring
         },
         historical: {
           enabled: this.config.enableHistorical,

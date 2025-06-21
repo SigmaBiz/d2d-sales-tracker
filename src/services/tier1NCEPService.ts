@@ -34,9 +34,38 @@ export class NCEPMRMSService {
   static async startRealTimeMonitoring(): Promise<void> {
     console.log('[TIER 1] Starting NCEP MRMS real-time monitoring...');
     
-    // Disabled for now - Tier 1 not implemented yet
-    // Will enable when we have real NCEP access
-    return;
+    try {
+      // Connect to our real-time server (use actual host IP for physical device)
+      const serverUrl = __DEV__ 
+        ? 'http://localhost:3003/api/monitoring/start'
+        : 'https://your-production-server.com/api/monitoring/start';
+        
+      const response = await fetch(serverUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[TIER 1] Real-time monitoring started:', data.message);
+        
+        // Start local monitoring interval
+        this.monitoringInterval = setInterval(async () => {
+          await this.checkForNewStorms();
+        }, this.UPDATE_INTERVAL);
+        
+      } else {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+    } catch (error) {
+      console.error('[TIER 1] Failed to start monitoring:', error);
+      // Fall back to local polling
+      this.monitoringInterval = setInterval(async () => {
+        await this.checkForNewStorms();
+      }, this.UPDATE_INTERVAL);
+    }
   }
 
   /**
@@ -57,31 +86,53 @@ export class NCEPMRMSService {
     try {
       console.log('[TIER 1] Checking NCEP MRMS for new storms...');
       
-      // Try direct NCEP access first (will fail due to CORS in browser)
-      // In production, this would go through your proxy
-      let data = await this.fetchDirectNCEP();
+      // Connect to our real-time server
+      const serverUrl = __DEV__ 
+        ? 'http://localhost:3003/api/storms/current'
+        : 'https://your-production-server.com/api/storms/current';
+        
+      const response = await fetch(serverUrl);
       
-      if (!data || data.length === 0) {
-        // Fallback to proxy
-        console.log('[TIER 1] Direct NCEP failed, using proxy...');
-        data = await MRMSProxyService.fetchRealtimeMRMS();
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[TIER 1] Real-time server returned ${data.storms.length} storms`);
+        
+        // Convert to HailReport format
+        const reports: HailReport[] = data.storms.map((storm: any) => ({
+          id: storm.id,
+          latitude: storm.latitude,
+          longitude: storm.longitude,
+          size: storm.size,
+          timestamp: new Date(storm.timestamp),
+          confidence: storm.confidence,
+          source: storm.source,
+          meshValue: storm.meshValue
+        }));
+        
+        // Check for alert-level storms
+        const alertStorms = reports.filter(r => r.size >= 1.25);
+        if (alertStorms.length > 0) {
+          console.log(`[TIER 1] 🚨 Found ${alertStorms.length} alert-level storms!`);
+          await this.triggerAlerts(alertStorms);
+        }
+        
+        return reports;
+      } else {
+        throw new Error(`Real-time server error: ${response.status}`);
       }
-
-      // Process MESH values
-      const reports = this.processMESHData(data);
       
-      // Filter for significant hail (>25mm = 1 inch)
-      const significantReports = reports.filter(r => r.size >= 1.0);
-      
-      if (significantReports.length > 0) {
-        console.log(`[TIER 1] Found ${significantReports.length} significant hail reports!`);
-        await this.triggerAlerts(significantReports);
-      }
-
-      return reports;
     } catch (error) {
-      console.error('[TIER 1] Error checking NCEP MRMS:', error);
-      return [];
+      console.error('[TIER 1] Error checking real-time server:', error);
+      
+      // Fallback to proxy if real-time server is down
+      try {
+        console.log('[TIER 1] Falling back to proxy server...');
+        const data = await MRMSProxyService.fetchRealtimeMRMS();
+        return this.processMESHData(data);
+      } catch (fallbackError) {
+        console.error('[TIER 1] Fallback also failed:', fallbackError);
+        return [];
+      }
     }
   }
 
