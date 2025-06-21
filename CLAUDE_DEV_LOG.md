@@ -19,6 +19,8 @@
 - 20%: Tier 2 enhanced - Dynamic server for 12-month data, deployment prep complete, critical errors fixed
 - 25%: Tier 2 GRIB2 processing fixed - Sept 24 storm now shows 426 real hail reports, ready for full testing
 - 30%: Attempted Tier 2 testing in Expo Go - app still shows 5 reports despite server returning 426
+- 35%: Fixed Tier 2 integration - app now shows all 584 reports, timezone handling fixed, mock data removed
+- 40%: 🎉 DEPLOYED TO PRODUCTION - Both servers running on Render.com, fully tested and operational!
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -349,6 +351,43 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
 - `/mrms-proxy-server/server-eccodes-final.js` - Production-ready implementation
 - Updated metro bounds in all server versions
 - Test data files verified correct storm data
+
+### 2025-06-21 - Production Deployment Complete! 🎉
+**Session Focus**: Deploy servers to production and achieve full operational status
+
+**Major Milestone Achieved at 40% Context**:
+The 3-Tier Hail Intelligence System is now **FULLY DEPLOYED TO PRODUCTION!**
+
+**Deployment Details**:
+1. **Production Servers on Render.com**
+   - Dynamic Server: https://d2d-dynamic-server.onrender.com (Port 3002)
+   - Real-time Server: https://d2d-realtime-server.onrender.com (Port 3003)
+   - Both servers running with ecCodes for GRIB2 processing
+   - Free tier hosting with 750 hours/month
+
+2. **Deployment Process**
+   - Railway.com initially attempted but limited to databases only
+   - Successfully migrated to Render.com
+   - Fixed Debian package names (libeccodes-tools, libeccodes-data)
+   - Created separate Dockerfiles for each service
+
+3. **Production Testing Results**
+   - ✅ Sept 24, 2024: 584 reports with 2.94" max hail
+   - ✅ Real-time monitoring active with 2-minute updates
+   - ✅ Push notifications working (test storms filtered)
+   - ✅ No dependency on local servers
+   - ✅ Accessible from anywhere by team members
+
+4. **Configuration Updates**
+   - Updated .env with production URLs
+   - Modified api.config.ts with Render URLs
+   - Committed all deployment configurations
+
+**What This Means**:
+- App works 24/7 without local servers
+- Team can use from anywhere
+- Professional deployment ready for field use
+- All storm data processing happens in the cloud
 
 ### 2025-06-21 - Tier 2 Integration Fixed & Timezone Handling
 **Session Focus**: Fix Tier 2 app integration and timezone issues
@@ -848,12 +887,50 @@ curl http://192.168.1.111:3003/api/test/simulate-storm
 
 ## Environment & Dependencies
 - React Native with Expo SDK 51
-- Node.js proxy server (Vercel deployed)
+- Node.js servers with ecCodes for GRIB2 processing
 - Supabase for cloud sync
 - Leaflet for mapping
 - D3-contour for smooth hail visualization
+- Docker containers for production deployment
 
-## Deployment URLs
-- Proxy Server: https://mrms-proxy-server-nine.vercel.app (or local: http://192.168.1.111:3001)
+## Production Deployment URLs 🚀
+- Dynamic Server (Historical): https://d2d-dynamic-server.onrender.com
+- Real-time Server: https://d2d-realtime-server.onrender.com
 - GitHub Repo: https://github.com/SigmaBiz/d2d-sales-tracker
-- Latest Tag: v1.1-overlays-working-correctly
+- Branch: feature/grib2-processing
+
+## System Architecture Summary
+**3-TIER HAIL INTELLIGENCE SYSTEM - PRODUCTION READY**
+
+### Tier 1: Real-Time Detection ✅
+- Monitors NCEP MRMS feed every 2 minutes
+- Push notifications for active storms
+- Team broadcast capability
+- Test storms filtered from production alerts
+
+### Tier 2: Historical Validation ✅
+- 12 months of GRIB2 processed data
+- Dynamic server with ecCodes
+- Timezone-aware for local dates
+- Sept 24, 2024 benchmark: 584 reports
+
+### Tier 3: Ground Truth ⏳
+- Skeleton implemented
+- Storm Events integration pending
+- Weekly validation framework ready
+
+## Major Achievements This Session
+1. **Fixed critical Tier 2 integration bug** (was showing 5 reports instead of 584)
+2. **Implemented proper timezone handling** for evening storms
+3. **Removed all mock data fallbacks** - only real data shown
+4. **Deployed both servers to production** on Render.com
+5. **Achieved full operational status** - no local dependencies
+
+## Next Steps for Future Development
+1. Complete Tier 3 Storm Events integration
+2. Build iOS native app (when Apple Developer account ready)
+3. Add hourly data capability for precise storm timing
+4. Implement user accounts and team management
+5. Add historical storm analytics dashboard
+
+**The D2D Sales Tracker Hail Intelligence System is now production-ready and operational!**
