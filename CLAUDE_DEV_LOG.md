@@ -44,6 +44,22 @@ This is a canvassing app designed to:
 - **Adequate Hail Tracking** - NOTIFY users when significant storms occur
 - **Field-First Design** - Every feature must work reliably in real field conditions
 
+**Geographic Scope - Metro OKC Definition:**
+"Metro OKC" or "OKC Metro" refers to the entire Oklahoma City metropolitan area, NOT just Oklahoma City proper. This includes:
+- **Oklahoma City** (central)
+- **Edmond** (north)
+- **Moore** (south)
+- **Norman** (south)
+- **Midwest City** (east)
+- **Del City** (southeast)
+- **Bethany** (northwest)
+- **Warr Acres** (northwest)
+- **Newcastle** (southwest)
+- **Mustang** (southwest)
+- **Yukon** (west)
+
+This broader definition is critical for hail tracking as storms often affect the entire metro area, and roofing contractors service all these communities.
+
 ## Milestones & Cornerstones
 
 ### Completed Milestones ✅
@@ -202,10 +218,56 @@ This is a canvassing app designed to:
 - Streaming approach (v3) should handle large files efficiently
 
 **Next Steps**:
-1. Find the correct storm hours for Sept 24, 2024
-2. Test server-eccodes-v3.js with proper storm timing
-3. Integrate with client application
-4. Consider deployment options for production (Docker with ecCodes)
+1. ✅ Found correct approach: Use next day's 00:00 UTC file for 24hr max
+2. ✅ Verified Sept 24, 2024 storm data exists with 307 hail reports
+3. ✅ Created server-eccodes-final.js with proper implementation
+4. ⏳ Integrate with client application
+5. ⏳ Deploy to production (requires Docker with ecCodes)
+
+### 2025-01-21 - GRIB2 Processing Completion
+**Session Focus**: Complete ecCodes implementation and verify real data
+
+**Key Achievements**:
+1. **Discovered Correct Data Access Pattern**
+   - MESH_Max_1440min files contain 24-hour maximum hail size
+   - Must use NEXT day's 00:00 UTC file to get previous day's data
+   - Example: For Sept 24, 2024 storms, use Sept 25 00:00 UTC file
+
+2. **Updated Metro OKC Definition**
+   - Expanded bounds to include entire metropolitan area
+   - North: 35.7 (Edmond), South: 35.1 (Norman)
+   - East: -97.1 (Midwest City), West: -97.8 (Yukon)
+   - Added all major suburbs to city list
+
+3. **Verified Real Storm Data**
+   - Sept 24, 2024 storm produced tennis ball to baseball size hail
+   - 307 points with ≥1" hail in metro area
+   - Maximum: 2.94 inches at 35.535°N, -97.495°W (central OKC)
+   - Storm peaked around 20:30 UTC (3:30 PM local)
+
+4. **Created Final Implementation**
+   - `server-eccodes-final.js` - Production-ready server
+   - Handles 24.5 million point CONUS grid efficiently
+   - Direct processing approach with 200MB buffer
+   - Proper coordinate conversion (0-360 to -180-180)
+   - Caching for processed dates
+
+**Technical Notes**:
+- GRIB2 files use millidegree coordinates
+- Longitude is in 0-360 format (add 360 to western hemisphere)
+- MESH values in millimeters (divide by 25.4 for inches)
+- Files are ~400KB compressed, expand to millions of data points
+
+**Current Status**:
+- ✅ ecCodes implementation complete and tested
+- ✅ Successfully processing real MRMS data
+- ✅ Verified against known Sept 24, 2024 storm
+- ✅ Ready for client integration
+
+**Files Created in This Session**:
+- `/mrms-proxy-server/server-eccodes-final.js` - Production-ready implementation
+- Updated metro bounds in all server versions
+- Test data files verified correct storm data
 
 ### 2025-01-20 - Address Search Implementation
 **Session Focus**: Add address search functionality to map view

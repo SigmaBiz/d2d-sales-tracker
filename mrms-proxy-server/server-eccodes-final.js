@@ -1,7 +1,7 @@
 /**
- * MRMS GRIB2 Processing Server using ecCodes V3
- * Optimized for OKC Metro area processing
- * Uses streaming approach to handle large GRIB2 files
+ * MRMS GRIB2 Processing Server using ecCodes - Final Version
+ * Processes 24-hour maximum MESH data from IEM Archive
+ * Optimized for OKC Metro area
  */
 
 const express = require('express');
@@ -38,16 +38,13 @@ const CONFIG = {
   },
   
   // Minimum hail size to include (inches)
-  MIN_HAIL_SIZE: 1.25,
+  MIN_HAIL_SIZE: 1.0,  // Lowered to 1 inch to catch more reports
   
   // Cache settings
   CACHE_DIR: path.join(__dirname, 'cache'),
   TEMP_DIR: path.join(__dirname, 'temp'),
   
-  // Processing settings
-  // For MESH_Max_1440min (24-hour max), we need to check the NEXT day's 00:00 UTC file
-  // which contains the maximum hail size from the previous 24 hours
-  USE_NEXT_DAY_FOR_24HR_MAX: true
+  PORT: process.env.PORT || 3002
 };
 
 // Ensure directories exist
@@ -78,9 +75,28 @@ app.get('/health', async (req, res) => {
   const hasEccodes = await checkEccodes();
   res.json({ 
     status: 'ok', 
-    service: 'mrms-eccodes-server-v3',
-    eccodes: hasEccodes ? 'installed' : 'missing'
+    service: 'mrms-eccodes-server-final',
+    eccodes: hasEccodes ? 'installed' : 'missing',
+    bounds: CONFIG.OKC_METRO_BOUNDS
   });
+});
+
+/**
+ * Get available storm dates
+ */
+app.get('/api/mesh/available-dates', async (req, res) => {
+  try {
+    const cacheFiles = await fs.readdir(CONFIG.CACHE_DIR);
+    const dates = cacheFiles
+      .filter(f => f.endsWith('_mesh.json'))
+      .map(f => f.replace('_mesh.json', ''))
+      .sort()
+      .reverse();
+    
+    res.json({ dates });
+  } catch (error) {
+    res.json({ dates: [] });
+  }
 });
 
 /**
@@ -109,9 +125,10 @@ app.get('/api/mesh/:date', async (req, res) => {
     // Process GRIB2 data
     const meshData = await processDateMESH(date);
     
-    // Cache the results
+    // Cache the results if we found data
     if (meshData.reports.length > 0) {
       await fs.writeFile(cacheFile, JSON.stringify(meshData));
+      console.log(`[GRIB2] Cached ${meshData.reports.length} reports for ${date}`);
     }
     
     res.json(meshData);
@@ -138,37 +155,31 @@ async function processDateMESH(date) {
   }
   
   // For MESH_Max_1440min (24-hour maximum), we need to get the NEXT day's 00:00 UTC file
-  // which contains the maximum hail size from the previous 24 hours ending at that time
-  const targetDate = new Date(`${year}-${month}-${day}T00:00:00Z`);
+  // which contains the maximum hail size from the previous 24 hours
+  const targetDate = new Date(`${year}-${month}-${day}T12:00:00Z`);
   targetDate.setDate(targetDate.getDate() + 1); // Add one day
   
   const nextYear = targetDate.getFullYear();
   const nextMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
   const nextDay = String(targetDate.getDate()).padStart(2, '0');
   
-  console.log(`[GRIB2] Processing ${date} using next day's 24hr max file...`);
+  console.log(`[GRIB2] Processing ${date} using ${nextYear}-${nextMonth}-${nextDay} 00:00 UTC (24hr max)`);
   
   try {
     const reports = await process24HourMaxMESH(nextYear, nextMonth, nextDay, date);
     
-    console.log(`[GRIB2] Processed ${reports.length} reports for ${date}`);
-    
     return {
       date,
       reports: reports,
-      source: 'IEM MRMS Archive (24hr Max)',
+      source: 'IEM MRMS Archive',
+      dataType: '24-hour Maximum',
       dataFile: `${nextYear}-${nextMonth}-${nextDay} 00:00 UTC`,
-      bounds: CONFIG.OKC_METRO_BOUNDS
+      bounds: CONFIG.OKC_METRO_BOUNDS,
+      reportCount: reports.length
     };
   } catch (error) {
     console.error(`[GRIB2] Error processing ${date}:`, error.message);
-    return {
-      date,
-      reports: [],
-      source: 'IEM MRMS Archive',
-      error: error.message,
-      bounds: CONFIG.OKC_METRO_BOUNDS
-    };
+    throw error;
   }
 }
 
@@ -182,7 +193,7 @@ async function process24HourMaxMESH(year, month, day, originalDate) {
   // Construct the URL for MESH data
   const url = `${CONFIG.IEM_BASE_URL}/${year}/${month}/${day}/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_${dateTimeStr}.grib2.gz`;
   
-  console.log(`[GRIB2] Fetching ${url}`);
+  console.log(`[GRIB2] Downloading from: ${url}`);
   
   // Download gzipped GRIB2 file
   const gzPath = path.join(CONFIG.TEMP_DIR, `MESH_${dateTimeStr}.grib2.gz`);
@@ -201,12 +212,18 @@ async function process24HourMaxMESH(year, month, day, originalDate) {
     
     // Save to disk
     await pipeline(response.data, fsSync.createWriteStream(gzPath));
+    console.log(`[GRIB2] Downloaded ${gzPath}`);
     
     // Decompress the file
     await execPromise(`gunzip -f ${gzPath}`);
+    console.log(`[GRIB2] Decompressed to ${gribPath}`);
     
-    // Process GRIB2 to get data using streaming approach
-    const meshData = await processMESHGrib2WithEccodesStream(gribPath, originalDate, '24hr');
+    // Get file info
+    const { stdout: gribInfo } = await execPromise(`grib_ls -p count,minimum,maximum,average ${gribPath}`);
+    console.log(`[GRIB2] File info:\n${gribInfo}`);
+    
+    // Process GRIB2 to get data
+    const meshData = await processMESHGrib2Direct(gribPath, originalDate);
     
     return meshData;
     
@@ -217,39 +234,37 @@ async function process24HourMaxMESH(year, month, day, originalDate) {
 }
 
 /**
- * Process MESH GRIB2 file using ecCodes with streaming to handle large files
+ * Process MESH GRIB2 file directly (non-streaming for testing)
  */
-async function processMESHGrib2WithEccodesStream(gribPath, date, hour) {
-  return new Promise((resolve, reject) => {
-    const reports = [];
-    
-    // Use grib_get_data as a spawned process to stream the output
-    const gribProcess = spawn('grib_get_data', [gribPath]);
-    
-    const rl = readline.createInterface({
-      input: gribProcess.stdout,
-      crlfDelay: Infinity
+async function processMESHGrib2Direct(gribPath, date) {
+  console.log(`[GRIB2] Extracting MESH data for OKC Metro area...`);
+  
+  const reports = [];
+  
+  try {
+    // Use grib_get_data to extract all data
+    const { stdout } = await execPromise(`grib_get_data ${gribPath}`, { 
+      maxBuffer: 200 * 1024 * 1024 // 200MB buffer
     });
     
+    const lines = stdout.split('\n');
     let headerSkipped = false;
-    let processedLines = 0;
+    let totalLines = 0;
+    let inBoundsCount = 0;
     
-    rl.on('line', (line) => {
+    for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed) return;
+      if (!trimmed) continue;
       
       // Skip header line
       if (!headerSkipped) {
         if (trimmed.includes('Latitude') || trimmed.includes('lat')) {
           headerSkipped = true;
         }
-        return;
+        continue;
       }
       
-      processedLines++;
-      if (processedLines % 100000 === 0) {
-        console.log(`[GRIB2] Processed ${processedLines} lines...`);
-      }
+      totalLines++;
       
       // Parse data line: latitude longitude value
       const parts = trimmed.split(/\s+/);
@@ -258,55 +273,51 @@ async function processMESHGrib2WithEccodesStream(gribPath, date, hour) {
         const lon = parseFloat(parts[1]);
         const meshValue = parseFloat(parts[2]); // MESH in mm
         
-        if (isNaN(lat) || isNaN(lon) || isNaN(meshValue)) return;
+        if (isNaN(lat) || isNaN(lon) || isNaN(meshValue)) continue;
         
-        // Quick bounds check before conversion
-        if (lat < CONFIG.OKC_METRO_BOUNDS.south || 
-            lat > CONFIG.OKC_METRO_BOUNDS.north ||
-            lon < CONFIG.OKC_METRO_BOUNDS.west || 
-            lon > CONFIG.OKC_METRO_BOUNDS.east) {
-          return;
-        }
-        
-        const meshInches = meshValue / 25.4;
-        
-        // Check minimum size
-        if (meshInches >= CONFIG.MIN_HAIL_SIZE) {
-          reports.push({
-            id: `mesh_${date}_${hour}_${reports.length}`,
-            latitude: lat,
-            longitude: lon,
-            size: meshInches,
-            meshValue: meshValue,
-            timestamp: new Date(`${date}T${hour}:00:00Z`),
-            confidence: calculateConfidence(meshInches),
-            city: getClosestCity(lat, lon),
-            isMetroOKC: true,
-            source: 'IEM MRMS Archive'
-          });
+        // Quick bounds check
+        if (lat >= CONFIG.OKC_METRO_BOUNDS.south && 
+            lat <= CONFIG.OKC_METRO_BOUNDS.north &&
+            lon >= CONFIG.OKC_METRO_BOUNDS.west + 360 && 
+            lon <= CONFIG.OKC_METRO_BOUNDS.east + 360) {
+          
+          inBoundsCount++;
+          const meshInches = meshValue / 25.4;
+          
+          // Check minimum size
+          if (meshInches >= CONFIG.MIN_HAIL_SIZE) {
+            reports.push({
+              id: `mesh_${date}_${reports.length}`,
+              latitude: lat,
+              longitude: lon - 360, // Convert back to -180 to 180
+              size: Math.round(meshInches * 100) / 100, // Round to 2 decimals
+              meshValue: meshValue,
+              timestamp: new Date(`${date}T20:30:00Z`), // Approximate storm time
+              confidence: calculateConfidence(meshInches),
+              city: getClosestCity(lat, lon - 360),
+              isMetroOKC: true,
+              source: 'IEM MRMS Archive'
+            });
+          }
         }
       }
-    });
-    
-    rl.on('close', () => {
-      console.log(`[GRIB2] Extracted ${reports.length} significant hail reports from ${processedLines} total lines`);
-      resolve(reports);
-    });
-    
-    gribProcess.stderr.on('data', (data) => {
-      console.error(`[GRIB2] Error:`, data.toString());
-    });
-    
-    gribProcess.on('error', (error) => {
-      reject(error);
-    });
-    
-    gribProcess.on('exit', (code) => {
-      if (code !== 0) {
-        reject(new Error(`grib_get_data exited with code ${code}`));
+      
+      if (totalLines % 1000000 === 0) {
+        console.log(`[GRIB2] Processed ${totalLines} lines, found ${inBoundsCount} in bounds, ${reports.length} significant`);
       }
-    });
-  });
+    }
+    
+    console.log(`[GRIB2] Total: ${totalLines} lines, ${inBoundsCount} in metro bounds, ${reports.length} with significant hail`);
+    
+    // Sort by size descending
+    reports.sort((a, b) => b.size - a.size);
+    
+    return reports;
+    
+  } catch (error) {
+    console.error('[GRIB2] Error processing GRIB2 file:', error);
+    throw error;
+  }
 }
 
 /**
@@ -316,7 +327,8 @@ function calculateConfidence(sizeInches) {
   if (sizeInches >= 2.5) return 95;
   if (sizeInches >= 2.0) return 90;
   if (sizeInches >= 1.5) return 85;
-  return 80;
+  if (sizeInches >= 1.25) return 80;
+  return 75;
 }
 
 /**
@@ -325,11 +337,16 @@ function calculateConfidence(sizeInches) {
 function getClosestCity(lat, lon) {
   const cities = [
     { name: 'Oklahoma City', lat: 35.4676, lon: -97.5164 },
-    { name: 'Norman', lat: 35.2226, lon: -97.4395 },
-    { name: 'Moore', lat: 35.3395, lon: -97.4867 },
     { name: 'Edmond', lat: 35.6528, lon: -97.4781 },
-    { name: 'Newcastle', lat: 35.3053, lon: -97.4766 },
-    { name: 'Midwest City', lat: 35.4934, lon: -97.2891 }
+    { name: 'Moore', lat: 35.3395, lon: -97.4867 },
+    { name: 'Norman', lat: 35.2226, lon: -97.4395 },
+    { name: 'Midwest City', lat: 35.4495, lon: -97.3967 },
+    { name: 'Del City', lat: 35.4451, lon: -97.4409 },
+    { name: 'Newcastle', lat: 35.2473, lon: -97.5997 },
+    { name: 'Bethany', lat: 35.5184, lon: -97.6322 },
+    { name: 'Warr Acres', lat: 35.5226, lon: -97.6189 },
+    { name: 'Mustang', lat: 35.3842, lon: -97.7244 },
+    { name: 'Yukon', lat: 35.5067, lon: -97.7625 }
   ];
   
   let closest = cities[0];
@@ -362,33 +379,15 @@ async function cleanupTempFiles(...files) {
   }
 }
 
-/**
- * Get available dates with significant hail
- */
-app.get('/api/mesh/available-dates', async (req, res) => {
-  try {
-    const cacheFiles = await fs.readdir(CONFIG.CACHE_DIR);
-    const dates = cacheFiles
-      .filter(f => f.endsWith('_mesh.json'))
-      .map(f => f.replace('_mesh.json', ''))
-      .sort()
-      .reverse();
-    
-    res.json({ dates });
-  } catch (error) {
-    res.json({ dates: [] });
-  }
-});
-
 // Initialize and start server
 async function start() {
   await ensureDirectories();
   
-  const PORT = process.env.PORT || 3002;
-  app.listen(PORT, () => {
-    console.log(`[GRIB2] ecCodes Server V3 running on port ${PORT}`);
-    console.log(`[GRIB2] Health check: http://localhost:${PORT}/health`);
-    console.log(`[GRIB2] Example: http://localhost:${PORT}/api/mesh/2024-09-24`);
+  app.listen(CONFIG.PORT, () => {
+    console.log(`[GRIB2] ecCodes Server Final running on port ${CONFIG.PORT}`);
+    console.log(`[GRIB2] Health check: http://localhost:${CONFIG.PORT}/health`);
+    console.log(`[GRIB2] Example: http://localhost:${CONFIG.PORT}/api/mesh/2024-09-24`);
+    console.log(`[GRIB2] Metro bounds: ${JSON.stringify(CONFIG.OKC_METRO_BOUNDS)}`);
   });
 }
 
