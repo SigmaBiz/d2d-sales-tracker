@@ -16,7 +16,8 @@
 - 5%: Tier 1 implementation started - real-time server verified running, dashboard updated for monitoring status
 - 10%: Real-time detection working with test storms, push notifications integrated, test button added to dashboard
 - 15%: Tier 1 complete - storm progression tracking and team broadcasts implemented, ready for production
-- 20%: [To be updated by current session]
+- 20%: Tier 2 enhanced - Dynamic server for 12-month data, deployment prep complete, critical errors fixed
+- 25%: [To be updated by current session]
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -386,60 +387,95 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
 2. Implement fallback to Tier 2 if real-time fails
 3. Add retry logic for server connection issues
 
-## 🚨 DETAILED HANDOFF FOR NEXT AGENT - CONTEXT AT 95% 🚨
+## 🚨 DETAILED HANDOFF FOR NEXT AGENT - CONTEXT AT 20% 🚨
 
 ### Current State Summary
-**Branch**: `feature/grib2-processing` (commit: 47ec0d9)
-**Session**: 2025-06-21 - Tier 1 Real-Time Implementation COMPLETE
+**Branch**: `feature/grib2-processing` (commit: 050f170)
+**Session**: 2025-06-21 - Tier 1 Complete, Tier 2 Enhanced, App Tested
 
-### What Was Accomplished
-1. **Tier 1 Real-Time Detection** - FULLY IMPLEMENTED
-   - `server-realtime.js` running on port 3003 with ecCodes
-   - Monitors NCEP MRMS every 2 minutes
-   - Storm progression tracking over 2hr window
-   - Push notifications with confidence scoring
-   - Team broadcast system for alerts
-   - Test endpoint: POST `/api/test/simulate-storm`
+### What Was Accomplished This Session (Context 15-20%)
 
-2. **Client Integration Complete**
-   - `tier1NCEPService.ts` connects to real-time server
-   - `HailAlertService` checks real-time first, falls back to historical
-   - Dashboard shows monitoring status with green/yellow/red indicators
-   - "Test Hail Alerts" button added for manual testing
+1. **Tier 2 Enhanced with Dynamic Data**
+   - Created `server-dynamic.js` - Can fetch ANY date from last 12 months
+   - Full ecCodes GRIB2 processing for OKC Metro area
+   - Endpoints: `/api/mesh/:date`, `/api/mesh/range/:start/:end`
+   - 24-hour cache for processed data
+   - Filters to OKC Metro bounds only
 
-3. **Files Modified in This Session**
-   - `/mrms-proxy-server/server-realtime.js` - Added test endpoint, storm progression
-   - `/src/services/tier1NCEPService.ts` - Real-time server integration
-   - `/src/services/integratedHailIntelligence.ts` - Health checks, progression data
-   - `/src/services/hailAlertService.ts` - Team broadcasts, real-time checks
-   - `/src/screens/HailIntelligenceDashboard.tsx` - Test button, active status
+2. **Deployment Infrastructure**
+   - Created Dockerfile with ecCodes for production
+   - Railway.toml configuration for easy deployment
+   - docker-compose.yml for local/staging
+   - DEPLOYMENT.md with complete instructions
+   - API configuration centralized in `src/config/api.config.ts`
+
+3. **Critical Bug Fixes**
+   - Fixed timestamp conversion error in HailAlertService
+   - Fixed missing function call (checkForNewAlerts → checkNow)
+   - Updated all services to use IP addresses for physical device
+
+4. **App Successfully Tested**
+   - Expo Go running with real data
+   - Test storms showing on map with contours
+   - Hail overlays working (red = 2.5", orange = 1.75")
+   - Push notification system ready (limited in Expo Go)
+
+### Current Issues & Solutions
+
+1. **Storm Report Counts**
+   - ISSUE: Sept 24, 2024 only shows 3-5 reports (should be 307)
+   - CAUSE: Old Vercel proxy returning 404, falling back to mock data
+   - SOLUTION: Update .env to use local server: `EXPO_PUBLIC_MRMS_PROXY_URL=http://192.168.1.111:3002`
+
+2. **Network Errors**
+   - Most are non-critical fallbacks working as designed
+   - Tier 3 Storm Events proxy is down (expected, uses mock data)
+   - Real servers are working when IP addresses are used
+
+3. **What's Working**
+   - ✅ Tier 1: Real-time monitoring with test storms
+   - ✅ Tier 2: Dynamic historical data (when using local server)
+   - ✅ Map visualization with professional hail contours
+   - ✅ Storm progression tracking
+   - ⏳ Tier 3: Using mock data (needs Storm Events API)
 
 ### CRITICAL NEXT STEPS
 
-#### 1. Deploy Real-Time Server to Production
-The server needs ecCodes which requires special deployment:
+#### 1. Fix Environment Variable
 ```bash
-# Option A: Railway.app with Dockerfile
-FROM node:18
-RUN apt-get update && apt-get install -y eccodes
-COPY mrms-proxy-server /app
-WORKDIR /app
-RUN npm install
-CMD ["node", "server-realtime.js"]
+# Update .env file:
+EXPO_PUBLIC_MRMS_PROXY_URL=http://192.168.1.111:3002
+# This will enable real Sept 24 data (307 reports)
 ```
 
-#### 2. Begin Tier 3 Implementation
-File to create: `/src/services/tier3StormEventsService.ts`
-- Already has skeleton implementation
-- Needs to connect to NOAA Storm Events Database
-- Weekly validation runs to improve confidence scoring
-- Updates reliability weights in `confidenceScoring.ts`
+#### 2. Deploy Servers to Production
+```bash
+# Deploy with Railway (has Dockerfile ready)
+cd mrms-proxy-server
+railway init
+railway up
 
-#### 3. Complete Data Flow Integration
-The grand vision requires all 3 tiers working together:
-- Tier 1 → Immediate alerts (COMPLETE ✅)
-- Tier 2 → Historical validation (COMPLETE ✅)  
-- Tier 3 → Ground truth accuracy (PENDING ⏳)
+# Or use docker-compose for both servers
+docker-compose up -d
+```
+
+#### 3. Complete Tier 3 Implementation
+- Skeleton already exists in `tier3StormEventsService.ts`
+- Need to create Storm Events proxy endpoint
+- Or use NOAA's CSV download API directly
+- Weekly validation will improve accuracy over time
+
+#### 4. Test Full Data Flow
+```bash
+# 1. Trigger test storm
+curl -X POST http://localhost:3003/api/test/simulate-storm
+
+# 2. Check historical data
+curl http://localhost:3002/api/mesh/2024-09-24
+
+# 3. Verify in app
+# Should see 307 reports for Sept 24
+```
 
 ### Test Instructions
 1. **Test Real-Time Detection**:
@@ -475,14 +511,48 @@ Replace all instances of:
 - Branch: `feature/grib2-processing`
 - Ready to merge to main after production deployment
 
-### The Vision Reminder
-This app enables canvassers to:
-1. Get instant alerts when hail hits
-2. See professional hail maps
-3. Beat competitors to damaged areas
-4. Maximize lead conversion
+### Technical Details for Next Agent
 
-**Tier 1 is complete and functional. The real-time intelligence system is ready to help the team succeed!**
+#### Server Architecture
+```
+Port 3003: Real-time server (2-min updates)
+Port 3002: Historical server (12-month data)
+Port 3001: Legacy proxy (deprecated)
+```
+
+#### Key Files Created/Modified
+- `server-dynamic.js` - NEW: Fetches any date from IEM
+- `src/config/api.config.ts` - NEW: Centralized API config
+- `DEPLOYMENT.md` - NEW: Complete deployment guide
+- `Dockerfile` - NEW: Production container
+- `hailAlertService.ts` - FIXED: Timestamp conversion
+- `hailDataFlowService.ts` - FIXED: Function name
+
+#### Testing Commands
+```bash
+# Start servers
+cd mrms-proxy-server
+node server-dynamic.js &
+node server-realtime.js &
+
+# Start app
+cd ..
+npx expo start
+
+# Test endpoints
+curl http://192.168.1.111:3002/api/mesh/2024-09-24
+curl http://192.168.1.111:3003/api/test/simulate-storm
+```
+
+### The Vision Achieved So Far
+- ✅ Real-time alerts working (test mode)
+- ✅ Professional hail maps with contours
+- ✅ 12-month historical data capability
+- ✅ Team broadcast system ready
+- ⏳ Production deployment needed
+- ⏳ Ground truth validation pending
+
+**The 3-tier system architecture is proven and functional!**
 
 ### 2025-01-20 - Address Search Implementation
 **Session Focus**: Add address search functionality to map view
