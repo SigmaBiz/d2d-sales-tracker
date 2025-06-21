@@ -386,6 +386,104 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
 2. Implement fallback to Tier 2 if real-time fails
 3. Add retry logic for server connection issues
 
+## 🚨 DETAILED HANDOFF FOR NEXT AGENT - CONTEXT AT 95% 🚨
+
+### Current State Summary
+**Branch**: `feature/grib2-processing` (commit: 47ec0d9)
+**Session**: 2025-06-21 - Tier 1 Real-Time Implementation COMPLETE
+
+### What Was Accomplished
+1. **Tier 1 Real-Time Detection** - FULLY IMPLEMENTED
+   - `server-realtime.js` running on port 3003 with ecCodes
+   - Monitors NCEP MRMS every 2 minutes
+   - Storm progression tracking over 2hr window
+   - Push notifications with confidence scoring
+   - Team broadcast system for alerts
+   - Test endpoint: POST `/api/test/simulate-storm`
+
+2. **Client Integration Complete**
+   - `tier1NCEPService.ts` connects to real-time server
+   - `HailAlertService` checks real-time first, falls back to historical
+   - Dashboard shows monitoring status with green/yellow/red indicators
+   - "Test Hail Alerts" button added for manual testing
+
+3. **Files Modified in This Session**
+   - `/mrms-proxy-server/server-realtime.js` - Added test endpoint, storm progression
+   - `/src/services/tier1NCEPService.ts` - Real-time server integration
+   - `/src/services/integratedHailIntelligence.ts` - Health checks, progression data
+   - `/src/services/hailAlertService.ts` - Team broadcasts, real-time checks
+   - `/src/screens/HailIntelligenceDashboard.tsx` - Test button, active status
+
+### CRITICAL NEXT STEPS
+
+#### 1. Deploy Real-Time Server to Production
+The server needs ecCodes which requires special deployment:
+```bash
+# Option A: Railway.app with Dockerfile
+FROM node:18
+RUN apt-get update && apt-get install -y eccodes
+COPY mrms-proxy-server /app
+WORKDIR /app
+RUN npm install
+CMD ["node", "server-realtime.js"]
+```
+
+#### 2. Begin Tier 3 Implementation
+File to create: `/src/services/tier3StormEventsService.ts`
+- Already has skeleton implementation
+- Needs to connect to NOAA Storm Events Database
+- Weekly validation runs to improve confidence scoring
+- Updates reliability weights in `confidenceScoring.ts`
+
+#### 3. Complete Data Flow Integration
+The grand vision requires all 3 tiers working together:
+- Tier 1 → Immediate alerts (COMPLETE ✅)
+- Tier 2 → Historical validation (COMPLETE ✅)  
+- Tier 3 → Ground truth accuracy (PENDING ⏳)
+
+### Test Instructions
+1. **Test Real-Time Detection**:
+   ```bash
+   # Terminal 1: Start real-time server
+   cd mrms-proxy-server && node server-realtime.js
+   
+   # Terminal 2: Simulate storm
+   curl -X POST http://localhost:3003/api/test/simulate-storm
+   
+   # Check alerts were created
+   ls -la realtime_cache/
+   ```
+
+2. **Test in App**:
+   - Open Hail Intelligence Dashboard
+   - Tap "Test Hail Alerts" button
+   - Should receive push notification if storms detected
+
+### Production URLs to Update
+Replace all instances of:
+- `http://localhost:3003` → Your production server URL
+- `https://your-production-server.com` → Actual deployed URL
+
+### Key Architecture Points
+- **NO MOCK DATA** - All implementations must use real NOAA data
+- **Metro OKC Bounds**: North: 35.7, South: 35.1, East: -97.1, West: -97.8
+- **Alert Threshold**: 1.25" (configurable)
+- **Update Frequency**: 2 minutes (real-time), 24-48hr (historical), weekly (validation)
+
+### Repository State
+- All changes committed and pushed to GitHub
+- Branch: `feature/grib2-processing`
+- Ready to merge to main after production deployment
+
+### The Vision Reminder
+This app enables canvassers to:
+1. Get instant alerts when hail hits
+2. See professional hail maps
+3. Beat competitors to damaged areas
+4. Maximize lead conversion
+
+**Tier 1 is complete and functional. The real-time intelligence system is ready to help the team succeed!**
+
 ### 2025-01-20 - Address Search Implementation
 **Session Focus**: Add address search functionality to map view
 
