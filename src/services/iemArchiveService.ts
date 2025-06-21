@@ -36,12 +36,12 @@ export class IEMArchiveService {
       const dateStr = `${year}-${month}-${day}`;
       
       // Use local proxy server (or deployed proxy URL)
-      const PROXY_URL = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'https://d2d-sales-tracker.vercel.app';
+      // Force local server for now - env var not updating properly
+      const PROXY_URL = 'http://192.168.1.111:3002';
       const url = `${PROXY_URL}/api/mesh/${dateStr}`;
       
       console.log('[IEM Archive] Formatted date string:', dateStr);
-      console.log('[IEM Archive] Proxy URL from env:', process.env.EXPO_PUBLIC_MRMS_PROXY_URL);
-      console.log('[IEM Archive] Using proxy URL:', PROXY_URL);
+      console.log('[IEM Archive] Using local dynamic server:', PROXY_URL);
       console.log('[IEM Archive] Fetching from proxy:', url);
       
       try {

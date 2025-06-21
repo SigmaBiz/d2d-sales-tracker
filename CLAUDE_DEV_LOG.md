@@ -18,6 +18,7 @@
 - 15%: Tier 1 complete - storm progression tracking and team broadcasts implemented, ready for production
 - 20%: Tier 2 enhanced - Dynamic server for 12-month data, deployment prep complete, critical errors fixed
 - 25%: Tier 2 GRIB2 processing fixed - Sept 24 storm now shows 426 real hail reports, ready for full testing
+- 30%: Attempted Tier 2 testing in Expo Go - app still shows 5 reports despite server returning 426
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -387,14 +388,16 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
 2. Implement fallback to Tier 2 if real-time fails
 3. Add retry logic for server connection issues
 
-## 🚨 DETAILED HANDOFF FOR NEXT AGENT - CONTEXT AT 25% 🚨
+## 🚨 DETAILED HANDOFF FOR NEXT AGENT - CONTEXT AT 30% 🚨
 
 ### Current State Summary
 **Branch**: `feature/grib2-processing` 
-**Session**: 2025-06-21 - Tier 1 Complete, Tier 2 FIXED and Working!
-**Last Commit**: "checkpoint: Tier 2 GRIB2 processing fixed - Sept 24 storm shows 426 reports"
+**Session**: 2025-06-21 - Tier 2 Server Fixed, App Integration Issue Remains
+**Last Commit**: "checkpoint: 30% - Tier 2 app testing reveals persistent 5-report issue"
 
-### What Was Accomplished This Session (Context 20-25%)
+### What Was Accomplished This Session (Context 20-30%)
+
+#### Successfully Fixed (20-25%)
 
 1. **Fixed Tier 2 GRIB2 Processing - CRITICAL FIX**
    - Identified and fixed timezone issue: Sept 24 data requires Sept 25 file (24hr max)
@@ -407,6 +410,33 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
    - Changed from old Vercel proxy to local dynamic server
    - `EXPO_PUBLIC_MRMS_PROXY_URL=http://192.168.1.111:3002`
    - This was THE KEY FIX - enables real data instead of empty results
+
+#### Failed to Fix (25-30%)
+
+1. **App Still Shows Only 5 Reports**
+   - Dynamic server correctly returns 426 reports (verified via curl)
+   - App logs show "[TIER 2] September 24, 2024 data available: 426 reports"
+   - But UI displays "5 reports" (3 mock + 2 ground truth)
+   - Issue persists even after:
+     - Restarting Expo with cache clear (-c flag)
+     - Hardcoding server URL to bypass env var issues
+     - Verifying CORS is enabled on server
+     - Confirming phone can access server
+
+2. **Debugging Attempts (Went in Circles)**
+   - Found `iemArchiveService` was using old Vercel URL
+   - Fixed by hardcoding local server URL
+   - Server connection now works BUT data still limited to 5
+   - Unable to identify where 426 reports get reduced to 5
+   - Suspect cached storm data or parallel mock data path
+
+3. **Root Cause Unknown**
+   - weatherHistoryService creates storm with only 5 reports
+   - Possible issues:
+     - Cached storm data being loaded instead of fresh fetch
+     - Mock data path running in parallel
+     - Data transformation limiting results
+   - Need better debugging tools/approach
    
 3. **Server Architecture Clarified**
    - Port 3003: Tier 1 Real-time server (2-min updates)
@@ -440,7 +470,7 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
    - Hail overlays working (red = 2.5", orange = 1.75")
    - Push notification system ready (limited in Expo Go)
 
-### Current Status - All Systems Working!
+### Current Status - Server Working, App Integration Broken
 
 1. **Tier 1 Real-Time (Port 3003)**
    - ✅ Test storms available via "Test Hail Alerts" button
@@ -449,23 +479,43 @@ TIER 3 (Weekly) → GROUND TRUTH → ALGORITHM IMPROVEMENT
    - ✅ Storm progression tracking
 
 2. **Tier 2 Historical (Port 3002)**  
-   - ✅ FIXED: Sept 24, 2024 now shows 426 real hail reports
+   - ✅ SERVER FIXED: Returns 426 real hail reports for Sept 24
    - ✅ Dynamic data for any date in last 12 months
    - ✅ Full GRIB2 processing with ecCodes
    - ✅ Pre-filters to OKC Metro area only
+   - ❌ APP ISSUE: Still displays only 5 reports in UI
 
 3. **Tier 3 Ground Truth**
    - ⏳ Not yet implemented (skeleton exists)
    - ⏳ Will use NOAA Storm Events Database
 
 
+### 🚨 CRITICAL ISSUE FOR NEXT AGENT 🚨
+
+**The 5-Report Problem**:
+- Server endpoint `http://192.168.1.111:3002/api/mesh/2024-09-24` returns 426 reports ✅
+- App's integrated service sees 426 reports available ✅
+- But Storm Search UI shows only 5 reports ❌
+
+These 5 reports are:
+1. 3 hardcoded mock reports from `iemArchiveService.getMockHistoricalData()`
+2. 2 ground truth reports from `tier3StormEventsService`
+
+**Debugging Path Taken (Failed)**:
+1. Traced env var issue - fixed by hardcoding URL
+2. Verified server accessibility and CORS
+3. Attempted cache clearing
+4. Could not find where 426 → 5 reduction occurs
+
+**Recommendation**: This requires Opus 4's superior pattern recognition for complex debugging. The issue involves multiple service layers and data flows that need careful analysis.
+
 ### CRITICAL NEXT STEPS
 
-#### 1. ✅ COMPLETED - Environment Variable Fixed
+#### 1. Fix App Integration with Dynamic Server
 ```bash
 # .env file already updated:
 EXPO_PUBLIC_MRMS_PROXY_URL=http://192.168.1.111:3002
-# Sept 24 now shows 426 reports (exceeds expected 307!)
+# Server returns 426 but app shows only 5 - NEEDS FIX
 ```
 
 #### 2. Deploy Servers to Production
@@ -578,7 +628,27 @@ curl http://192.168.1.111:3003/api/test/simulate-storm
 - ⏳ Production deployment needed
 - ⏳ Tier 3: Ground truth validation pending
 
-**The 3-tier system architecture is proven and functional!**
+**The 3-tier system architecture is proven on the server side but needs app integration fixes!**
+
+### Session Summary (Context 25-30%)
+
+**What Went Wrong**:
+1. Spent entire session trying to debug why app shows 5 reports instead of 426
+2. Made multiple attempts but kept going in circles
+3. Fixed server connection but couldn't fix data flow issue
+4. Unable to trace where the 426 reports get filtered down to 5
+
+**Files Modified**:
+- `src/services/iemArchiveService.ts` - Hardcoded local server URL (line 40)
+
+**What Next Agent Needs to Do**:
+1. Debug why `weatherHistoryService` returns only 5 reports for Sept 24
+2. Check if there's a cache that needs clearing (AsyncStorage)
+3. Trace the complete data flow from server → services → UI
+4. Look for parallel code paths that might be overriding real data
+
+**User Feedback**: "you are not getting anywhere... going in circles"
+**Recommendation**: Use Opus 4 for complex debugging patterns
 
 ### Key Fixes Applied (20-25% Context)
 1. **Date Calculation Fix** (server-dynamic.js lines 232-240):
@@ -624,6 +694,7 @@ curl http://192.168.1.111:3003/api/test/simulate-storm
 - Tagged: v1.2-address-search
 - Feature immediately available in development
 - 25% Context Checkpoint: Tier 2 GRIB2 processing fixed
+- 30% Context Checkpoint: App integration debugging needed (Opus 4 recommended)
 
 ### 2025-01-19 - Perfect Hail Overlay Visualization
 **Session Focus**: Fix hail overlay accuracy and storm data management
