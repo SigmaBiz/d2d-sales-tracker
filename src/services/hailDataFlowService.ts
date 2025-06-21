@@ -54,7 +54,7 @@ export class HailDataFlowService {
         await MRMSService.saveStormEvent(storm);
         
         // Trigger immediate alerts for canvassing
-        await HailAlertService.checkForNewAlerts();
+        await HailAlertService.checkNow();
         
         // Mark reports for historical processing
         await this.markForHistoricalProcessing(reports);

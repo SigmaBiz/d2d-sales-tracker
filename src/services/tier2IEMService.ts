@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
 import * as FileSystem from 'expo-file-system';
+import { getHistoricalServerUrl } from '../config/api.config';
 
 export interface IEMArchiveData {
   date: Date;
@@ -30,18 +31,31 @@ export class IEMArchiveService {
   static async fetchHistoricalStorm(date: Date): Promise<HailReport[]> {
     try {
       // Validate date range
-      if (date < this.MIN_DATE || date > new Date()) {
-        console.log('[TIER 2] Date out of range:', date.toISOString());
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      if (date < twelveMonthsAgo || date > new Date()) {
+        console.log('[TIER 2] Date out of range (last 12 months only):', date.toISOString());
         return [];
       }
 
       console.log(`[TIER 2] Fetching historical data for ${date.toISOString()}`);
 
-      // Skip direct fetch and go straight to proxy
-      return await this.fetchAlternativeIEM(date);
+      // Use dynamic server for any date in last 12 months
+      const dateStr = date.toISOString().split('T')[0];
+      const url = getHistoricalServerUrl(`/api/mesh/${dateStr}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.reports || [];
     } catch (error) {
       console.error('[TIER 2] Error fetching historical data:', error);
-      return [];
+      // Fallback to alternative method
+      return await this.fetchAlternativeIEM(date);
     }
   }
 
@@ -225,6 +239,66 @@ export class IEMArchiveService {
       cached: new Date(),
       validated: true
     }));
+  }
+
+  /**
+   * Fetch last 12 months of storm data for OKC Metro
+   */
+  static async fetchLast12Months(): Promise<any> {
+    try {
+      console.log('[TIER 2] Fetching last 12 months of OKC Metro storm data...');
+      
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 12);
+      
+      // First, get available significant dates
+      const availableUrl = getHistoricalServerUrl('/api/mesh/available');
+      const availableResponse = await fetch(availableUrl);
+      
+      if (!availableResponse.ok) {
+        throw new Error('Failed to get available dates');
+      }
+      
+      const { availableDates } = await availableResponse.json();
+      
+      // Fetch data for each significant date
+      const allStorms = [];
+      
+      for (const dateInfo of availableDates) {
+        try {
+          const reports = await this.fetchHistoricalStorm(new Date(dateInfo.date));
+          if (reports.length > 0) {
+            allStorms.push({
+              date: dateInfo.date,
+              description: dateInfo.description,
+              reports: reports,
+              maxSize: Math.max(...reports.map(r => r.size)),
+              totalReports: reports.length
+            });
+          }
+        } catch (error) {
+          console.error(`[TIER 2] Error fetching ${dateInfo.date}:`, error);
+        }
+      }
+      
+      return {
+        period: {
+          start: startDate.toISOString().split('T')[0],
+          end: endDate.toISOString().split('T')[0]
+        },
+        storms: allStorms,
+        summary: {
+          totalStormDays: allStorms.length,
+          totalReports: allStorms.reduce((sum, s) => sum + s.totalReports, 0),
+          largestHail: Math.max(...allStorms.map(s => s.maxSize))
+        }
+      };
+      
+    } catch (error) {
+      console.error('[TIER 2] Error fetching 12-month data:', error);
+      throw error;
+    }
   }
 
   /**

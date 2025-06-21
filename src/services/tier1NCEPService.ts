@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
 import { MRMSProxyService } from './mrmsProxyService';
+import { getRealtimeServerUrl } from '../config/api.config';
 
 export interface NCEPMRMSData {
   meshValue: number;  // in mm
@@ -35,10 +36,8 @@ export class NCEPMRMSService {
     console.log('[TIER 1] Starting NCEP MRMS real-time monitoring...');
     
     try {
-      // Connect to our real-time server (use actual host IP for physical device)
-      const serverUrl = __DEV__ 
-        ? 'http://localhost:3003/api/monitoring/start'
-        : 'https://your-production-server.com/api/monitoring/start';
+      // Connect to our real-time server
+      const serverUrl = getRealtimeServerUrl('/api/monitoring/start');
         
       const response = await fetch(serverUrl, {
         method: 'POST',
@@ -87,9 +86,7 @@ export class NCEPMRMSService {
       console.log('[TIER 1] Checking NCEP MRMS for new storms...');
       
       // Connect to our real-time server
-      const serverUrl = __DEV__ 
-        ? 'http://localhost:3003/api/storms/current'
-        : 'https://your-production-server.com/api/storms/current';
+      const serverUrl = getRealtimeServerUrl('/api/storms/current');
         
       const response = await fetch(serverUrl);
       
@@ -222,9 +219,7 @@ export class NCEPMRMSService {
   static async getStormTimeline(stormId: string): Promise<any[]> {
     try {
       // Try to get from real-time server first
-      const serverUrl = __DEV__ 
-        ? `http://localhost:3003/api/storms/progression/${stormId}`
-        : `https://your-production-server.com/api/storms/progression/${stormId}`;
+      const serverUrl = getRealtimeServerUrl(`/api/storms/progression/${stormId}`);
         
       const response = await fetch(serverUrl);
       if (response.ok) {
@@ -247,9 +242,7 @@ export class NCEPMRMSService {
    */
   static async getAllStormProgressions(): Promise<any> {
     try {
-      const serverUrl = __DEV__ 
-        ? 'http://localhost:3003/api/storms/progressions'
-        : 'https://your-production-server.com/api/storms/progressions';
+      const serverUrl = getRealtimeServerUrl('/api/storms/progressions');
         
       const response = await fetch(serverUrl);
       if (response.ok) {

@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MRMSService, HailReport, StormEvent } from './mrmsService';
 import { StorageService } from './storageService';
 import { ConfidenceScoring } from './confidenceScoring';
+import { getRealtimeServerUrl } from '../config/api.config';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -129,16 +130,18 @@ export class HailAlertService {
       // Try real-time server first
       let reports: HailReport[] = [];
       try {
-        const serverUrl = __DEV__ 
-          ? 'http://localhost:3003/api/storms/current'
-          : 'https://your-production-server.com/api/storms/current';
+        const serverUrl = getRealtimeServerUrl('/api/storms/current');
         
         const response = await fetch(serverUrl);
         if (response.ok) {
           const data = await response.json();
           if (data.storms && data.storms.length > 0) {
             console.log(`[HailAlert] Found ${data.storms.length} storms from real-time server`);
-            reports = data.storms;
+            // Convert timestamp strings to Date objects
+            reports = data.storms.map((storm: any) => ({
+              ...storm,
+              timestamp: new Date(storm.timestamp)
+            }));
           }
         }
       } catch (error) {

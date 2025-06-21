@@ -10,6 +10,7 @@ import { HailDataFlowService } from './hailDataFlowService';
 import { HailAlertService } from './hailAlertService';
 import { MRMSService } from './mrmsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getRealtimeServerUrl } from '../config/api.config';
 
 export interface HailIntelligenceConfig {
   enableRealTime: boolean;
@@ -148,9 +149,7 @@ export class IntegratedHailIntelligence {
     let realtimeServerStatus = 'offline';
     let realtimeMonitoring = false;
     try {
-      const serverUrl = __DEV__ 
-        ? 'http://localhost:3003/health'
-        : 'https://your-production-server.com/health';
+      const serverUrl = getRealtimeServerUrl('/health');
       const response = await fetch(serverUrl);
       if (response.ok) {
         const health = await response.json();
