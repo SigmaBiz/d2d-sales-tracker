@@ -106,8 +106,11 @@ export class NCEPMRMSService {
           meshValue: storm.meshValue
         }));
         
-        // Check for alert-level storms
-        const alertStorms = reports.filter(r => r.size >= 1.25);
+        // Check for alert-level storms (exclude test storms)
+        const alertStorms = reports.filter(r => 
+          r.size >= 1.25 && 
+          !r.source?.toLowerCase().includes('test')
+        );
         if (alertStorms.length > 0) {
           console.log(`[TIER 1] 🚨 Found ${alertStorms.length} alert-level storms!`);
           await this.triggerAlerts(alertStorms);

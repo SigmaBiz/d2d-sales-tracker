@@ -153,13 +153,13 @@ export class StormEventsService {
         return data.events.map((event: any) => this.parseStormEvent(event));
       }
       
-      console.log('[TIER 3] No events in response, using mock data');
-      return this.getMockStormEvents(startDate, endDate);
+      console.log('[TIER 3] No events in response');
+      return [];
     } catch (error) {
       console.error('[TIER 3] Error fetching Storm Events:', error);
       
-      // Use cached/mock data for demo
-      return this.getMockStormEvents(startDate, endDate);
+      // Return empty array instead of mock data
+      return [];
     }
   }
 

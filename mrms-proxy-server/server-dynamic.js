@@ -82,7 +82,76 @@ app.get('/health', async (req, res) => {
 });
 
 /**
- * Get MESH data for a specific date
+ * Get MESH data for a local Oklahoma date
+ * This endpoint handles timezone conversion properly for evening storms
+ */
+app.get('/api/mesh/local/:date', async (req, res) => {
+  try {
+    const dateStr = req.params.date;
+    const requestedDate = new Date(dateStr);
+    
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    
+    console.log(`[DYNAMIC] Processing LOCAL date request for ${dateStr} (Oklahoma time)`);
+    
+    // Check cache for combined data
+    const cacheFile = path.join(CONFIG.CACHE_DIR, `okc_mesh_local_${dateStr}.json`);
+    try {
+      const stats = await fs.stat(cacheFile);
+      if (Date.now() - stats.mtime.getTime() < CONFIG.CACHE_DURATION) {
+        console.log('[DYNAMIC] Serving local date from cache');
+        const cachedData = await fs.readFile(cacheFile, 'utf8');
+        return res.json(JSON.parse(cachedData));
+      }
+    } catch (error) {
+      // Cache miss
+    }
+    
+    // For Oklahoma evening storms, check both the current date and next date
+    // A storm at 8 PM CDT on May 17 = May 18 1 AM UTC
+    const currentDateData = await fetchAndProcessMESH(requestedDate);
+    
+    // Also check the next day's file for evening storms
+    const nextDate = new Date(requestedDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    const nextDateData = await fetchAndProcessMESH(nextDate);
+    
+    // Combine reports from both days, removing duplicates by location
+    const allReports = [...currentDateData.reports, ...nextDateData.reports];
+    const uniqueReports = Array.from(
+      new Map(allReports.map(r => [`${r.latitude.toFixed(3)}_${r.longitude.toFixed(3)}`, r])).values()
+    );
+    
+    const combinedData = {
+      date: dateStr,
+      source: 'IEM Archive MRMS',
+      bounds: CONFIG.OKC_METRO_BOUNDS,
+      reports: uniqueReports,
+      summary: {
+        totalReports: uniqueReports.length,
+        maxSize: uniqueReports.length > 0 ? Math.max(...uniqueReports.map(r => r.size)) : 0,
+        avgSize: uniqueReports.length > 0 ? uniqueReports.reduce((sum, r) => sum + r.size, 0) / uniqueReports.length : 0
+      },
+      note: `Combined data from ${requestedDate.toISOString().split('T')[0]} and ${nextDate.toISOString().split('T')[0]} UTC to capture evening storms`
+    };
+    
+    console.log(`[DYNAMIC] Combined: ${uniqueReports.length} reports (from ${currentDateData.reports.length} + ${nextDateData.reports.length})`);
+    
+    // Cache the combined results
+    await fs.writeFile(cacheFile, JSON.stringify(combinedData, null, 2));
+    
+    res.json(combinedData);
+    
+  } catch (error) {
+    console.error('[DYNAMIC] Error processing local date request:', error);
+    res.status(500).json({ error: 'Failed to process request' });
+  }
+});
+
+/**
+ * Get MESH data for a specific date (UTC-based)
  */
 app.get('/api/mesh/:date', async (req, res) => {
   try {
@@ -227,6 +296,8 @@ app.get('/api/mesh/available', async (req, res) => {
 
 /**
  * Fetch and process MESH data for a specific date
+ * NOTE: For Oklahoma local time, evening storms may appear in the next UTC day's file
+ * Example: May 17 8PM CDT = May 18 1AM UTC
  */
 async function fetchAndProcessMESH(date) {
   // Create date at UTC midnight to avoid timezone issues

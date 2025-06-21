@@ -78,11 +78,9 @@ export class IEMArchiveService {
         
       } catch (fetchError) {
         console.log('[IEM Archive] Proxy error details:', fetchError);
-        console.log('[IEM Archive] Proxy not available, using mock data for date:', dateStr);
-        // Fallback to mock data if proxy is not running
-        const mockData = this.getMockHistoricalData(date);
-        console.log('[IEM Archive] Returning', mockData.length, 'mock reports');
-        return mockData;
+        console.log('[IEM Archive] Proxy not available for date:', dateStr);
+        // Return empty array instead of mock data
+        return [];
       }
     } catch (error) {
       console.error('[IEM Archive] Error fetching historical MESH:', error);

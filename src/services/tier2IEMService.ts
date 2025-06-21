@@ -42,8 +42,10 @@ export class IEMArchiveService {
       console.log(`[TIER 2] Fetching historical data for ${date.toISOString()}`);
 
       // Use dynamic server for any date in last 12 months
+      // Use the local endpoint to handle timezone conversion properly
+      // This ensures evening storms show on the correct local date
       const dateStr = date.toISOString().split('T')[0];
-      const url = getHistoricalServerUrl(`/api/mesh/${dateStr}`);
+      const url = getHistoricalServerUrl(`/api/mesh/local/${dateStr}`);
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -51,7 +53,12 @@ export class IEMArchiveService {
       }
       
       const data = await response.json();
-      return data.reports || [];
+      // Convert timestamp strings to Date objects
+      const reports = data.reports || [];
+      return reports.map((report: any) => ({
+        ...report,
+        timestamp: new Date(report.timestamp)
+      }));
     } catch (error) {
       console.error('[TIER 2] Error fetching historical data:', error);
       // Fallback to alternative method
@@ -131,7 +138,8 @@ export class IEMArchiveService {
             timestamp: new Date(props.valid || date),
             source: 'IEM Archive',
             meshValue: props.mesh,
-            polygon: coords
+            polygon: coords,
+            confidence: 75
           });
         }
       });
@@ -146,7 +154,8 @@ export class IEMArchiveService {
             size: item.mesh_mm / 25.4,
             timestamp: date,
             source: 'IEM Archive',
-            meshValue: item.mesh_mm
+            meshValue: item.mesh_mm,
+            confidence: 75
           });
         }
       });

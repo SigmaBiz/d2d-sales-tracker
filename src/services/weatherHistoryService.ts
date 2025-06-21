@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
-import { IEMArchiveService } from './iemArchiveService';
+import { IEMArchiveService as Tier2Service } from './tier2IEMService';
 import { MRMSProxyService } from './mrmsProxyService';
 import { StormEventsService } from './tier3StormEventsService';
 
@@ -56,7 +56,7 @@ export class WeatherHistoryService {
         
         // Fetch both IEM data and ground truth Storm Events
         const [iemReports, stormEvents] = await Promise.all([
-          IEMArchiveService.fetchHistoricalMESH(params.date),
+          Tier2Service.fetchHistoricalStorm(params.date),
           StormEventsService.fetchStormEvents(params.date, params.date)
         ]);
         
@@ -79,7 +79,7 @@ export class WeatherHistoryService {
         
         while (current <= end) {
           try {
-            const reports = await IEMArchiveService.fetchHistoricalMESH(current);
+            const reports = await Tier2Service.fetchHistoricalStorm(current);
             if (reports.length > 0) {
               results.push(this.createStormEvent(current, reports));
             }
@@ -120,7 +120,7 @@ export class WeatherHistoryService {
     const current = new Date(startDate);
     while (current <= endDate) {
       try {
-        const reports = await IEMArchiveService.fetchHistoricalMESH(current);
+        const reports = await Tier2Service.fetchHistoricalStorm(current);
         if (reports.length > 0) {
           results.push(this.createStormEvent(current, reports));
         }
