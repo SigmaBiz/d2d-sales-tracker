@@ -934,3 +934,80 @@ curl http://192.168.1.111:3003/api/test/simulate-storm
 5. Add historical storm analytics dashboard
 
 **The D2D Sales Tracker Hail Intelligence System is now production-ready and operational!**
+
+## Tier 1 Real-Time Enhancement Strategy (Planned)
+
+### Overview
+Enhancing Tier 1 to provide SOP rigor and maximize field efficiency through systematic storm response.
+
+### Planned Features:
+
+#### 1. **Notification Management System**
+- **Notification Log** (20 entries, FIFO)
+  - Persistent storage of recent alerts
+  - Timestamp, location, hail size, confidence
+  - Quick access from dashboard
+- **Notification Actions**
+  - Tap notification → Notification Log Screen
+  - Each log entry has "Create Overlay" button
+  - Swipe to dismiss or mark as "actioned"
+
+#### 2. **Automated Storm Processing**
+- **Auto-populate for severe storms (≥2")**
+  - Immediate overlay generation
+  - Auto-save to active storms
+  - Visual/audio alert for severity
+- **Configurable thresholds**
+  - User settings for auto-populate size
+  - Quiet hours configuration
+  - Alert radius settings
+
+#### 3. **Multi-Channel Severe Storm Alerts**
+- **For ≥2" hail**:
+  - Push notification (existing)
+  - SMS via Twilio
+  - Email alerts
+  - In-app siren/sound
+- **Team broadcast options**
+  - Notify specific team members
+  - Territory-based routing
+
+#### 4. **Visual Storm Differentiation**
+- **Active Storms Panel**
+  - Tier 1: Red badge, "LIVE" label, top of list
+  - Tier 2: Blue badge, "HISTORICAL" label
+  - Sort order: Tier 1 → Size → Recency
+- **Map indicators**
+  - Pulsing markers for active storms
+  - Static markers for historical
+
+#### 5. **Field Navigation Integration**
+- **Door Knock Screen Enhancement**
+  - "Navigate" button in location panel
+  - Options: Apple Maps, Google Maps, Waze
+  - Copy address to clipboard
+- **Property click actions**
+  - Quick navigation option
+  - Save to prospect list
+  - Add notes about storm damage
+
+### Implementation Priority Matrix:
+
+| Feature | Business Impact | Technical Effort | Priority | Status |
+|---------|----------------|------------------|----------|---------|
+| Notification Log | High | Low | 🟢 1 | Planned |
+| Auto-populate ≥2" | High | Low | 🟢 1 | Planned |
+| Visual Differentiation | High | Low | 🟢 1 | Planned |
+| Navigation Integration | High | Medium | 🟡 2 | Planned |
+| Multi-channel Alerts | Medium | Medium | 🟡 2 | Planned |
+| Storm Lifecycle | Medium | High | 🟡 3 | Future |
+| Territory Assignment | High | High | 🟡 3 | Future |
+| Competition Tracking | Low | Medium | 🔴 4 | Future |
+
+### Additional Pattern Analysis Recommendations:
+- Storm duration and movement tracking
+- Damage probability scoring based on size + duration + wind
+- CRM integration for automatic lead updates
+- Route optimization for efficient canvassing
+
+**Next Implementation Phase: Top 5 features from priority matrix**
