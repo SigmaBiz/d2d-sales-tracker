@@ -166,6 +166,47 @@ This is a canvassing app designed to:
 - Same data flow: IEM Archive → Download ZIP → Extract GRIB2 → Process with ecCodes → JSON output
 - Development protocol requires real data - no mocks allowed!
 
+### 2025-01-21 - GRIB2 Processing Testing & Debugging
+**Session Focus**: Test ecCodes implementation with real MRMS data
+
+**Key Findings**:
+1. **URL Structure Updated**
+   - Old (incorrect): `https://mrms.agron.iastate.edu/YYYY/MM/DD/HH/YYYYMMDDHHMM.zip`
+   - New (correct): `https://mtarchive.geol.iastate.edu/YYYY/MM/DD/mrms/ncep/MESH_Max_1440min/`
+   - Files are gzipped GRIB2: `MESH_Max_1440min_00.50_YYYYMMDD-HHMMSS.grib2.gz`
+
+2. **GRIB2 Processing Challenges**
+   - CONUS grid is huge: 7000x3500 = 24.5 million points
+   - Initial attempts exceeded memory buffers
+   - Created three server versions to handle the data:
+     - `server-eccodes.js` - Original (wrong URL structure)
+     - `server-eccodes-v2.js` - Updated URLs, attempted subsetting
+     - `server-eccodes-v3.js` - Streaming approach for large files
+
+3. **Data Verification**
+   - Successfully downloaded and processed GRIB2 files
+   - Confirmed ecCodes can read MESH data (values in mm)
+   - Found that Sept 24, 2024 at 00:00 UTC had minimal hail in OKC (< 0.13")
+   - Need to check different hours for the actual storm
+
+**Technical Details**:
+- GRIB2 coordinates are in millidegrees
+- Longitude is in 0-360 format (need to subtract 360 for Western hemisphere)
+- MESH values are in millimeters (divide by 25.4 for inches)
+- OKC bounds in 0-360 longitude: 262.3°E to 262.9°E
+
+**Current Status**:
+- ecCodes is working correctly
+- Can download and read real GRIB2 files
+- Need to find the correct hour when the storm hit OKC
+- Streaming approach (v3) should handle large files efficiently
+
+**Next Steps**:
+1. Find the correct storm hours for Sept 24, 2024
+2. Test server-eccodes-v3.js with proper storm timing
+3. Integrate with client application
+4. Consider deployment options for production (Docker with ecCodes)
+
 ### 2025-01-20 - Address Search Implementation
 **Session Focus**: Add address search functionality to map view
 
