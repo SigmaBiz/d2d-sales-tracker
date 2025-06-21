@@ -88,56 +88,83 @@ This is a canvassing app designed to:
    - Example violation: Python mock processor that generates fake MESH data
 
 2. **GRIB2 Infrastructure Setup**
-   - Created `server-grib2.js` with full GRIB2 processing pipeline
+   - Created `server-grib2.js` with full GRIB2 processing pipeline (wgrib2-based)
    - Designed to fetch real MRMS data from IEM Archive
    - Processes MESH (Maximum Estimated Size of Hail) from binary GRIB2 files
    - Filters for OKC Metro area and significant hail (≥1.25")
 
-3. **wgrib2 Build Process**
+3. **wgrib2 Build Process (Failed)**
    - Downloaded wgrib2 source from NOAA (27.3MB)
    - Installed gcc/gfortran via Homebrew (required for compilation)
-   - Build initiated but not completed in session
-   - Located at: `/Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2/`
+   - Successfully built C dependencies: libaec, netcdf, zlib, libpng
+   - **FAILED** at Fortran interpolation library (ip2lib_d) with gfortran-15
+   - Build artifacts located at: `/Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2/`
+
+4. **Consulted AI Assistants for Solutions**
+   - Both Claude and ChatGPT confirmed the Fortran compilation issues
+   - Consensus: Mixing Apple clang + Homebrew gfortran causes problems
+   - Both strongly recommended using **ecCodes** instead of wgrib2
+
+5. **Switched to ecCodes Implementation**
+   - Successfully installed ecCodes via Homebrew: `brew install eccodes`
+   - ecCodes version 2.41.0 installed with all tools
+   - Created new `server-eccodes.js` that uses ecCodes command-line tools
+   - Created `test-eccodes.js` to verify installation
+   - ecCodes provides native ARM64 support and better macOS compatibility
 
 **Technical Decisions**:
-- Chose to build wgrib2 from source rather than use workarounds
-- Rejected Python fallback approach to maintain data integrity
-- Focused on OKC Metro bounds to reduce processing overhead
-- Set minimum hail size threshold at 1.25" for business relevance
+- Abandoned wgrib2 source build due to Fortran compatibility issues
+- Switched to ecCodes (ECMWF library) based on AI recommendations
+- Maintained focus on real data processing (no mock data)
+- Kept same OKC Metro bounds and hail size thresholds
 
-**Next Steps for Completion**:
-1. Complete wgrib2 build process OR consider alternatives:
-   - Option A: Fix Fortran build issues and complete source build
-   - Option B: Use Docker container with pre-built wgrib2
-   - Option C: Use cloud-based GRIB2 processing service
-   - Option D: Find pre-built wgrib2 binary for macOS ARM64
-2. Test GRIB2 processing with known storm date (e.g., 2024-09-24)
-3. Integrate `server-grib2.js` with main proxy server
-4. Update client services to use real data endpoint
-5. Deploy updated server to Vercel/production
+**Current Implementation Status**:
+- ✅ ecCodes installed and verified working
+- ✅ `server-eccodes.js` created with full GRIB2 processing via ecCodes
+- ✅ Uses `grib_get_data` command to extract MESH values from GRIB2 files
+- ✅ Same IEM Archive data source and processing logic as original design
+- ⏳ Ready for testing with real MRMS data
 
-**Alternative Approaches** (if wgrib2 build continues to fail):
-- Consider using eccodes (ECMWF's GRIB library) which has better macOS support
-- Explore pygrib Python library with a Python subprocess
-- Use a cloud service that can process GRIB2 files (AWS Lambda with wgrib2)
-- Important: Any alternative MUST process real GRIB2 data, not generate mock data
+**Next Steps for Completion** (FOR NEXT AGENT):
+1. **Test the ecCodes implementation**:
+   ```bash
+   cd /Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server
+   node server-eccodes.js
+   # In another terminal:
+   curl http://localhost:3002/api/mesh/2024-09-24
+   ```
 
-**Files Created/Modified**:
-- `/mrms-proxy-server/server-grib2.js` - Complete GRIB2 processing server
-- `/mrms-proxy-server/tools/` - wgrib2 build directory
-- `CLAUDE_DEV_LOG.md` - Added development protocol
+2. **Verify real data processing**:
+   - Check that it downloads real .zip files from IEM Archive
+   - Confirm MESH data extraction works correctly
+   - Validate that hail reports match expected Sept 24 storm
 
-**Current Status**: 
-- wgrib2 source downloaded and partially built
-- Successfully compiled dependencies: libaec, netcdf, zlib, libpng
-- Build encountering Fortran compatibility issues on macOS
-- server-grib2.js ready for integration once wgrib2 is available
-- No mock data fallbacks implemented (adhering to development protocol)
+3. **Integration tasks**:
+   - Update client services to use the ecCodes server endpoint
+   - Consider renaming server-eccodes.js to server-grib2.js for consistency
+   - Update package.json scripts to use the ecCodes version
+   - Deploy to Vercel (may need to use Docker for ecCodes in production)
 
-**Challenges Encountered**:
-- macOS compatibility issues with older source code (fp.h, fdopen macro, math.h)
-- Fortran library compilation errors with gfortran-15
-- Complex dependency chain requiring manual fixes
+4. **Production deployment considerations**:
+   - Vercel doesn't have ecCodes installed
+   - Options:
+     a) Use Docker container with ecCodes pre-installed
+     b) Create a separate cloud service (AWS Lambda, etc.)
+     c) Use Vercel's build command to install ecCodes (may not work)
+
+**Files Created/Modified in This Session**:
+- `/mrms-proxy-server/server-eccodes.js` - New ecCodes-based GRIB2 processor
+- `/mrms-proxy-server/test-eccodes.js` - ecCodes installation test script
+- `/mrms-proxy-server/server-grib2.js` - Original wgrib2-based server (kept for reference)
+- `/mrms-proxy-server/tools/` - wgrib2 build artifacts (can be deleted)
+- Various source files with compatibility fixes (libpng, zlib)
+
+**Key Context for Next Agent**:
+- We're using ecCodes now, NOT wgrib2
+- ecCodes tools are installed at `/opt/homebrew/bin/grib_*`
+- The server uses `grib_get_data` command to extract lat/lon/value triplets
+- Same data flow: IEM Archive → Download ZIP → Extract GRIB2 → Process with ecCodes → JSON output
+- Development protocol requires real data - no mocks allowed!
 
 ### 2025-01-20 - Address Search Implementation
 **Session Focus**: Add address search functionality to map view
