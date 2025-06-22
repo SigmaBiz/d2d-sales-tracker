@@ -28,6 +28,7 @@
 - 65%: Production server investigation - fixed dev config, added diagnostics, identified silent failure issue
 - 70%: GRIB2 processing failure diagnosed - likely coordinate mismatch, troubleshooting strategy documented
 - 75%: Root cause confirmed (512MB limit), implemented streaming/pre-filtering solution
+- 80%: Deployed server-dynamic-precise.js but sed command fails in production (502 errors)
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -1603,3 +1604,43 @@ Render support emails revealed:
    - Consider $7/month upgrade if still needed
 
 **Context at 75%** - Memory optimization implemented, ready for deployment and testing.
+
+## Session Log - Context 75-80%: Production Deployment Issue
+
+### Session Focus
+Deployed optimized server-dynamic-precise.js to Render but encountered production compatibility issues.
+
+### Key Events
+
+1. **Deployment Process**
+   - Fixed Dockerfile.dynamic to use server-dynamic-precise.js
+   - Pushed to feature/grib2-processing branch (Render's watched branch)
+   - Deployment completed successfully
+   - Health endpoint confirms new server is running
+
+2. **Production Issue: 502 Errors**
+   - Health endpoint works: Shows "mrms-dynamic-server-precise" with 60MB memory
+   - Data endpoints fail: /api/mesh/2024-09-24 returns 502 Bad Gateway
+   - Cause: sed command with large line numbers (13.4M-14M) likely incompatible with Linux
+
+3. **Technical Details**
+   - Local (macOS): `sed -n '1p;13400000,14000000p'` works perfectly
+   - Production (Linux): Same command appears to fail/timeout
+   - The complex shell spawning might also be an issue
+
+### Next Steps for Resolution
+
+1. **Option A: Simplify Extraction**
+   - Use head/tail combination instead of sed
+   - Or use awk which handles large line numbers better
+   - Example: `grib_get_data file | awk 'NR==1 || (NR>=13400000 && NR<=14000000)'`
+
+2. **Option B: Different Pre-filtering Approach**
+   - Use ecCodes native filtering if possible
+   - Or process in chunks with Node.js streaming
+
+3. **Option C: Fallback to Streaming**
+   - Use server-dynamic-optimized.js which uses pure Node.js streaming
+   - Slightly higher memory but should work reliably
+
+**Context at 80%** - Deployment successful but extraction command needs Linux compatibility fix.

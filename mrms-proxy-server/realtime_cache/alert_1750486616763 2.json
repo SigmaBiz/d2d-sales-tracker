@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-06-21T06:16:56.763Z",
+  "storms": [
+    {
+      "id": "test_storm_1750486616763",
+      "latitude": 35.6,
+      "longitude": -97.47,
+      "size": 2.5,
+      "meshValue": 63.5,
+      "timestamp": "2025-06-21T06:16:56.763Z",
+      "confidence": 85,
+      "source": "TEST SIMULATION",
+      "isActive": true
+    },
+    {
+      "id": "test_storm_1750486616763_2",
+      "latitude": 35.45,
+      "longitude": -97.51,
+      "size": 1.75,
+      "meshValue": 44.45,
+      "timestamp": "2025-06-21T06:16:56.763Z",
+      "confidence": 80,
+      "source": "TEST SIMULATION",
+      "isActive": true
+    }
+  ],
+  "alertLevel": "HIGH",
+  "message": "2 significant storm(s) detected in OKC Metro"
+}

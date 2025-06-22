@@ -62,10 +62,13 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
   return new Promise((resolve, reject) => {
     console.log(`[PRECISE] Extracting lines ${CONFIG.OKC_LINE_RANGE.start} to ${CONFIG.OKC_LINE_RANGE.end}...`);
     
-    // Use sed for efficient line extraction
+    // Use awk for efficient line extraction (more compatible with Linux)
     const extractCommand = spawn('sh', ['-c', 
-      `grib_get_data ${gribPath} | sed -n '1p;${CONFIG.OKC_LINE_RANGE.start},${CONFIG.OKC_LINE_RANGE.end}p'`
-    ]);
+      `grib_get_data ${gribPath} | awk 'NR==1 || (NR>=${CONFIG.OKC_LINE_RANGE.start} && NR<=${CONFIG.OKC_LINE_RANGE.end})'`
+    ], {
+      timeout: 30000, // 30 second timeout
+      maxBuffer: 100 * 1024 * 1024 // 100MB buffer
+    });
     
     let buffer = '';
     let processedLines = 0;
@@ -150,8 +153,11 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
       }
     });
     
+    let stderrBuffer = '';
     extractCommand.stderr.on('data', (data) => {
-      console.error('[PRECISE] Extract stderr:', data.toString());
+      const error = data.toString();
+      stderrBuffer += error;
+      console.error('[PRECISE] Extract stderr:', error);
     });
     
     extractCommand.on('close', (code) => {
@@ -160,7 +166,7 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
       console.log(`[PRECISE] Processed ${processedLines} lines, found ${reports.length} reports`);
       
       if (code !== 0 && code !== null) {
-        reject(new Error(`Extract process exited with code ${code}`));
+        reject(new Error(`Extract process exited with code ${code}. Stderr: ${stderrBuffer}`));
       } else {
         resolve(reports);
       }

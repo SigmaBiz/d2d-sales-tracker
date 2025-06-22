@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  realtime-server:
+    build: .
+    command: node server-realtime.js
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - NODE_ENV=production
+    volumes:
+      - ./realtime_cache:/app/realtime_cache
+      - ./realtime_temp:/app/realtime_temp
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  historical-server:
+    build: .
+    command: node server-eccodes-final.js
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+    volumes:
+      - ./cache:/app/cache
+      - ./temp:/app/temp
+    restart: unless-stopped

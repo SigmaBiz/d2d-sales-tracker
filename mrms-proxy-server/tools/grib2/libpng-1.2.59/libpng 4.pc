@@ -1,0 +1,11 @@
+prefix=/Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2
+exec_prefix=/Users/antoniomartinez/Desktop/d2d-sales-tracker/mrms-proxy-server/tools/grib2
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/libpng12
+
+Name: libpng
+Description: Loads and saves PNG files
+Version: 1.2.59
+Libs: -L${libdir} -lpng12
+Libs.private: -lz 
+Cflags: -I${includedir} 
