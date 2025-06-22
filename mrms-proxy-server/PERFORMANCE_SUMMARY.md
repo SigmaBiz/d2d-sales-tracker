@@ -38,10 +38,21 @@
 
 ### Key Insights
 
-1. **OKC data location is predictable**: Always around lines 13.5M-13.9M
+1. **OKC data location is predictable**: Always between lines 13.51M-13.59M across all tested dates
 2. **Pre-filtering reduces processing by 97.6%**: 600k vs 24.5M lines
 3. **5x performance improvement**: 10s vs 50s processing time
-4. **Memory efficient**: 72MB peak usage leaves plenty of headroom
+4. **Memory efficient**: 70-79MB peak usage leaves plenty of headroom
+
+### Tested Dates Verification
+
+| Date | Reports Found | Max Size | OKC Data Line | Memory |
+|------|--------------|----------|---------------|---------|
+| 2024-04-27 | 0 | - | 13,513,230 | 75MB |
+| 2024-06-25 | 0 | - | - | 78MB |
+| 2024-07-04 | 123 | 1.4" | 13,513,277 | 79MB |
+| 2024-09-24 | 426 | 2.94" | 13,513,224 | 72MB |
+| 2025-03-29 | 0 | - | - | 70MB |
+| 2025-05-17 | 58 | 1.18" | 13,590,233 | 75MB |
 
 ### Recommendation
 
