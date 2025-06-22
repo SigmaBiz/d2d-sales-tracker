@@ -35,13 +35,12 @@ export class IEMArchiveService {
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       
-      // Use local proxy server (or deployed proxy URL)
-      // Force local server for now - env var not updating properly
-      const PROXY_URL = 'http://192.168.1.111:3002';
+      // Use production server for consistent data access
+      const PROXY_URL = 'https://d2d-dynamic-server.onrender.com';
       const url = `${PROXY_URL}/api/mesh/${dateStr}`;
       
       console.log('[IEM Archive] Formatted date string:', dateStr);
-      console.log('[IEM Archive] Using local dynamic server:', PROXY_URL);
+      console.log('[IEM Archive] Using production server:', PROXY_URL);
       console.log('[IEM Archive] Fetching from proxy:', url);
       
       try {

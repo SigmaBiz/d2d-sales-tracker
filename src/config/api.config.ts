@@ -10,9 +10,9 @@ interface ApiConfig {
 }
 
 const DEV_CONFIG: ApiConfig = {
-  realTimeServer: 'http://192.168.1.111:3003',
-  historicalServer: 'http://192.168.1.111:3002',
-  proxyServer: 'http://192.168.1.111:3001' // Local IP for physical device testing
+  realTimeServer: 'https://d2d-realtime-server.onrender.com',
+  historicalServer: 'https://d2d-dynamic-server.onrender.com',
+  proxyServer: 'https://d2d-dynamic-server.onrender.com' // Using production servers for dev
 };
 
 const PROD_CONFIG: ApiConfig = {

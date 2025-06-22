@@ -24,6 +24,7 @@
 - 45%: Commercial scaling strategy documented, Tier 1 enhancements planned with priority matrix
 - 50%: Comprehensive handoff documentation completed, ready for context compacting
 - 55%: Tier 1 notification log implemented - FIFO storage, bell icon on map, long-press to delete
+- 60%: Visual storm differentiation complete - T1/T2 badges, LIVE/HISTORICAL indicators, AUTO badge for severe storms
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -1289,3 +1290,65 @@ The notification log is complete and tested. Ready to proceed with the next Tier
 - Visual storm differentiation (Tier 1 vs Tier 2)
 - Field navigation integration
 - Multi-channel alerts
+
+## Session Log - Context 55-60%: Tier 1 Visual Storm Differentiation
+
+### Session Focus
+Implemented visual storm differentiation to help canvassers quickly identify Tier 1 real-time vs Tier 2 historical storms.
+
+### Key Achievements
+
+1. **Auto-populate for Severe Storms (≥2 inch)** ✅
+   - Already implemented in hailAlertService.ts (lines 242-250)
+   - Severe storms automatically set enabled = true
+   - Marked as autoPopulated for tracking
+   - Marked as actioned in notification log
+
+2. **Visual Storm Differentiation (Tier 1 vs Tier 2)** ✅
+   - **T1 Badge**: Green background (#10b981) for MRMS real-time storms
+   - **T2 Badge**: Blue background (#3b82f6) for IEM historical storms
+   - **AUTO Badge**: Red background with flash icon for auto-populated severe storms
+   - **LIVE Indicator**: Pulsing red dot with "LIVE" text for active Tier 1 storms
+   - **HISTORICAL Indicator**: Static blue dot with "HISTORICAL" text for Tier 2 storms
+
+3. **Test Utility Created**
+   - `/src/utils/testStormDifferentiation.ts` - Creates 3 test storms without saving to storage
+   - Test storms demonstrate all visual features:
+     - Tier 1 severe (2.5") - Shows T1, LIVE, and AUTO badges
+     - Tier 2 historical (1.75") - Shows T2 and HISTORICAL
+     - Tier 1 small (1.25") - Shows T1 and LIVE only
+   - Added "Test Storm Visual" button to dashboard (purple button)
+
+4. **Dashboard Improvements**
+   - Fixed navigation error for "View on Map" button
+   - Added 3-second loading timeout to prevent indefinite loading
+   - Improved error handling with Promise.allSettled
+   - Dashboard shows partial data if some services fail
+
+### Technical Implementation
+- Visual badges implemented in HailOverlay.tsx
+- Badges positioned next to storm name in active storms list
+- Color-coded system for quick visual identification
+- Test button added to HailIntelligenceDashboard for easy demonstration
+
+### User Feedback
+- Test feature works correctly
+- Dashboard loading was too slow - fixed with timeout
+- Navigation error on "View on Map" - fixed
+- Network timeout errors are non-critical (servers not running locally)
+
+### Files Modified
+- `/src/components/HailOverlay.tsx` - Added T1/T2 badges and indicators
+- `/src/utils/testStormDifferentiation.ts` - New test utility
+- `/src/screens/HailIntelligenceDashboard.tsx` - Added test button and fixed loading
+- `/src/services/hailAlertService.ts` - Auto-populate already implemented
+
+### Next Priority Items
+According to the Tier 1 enhancement plan:
+1. ✅ Notification log (completed at 55%)
+2. ✅ Auto-populate severe storms (already implemented)
+3. ✅ Visual differentiation (completed at 58%)
+4. Field navigation integration
+5. Multi-channel alerts
+
+**Context at 60%** - Ready to proceed with navigation integration or other enhancements.
