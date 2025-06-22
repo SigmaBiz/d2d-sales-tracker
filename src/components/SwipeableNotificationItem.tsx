@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { NotificationLogEntry } from '../types';
 
 const { width: screenWidth } = Dimensions.get('window');
-const SWIPE_THRESHOLD = screenWidth * 0.3;
+const SWIPE_THRESHOLD = screenWidth * 0.25; // Reduced threshold for easier swiping
 
 interface SwipeableNotificationItemProps {
   item: NotificationLogEntry;
@@ -33,10 +33,22 @@ export default function SwipeableNotificationItem({
 
   const panResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 5;
+        // Activate pan responder on horizontal swipe
+        const shouldSet = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 5;
+        if (shouldSet) {
+          console.log('Pan responder activated', gestureState.dx);
+        }
+        return shouldSet;
+      },
+      onPanResponderGrant: () => {
+        // Start of gesture
+        console.log('Swipe gesture started');
       },
       onPanResponderMove: (_, gestureState) => {
+        // Only allow left swipe
+        console.log('Moving:', gestureState.dx);
         if (gestureState.dx < 0) {
           translateX.setValue(gestureState.dx);
         }
@@ -67,6 +79,14 @@ export default function SwipeableNotificationItem({
           }).start();
         }
       },
+      onPanResponderTerminate: () => {
+        // Another component has become the responder, snap back
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 5,
+        }).start();
+      },
     })
   ).current;
 
@@ -88,8 +108,8 @@ export default function SwipeableNotificationItem({
             opacity: itemOpacity,
           },
         ]}
-        {...panResponder.panHandlers}
       >
+        <View style={{ flex: 1 }} {...panResponder.panHandlers}>
         <View style={styles.notificationHeader}>
           <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.type) }]}>
             <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
@@ -122,6 +142,7 @@ export default function SwipeableNotificationItem({
           <TouchableOpacity
             style={styles.createOverlayButton}
             onPress={() => onCreateOverlay(item)}
+            activeOpacity={0.8}
           >
             <Ionicons name="map" size={20} color="#FFF" />
             <Text style={styles.buttonText}>Create Overlay</Text>
@@ -134,6 +155,7 @@ export default function SwipeableNotificationItem({
             <Text style={styles.actionedText}>Overlay Created</Text>
           </View>
         )}
+        </View>
       </Animated.View>
     </View>
   );

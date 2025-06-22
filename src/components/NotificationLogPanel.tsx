@@ -186,6 +186,8 @@ export default function NotificationLogPanel({ visible, onClose, onCreateOverlay
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
                 contentContainerStyle={styles.listContent}
+                scrollEnabled={true}
+                showsVerticalScrollIndicator={true}
               />
             </>
           )}
