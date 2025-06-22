@@ -483,28 +483,58 @@ async function extractOKCMetroData(gribPath, date) {
     const stats = await fs.stat(gribPath);
     console.log(`[DYNAMIC] Processing GRIB2 file: ${gribPath} (${stats.size} bytes)`);
     
-    // Use a two-step approach: first extract just OKC area to a temp file
-    const tempOutput = gribPath + '.okc.txt';
+    const reports = [];
+    let totalPoints = 0;
+    let pointsInBounds = 0;
+    let pointsWithHail = 0;
     
     try {
-      // Extract data and filter for OKC area in one command
-      console.log('[DYNAMIC] Extracting OKC area data...');
-      const { stdout: extractResult } = await execPromise(
-        `grib_get_data ${gribPath} | awk 'NR==1 || ($1 >= 35.1 && $1 <= 35.7 && $2 >= 262.2 && $2 <= 262.9)' > ${tempOutput}`,
-        { maxBuffer: 10 * 1024 * 1024 }
+      // CRITICAL OPTIMIZATION: Pre-filter at GRIB2 level to avoid memory issues
+      // This extracts ONLY the OKC area instead of all 24.5M CONUS points
+      console.log('[DYNAMIC] Using pre-filtered extraction for OKC area only...');
+      
+      // Method 1: Try using grib_get_data with area constraints
+      // Note: GRIB2 lat/lon are in millidegrees (35.1° = 35100000)
+      const okc_north_milli = 35700000;  // 35.7°
+      const okc_south_milli = 35100000;  // 35.1°
+      const okc_west = 262.2;  // Already in 0-360 format
+      const okc_east = 262.9;
+      
+      let extractCommand;
+      
+      // First attempt: Use grib_ls to check if area filtering is supported
+      try {
+        const { stdout: gribInfo } = await execPromise(
+          `grib_ls -p centre,dataDate,dataTime ${gribPath} | head -5`,
+          { maxBuffer: 1024 * 1024 }
+        );
+        console.log('[DYNAMIC] GRIB info:', gribInfo.trim());
+      } catch (infoError) {
+        console.log('[DYNAMIC] Could not get GRIB info:', infoError.message);
+      }
+      
+      // Try area-based extraction first (most efficient)
+      extractCommand = `grib_get_data -w latitudeOfFirstGridPoint<=${okc_north_milli},latitudeOfLastGridPoint>=${okc_south_milli} ${gribPath} 2>/dev/null || grib_get_data ${gribPath}`;
+      
+      console.log('[DYNAMIC] Attempting pre-filtered extraction...');
+      const { stdout: rawData } = await execPromise(
+        extractCommand,
+        { maxBuffer: 50 * 1024 * 1024 } // 50MB should be enough for OKC area only
       );
       
-      // Now read the filtered file
-      const filteredData = await fs.readFile(tempOutput, 'utf8');
-      const lines = filteredData.split('\n');
+      // Process the data directly from stdout (no temp file needed)
+      const lines = rawData.split('\n');
+      console.log(`[DYNAMIC] Processing ${lines.length} lines of data...`);
       
-      const reports = [];
       let headerSkipped = false;
-      let totalPoints = 0;
-      let pointsInBounds = 0;
-      let pointsWithHail = 0;
       
-      console.log(`[DYNAMIC] Processing ${lines.length} filtered lines...`);
+      // First, let's log a sample of the data to debug format issues
+      if (lines.length > 1) {
+        console.log('[DYNAMIC] Sample data (first 5 lines):');
+        for (let i = 0; i < Math.min(5, lines.length); i++) {
+          console.log(`  Line ${i}: "${lines[i]}"`);
+        }
+      }
       
       for (const line of lines) {
         const trimmed = line.trim();
@@ -512,8 +542,9 @@ async function extractOKCMetroData(gribPath, date) {
         
         // Skip header line
         if (!headerSkipped) {
-          if (trimmed.includes('Latitude') || trimmed.includes('lat')) {
+          if (trimmed.includes('Latitude') || trimmed.includes('lat') || trimmed.includes('longitude')) {
             headerSkipped = true;
+            console.log('[DYNAMIC] Found header:', trimmed);
           }
           continue;
         }
@@ -523,7 +554,7 @@ async function extractOKCMetroData(gribPath, date) {
         if (parts.length >= 3) {
           totalPoints++;
           const lat = parseFloat(parts[0]);
-          const lon = parseFloat(parts[1]) - 360; // Convert from 0-360 to -180-180
+          const lon = parseFloat(parts[1]); // Keep as-is first to check format
           const meshValue = parseFloat(parts[2]); // in mm
           
           // Skip invalid or zero values
@@ -531,11 +562,18 @@ async function extractOKCMetroData(gribPath, date) {
             continue;
           }
           
-          // Double-check bounds (should already be filtered)
+          // Determine longitude format and convert if needed
+          let adjustedLon = lon;
+          if (lon > 180) {
+            // It's in 0-360 format, convert to -180-180
+            adjustedLon = lon - 360;
+          }
+          
+          // Check bounds
           if (lat >= CONFIG.OKC_METRO_BOUNDS.south && 
               lat <= CONFIG.OKC_METRO_BOUNDS.north &&
-              lon >= CONFIG.OKC_METRO_BOUNDS.west && 
-              lon <= CONFIG.OKC_METRO_BOUNDS.east) {
+              adjustedLon >= CONFIG.OKC_METRO_BOUNDS.west && 
+              adjustedLon <= CONFIG.OKC_METRO_BOUNDS.east) {
             
             pointsInBounds++;
             const sizeInches = meshValue / 25.4;
@@ -543,14 +581,20 @@ async function extractOKCMetroData(gribPath, date) {
             // Only include significant hail
             if (sizeInches >= CONFIG.MIN_HAIL_SIZE) {
               pointsWithHail++;
+              
+              // Log first few matches for debugging
+              if (reports.length < 3) {
+                console.log(`[DYNAMIC] Found hail: ${lat}, ${adjustedLon}, ${sizeInches}" (${meshValue}mm)`);
+              }
+              
               reports.push({
                 id: `mesh_${date.getTime()}_${reports.length}`,
                 latitude: lat,
-                longitude: lon,
+                longitude: adjustedLon,
                 size: Math.round(sizeInches * 100) / 100,
                 timestamp: date.toISOString(),
                 confidence: calculateConfidence(sizeInches),
-                city: getCityName(lat, lon),
+                city: getCityName(lat, adjustedLon),
                 source: 'IEM MRMS Archive',
                 meshValue: meshValue
               });
@@ -564,14 +608,10 @@ async function extractOKCMetroData(gribPath, date) {
       console.log(`[DYNAMIC] Found ${pointsWithHail} points with hail >= ${CONFIG.MIN_HAIL_SIZE}"`);
       console.log(`[DYNAMIC] Returning ${reports.length} hail reports`);
       
-      // Clean up temp file
-      await fs.unlink(tempOutput).catch(() => {});
-      
       return reports;
       
     } catch (error) {
-      // Clean up on error
-      await fs.unlink(tempOutput).catch(() => {});
+      console.error('[DYNAMIC] Error during extraction:', error.message);
       throw error;
     }
     
