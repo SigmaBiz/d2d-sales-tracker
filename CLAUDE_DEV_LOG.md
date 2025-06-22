@@ -1644,3 +1644,18 @@ Deployed optimized server-dynamic-precise.js to Render but encountered productio
    - Slightly higher memory but should work reliably
 
 **Context at 80%** - Deployment successful but extraction command needs Linux compatibility fix.
+
+### Critical Update at 80%: AWK Fix Applied
+
+1. **Fixed sed→awk**: Replaced sed with awk per AI consultation (both ChatGPT and Claude recommended)
+2. **Debug Results**: AWK works fine on Linux, but GRIB2 processing still returns 502
+3. **Root Cause Still Unknown**: The issue appears to be earlier in the pipeline, not the extraction
+4. **Added Diagnostic Endpoints**: 
+   - `/api/debug/awk` - Tests awk functionality (working)
+   - `/api/test/grib2/:date` - Tests each step of processing
+   - `/api/test/process/:date` - Tests actual GRIB2 download/extraction
+
+### Next Steps:
+- The 502 error is happening before the awk extraction
+- Need to determine if it's download, ecCodes, or memory issue
+- May need to fallback to streaming approach (server-dynamic-optimized.js)
