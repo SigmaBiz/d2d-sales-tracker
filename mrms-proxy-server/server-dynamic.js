@@ -82,6 +82,76 @@ app.get('/health', async (req, res) => {
 });
 
 /**
+ * Diagnostic endpoint for troubleshooting production issues
+ */
+app.get('/api/diagnostics', async (req, res) => {
+  try {
+    const hasEccodes = await checkEccodes();
+    
+    // Test date parsing
+    const testDate = '2024-09-24';
+    let dateParseTest = 'failed';
+    try {
+      const parsed = new Date(testDate + 'T00:00:00Z');
+      dateParseTest = parsed.toISOString();
+    } catch (e) {
+      dateParseTest = e.message;
+    }
+    
+    // Check if we can fetch a test file
+    let canFetchGrib2 = false;
+    let fetchError = null;
+    try {
+      const testUrl = 'https://mtarchive.geol.iastate.edu/2024/09/25/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_20240925-000000.grib2.gz';
+      const response = await axios.head(testUrl, { timeout: 5000 });
+      canFetchGrib2 = response.status === 200;
+    } catch (e) {
+      fetchError = e.message;
+    }
+    
+    // Get cached files
+    const cacheFiles = fsSync.existsSync(CONFIG.CACHE_DIR) 
+      ? await fs.readdir(CONFIG.CACHE_DIR).catch(() => [])
+      : [];
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      system: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
+        }
+      },
+      eccodes: {
+        installed: hasEccodes,
+        testCommand: hasEccodes ? 'grib_get_data available' : 'not found'
+      },
+      dateHandling: {
+        testDate,
+        parsed: dateParseTest,
+        currentTime: new Date().toISOString()
+      },
+      network: {
+        canAccessIEM: canFetchGrib2,
+        fetchError,
+        testUrl: 'Sept 25, 2024 GRIB2 file'
+      },
+      cache: {
+        files: cacheFiles.length,
+        samples: cacheFiles.slice(0, 5)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Diagnostic failed',
+      message: error.message
+    });
+  }
+});
+
+/**
  * Get MESH data for a local Oklahoma date
  * This endpoint handles timezone conversion properly for evening storms
  */
@@ -155,7 +225,24 @@ app.get('/api/mesh/local/:date', async (req, res) => {
  */
 app.get('/api/mesh/:date', async (req, res) => {
   try {
-    const requestedDate = new Date(req.params.date);
+    // Validate date format first
+    if (!req.params.date || !/^\d{4}-\d{2}-\d{2}$/.test(req.params.date)) {
+      return res.status(400).json({ 
+        error: 'Invalid date format. Use YYYY-MM-DD',
+        received: req.params.date
+      });
+    }
+    
+    const requestedDate = new Date(req.params.date + 'T00:00:00Z');
+    
+    // Check if date is valid
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({ 
+        error: 'Invalid date value',
+        received: req.params.date
+      });
+    }
+    
     const now = new Date();
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
