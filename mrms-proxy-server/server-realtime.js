@@ -244,7 +244,7 @@ app.post('/api/test/simulate-storm', async (req, res) => {
         meshValue: 63.5,     // 2.5 * 25.4
         timestamp: new Date(),
         confidence: 85,
-        source: 'TEST SIMULATION',
+        source: 'NCEP MRMS Real-Time',
         isActive: true
       },
       {
@@ -255,7 +255,7 @@ app.post('/api/test/simulate-storm', async (req, res) => {
         meshValue: 44.45,
         timestamp: new Date(),
         confidence: 80,
-        source: 'TEST SIMULATION',
+        source: 'NCEP MRMS Real-Time',
         isActive: true
       }
     ];
@@ -274,6 +274,63 @@ app.post('/api/test/simulate-storm', async (req, res) => {
     console.error('[REALTIME] Error in test simulation:', error);
     res.status(500).json({ 
       error: 'Test simulation failed',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * TEST ENDPOINT: Create storms with different tier labels for visual testing
+ */
+app.post('/api/test/tier-test', async (req, res) => {
+  try {
+    console.log('[REALTIME] 🧪 TEST: Creating Tier 1 and Tier 2 test storms');
+    
+    // Create one storm from each tier for visual testing
+    testStorms = [
+      // TIER 1: Real-time storm
+      {
+        id: `tier1_test_${Date.now()}`,
+        latitude: 35.6,
+        longitude: -97.47,
+        size: 2.5,  // Will show AUTO badge
+        meshValue: 63.5,
+        timestamp: new Date(),
+        confidence: 85,
+        source: 'NCEP MRMS Real-Time',  // This makes it TIER 1
+        isActive: true,
+        city: 'Edmond'
+      },
+      // TIER 2: Historical storm (simulated)
+      {
+        id: `tier2_test_${Date.now()}`,
+        latitude: 35.45,
+        longitude: -97.51,
+        size: 1.75,
+        meshValue: 44.45,
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+        confidence: 75,
+        source: 'IEM Archive MESH',  // This makes it TIER 2
+        isActive: false,  // Historical storms are not active
+        city: 'Oklahoma City'
+      }
+    ];
+    
+    console.log('[REALTIME] Created test storms:');
+    console.log('  - TIER 1 (MRMS): 2.5" in Edmond - should show T1 + AUTO badges');
+    console.log('  - TIER 2 (IEM): 1.75" in OKC - should show T2 badge');
+    
+    res.json({
+      status: 'success',
+      message: 'Tier test storms created',
+      storms: testStorms,
+      instructions: 'Check Active Storms panel for T1/T2 badges'
+    });
+    
+  } catch (error) {
+    console.error('[REALTIME] Error in tier test:', error);
+    res.status(500).json({ 
+      error: 'Tier test failed',
       details: error.message 
     });
   }

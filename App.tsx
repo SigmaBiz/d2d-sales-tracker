@@ -8,9 +8,12 @@ import { HailDataFlowService } from './src/services/hailDataFlowService';
 import { SupabaseService } from './src/services/supabaseService';
 import { IntegratedHailIntelligence } from './src/services/integratedHailIntelligence';
 
+// TEMPORARY: Test utility for visual storm differentiation
+// Moved to RealMapScreen for easier testing
+
 export default function App() {
-  const notificationListener = useRef<any>();
-  const responseListener = useRef<any>();
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
     // Initialize services
@@ -47,10 +50,10 @@ export default function App() {
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, []);

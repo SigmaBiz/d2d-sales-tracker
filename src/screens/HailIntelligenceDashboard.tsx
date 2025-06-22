@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { IntegratedHailIntelligence } from '../services/integratedHailIntelligence';
 import { HailAlertService } from '../services/hailAlertService';
 import { useNavigation } from '@react-navigation/native';
+import { testVisualDifferentiation } from '../utils/testStormDifferentiation';
+import { MRMSService } from '../services/mrmsService';
 
 export default function HailIntelligenceDashboard() {
   const navigation = useNavigation();
@@ -93,6 +95,40 @@ export default function HailIntelligenceDashboard() {
       );
     } catch (error) {
       Alert.alert('Error', 'Failed to test alerts');
+    }
+  };
+
+  const testStormDifferentiation = async () => {
+    try {
+      Alert.alert(
+        'Test Storm Differentiation',
+        'This will create 3 test storms to demonstrate T1/T2 badges and visual differences. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Create Test Storms', 
+            onPress: async () => {
+              const testStorms = testVisualDifferentiation();
+              
+              // Save test storms to storage
+              for (const storm of testStorms) {
+                await MRMSService.saveStormEvent(storm);
+              }
+              
+              Alert.alert(
+                'Test Storms Created', 
+                'Created 3 test storms:\n\n• T1 LIVE - Edmond (2.5") with AUTO badge\n• T2 HISTORICAL - Moore (1.75")\n• T1 LIVE - Norman (1.25") disabled\n\nGo to Map to see visual differences.',
+                [
+                  { text: 'View on Map', onPress: () => navigation.navigate('Map' as never) },
+                  { text: 'OK' }
+                ]
+              );
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create test storms');
     }
   };
 
@@ -245,11 +281,18 @@ export default function HailIntelligenceDashboard() {
         </View>
       )}
 
-      {/* Test Button */}
-      <TouchableOpacity style={styles.testButton} onPress={testHailAlerts}>
-        <Ionicons name="notifications" size={20} color="#fff" />
-        <Text style={styles.testButtonText}>Test Hail Alerts</Text>
-      </TouchableOpacity>
+      {/* Test Buttons */}
+      <View style={styles.testButtonsContainer}>
+        <TouchableOpacity style={styles.testButton} onPress={testHailAlerts}>
+          <Ionicons name="notifications" size={20} color="#fff" />
+          <Text style={styles.testButtonText}>Test Hail Alerts</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={[styles.testButton, { backgroundColor: '#7c3aed' }]} onPress={testStormDifferentiation}>
+          <Ionicons name="eye" size={20} color="#fff" />
+          <Text style={styles.testButtonText}>Test Storm Visual</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Feature Highlights */}
       <View style={styles.featuresContainer}>
@@ -426,14 +469,19 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
   },
+  testButtonsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 8,
+    marginVertical: 12,
+  },
   testButton: {
     backgroundColor: '#3b82f6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 12,
+    flex: 1,
     borderRadius: 8,
   },
   testButtonText: {
