@@ -25,6 +25,7 @@
 - 50%: Comprehensive handoff documentation completed, ready for context compacting
 - 55%: Tier 1 notification log implemented - FIFO storage, bell icon on map, long-press to delete
 - 60%: Visual storm differentiation complete - T1/T2 badges, LIVE/HISTORICAL indicators, AUTO badge for severe storms
+- 65%: Production server investigation - fixed dev config, added diagnostics, identified silent failure issue
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -1352,3 +1353,111 @@ According to the Tier 1 enhancement plan:
 5. Multi-channel alerts
 
 **Context at 60%** - Ready to proceed with navigation integration or other enhancements.
+
+## Session Log - Context 60-65%: Production Server Investigation
+
+### Session Focus
+Investigated why production servers on Render.com were returning empty data instead of real storm data, violating our NO MOCK DATA protocol.
+
+### Key Findings
+
+1. **Network Configuration Issue**
+   - App was using local development IPs (192.168.1.111) instead of production servers
+   - Fixed by pointing DEV_CONFIG to production URLs
+   - This resolved notification issues - app now connects to real servers
+
+2. **Production Server Error: "Invalid time value"**
+   - Root cause: Date parsing error in server-dynamic.js
+   - Server was failing with 500 error when processing date requests
+   - Added proper date validation and format checking (YYYY-MM-DD required)
+
+3. **Diagnostic Endpoint Created**
+   - Added `/api/diagnostics` endpoint for troubleshooting
+   - Shows system info, ecCodes status, date handling, network access
+   - Helps debug production issues without server logs
+
+4. **Critical Issue Identified**
+   - When GRIB2 processing fails, server returns empty data instead of error
+   - Violates NO SILENT FALLBACKS protocol
+   - extractOKCMetroData returns `[]` on error (line 569)
+   - Should throw error to trigger proper error response
+
+### Code Changes Made
+
+1. **Fixed Development Config** (`src/config/api.config.ts`):
+   ```typescript
+   const DEV_CONFIG: ApiConfig = {
+     realTimeServer: 'https://d2d-realtime-server.onrender.com',
+     historicalServer: 'https://d2d-dynamic-server.onrender.com',
+     proxyServer: 'https://d2d-dynamic-server.onrender.com'
+   };
+   ```
+
+2. **Fixed Date Validation** (`server-dynamic.js`):
+   - Added regex validation for YYYY-MM-DD format
+   - Added isNaN check for parsed dates
+   - Better error messages for invalid dates
+
+3. **Added Diagnostics** (`server-dynamic.js`):
+   - New `/api/diagnostics` endpoint
+   - Tests ecCodes, date parsing, IEM access, cache status
+
+### Unresolved Issues for Next Agent
+
+1. **Silent Failure on GRIB2 Errors**
+   ```javascript
+   // Line 569 in server-dynamic.js - NEEDS FIX:
+   } catch (error) {
+     console.error('[DYNAMIC] Error extracting data:', error);
+     return []; // WRONG - should throw error
+   }
+   ```
+   Should be:
+   ```javascript
+   throw new Error(`Failed to extract GRIB2 data: ${error.message}`);
+   ```
+
+2. **Production Server Not Returning Data**
+   - Server says ecCodes is installed
+   - IEM Archive URLs are accessible
+   - But Sept 24, 2024 returns empty data
+   - Possible causes:
+     - Memory limitations on Render free tier
+     - ecCodes not working properly in Docker
+     - Timeout during GRIB2 processing
+
+3. **Deployment Needed**
+   - Changes committed but not pushed to GitHub
+   - Need to: `git push origin feature/grib2-processing`
+   - Render will auto-deploy from GitHub
+
+### Next Steps for Next Agent
+
+1. **Fix Silent Failure**:
+   - Change line 569 to throw error instead of returning empty array
+   - Ensure all errors result in proper HTTP error responses
+
+2. **Deploy and Test**:
+   ```bash
+   git push origin feature/grib2-processing
+   # Wait 5-10 minutes for Render deployment
+   curl https://d2d-dynamic-server.onrender.com/api/diagnostics
+   ```
+
+3. **Debug Production Issues**:
+   - Check diagnostics endpoint after deployment
+   - Test with recent dates (not just Sept 24)
+   - Monitor Render logs during GRIB2 processing
+   - Consider upgrading from free tier if memory is issue
+
+4. **Verify Protocol Compliance**:
+   - Server must return real data or clear errors
+   - No empty successful responses when processing fails
+   - User needs ANY date in last 12 months to work
+
+### User Requirements Reminder
+- Need ANY date within last 12 months to return available hail data
+- Not just Sept 24, 2024 - full 12-month dynamic capability
+- Must follow NO MOCK DATA protocol - real data or explicit failure
+
+**Context at 65%** - Production server investigation complete, fixes identified but not fully deployed.
