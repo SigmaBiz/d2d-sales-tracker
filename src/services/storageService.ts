@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Knock, Territory, DailyStats, ContactForm, ContactFormData } from '../types';
+import { Knock, Territory, DailyStats, ContactForm, ContactFormData, NotificationLogEntry } from '../types';
 
 const KEYS = {
   KNOCKS: '@knocks',
@@ -8,6 +8,7 @@ const KEYS = {
   USER: '@user',
   SETTINGS: '@settings',
   CONTACT_FORMS: '@contact_forms',
+  NOTIFICATION_LOG: '@notification_log',
 };
 
 export class StorageService {
@@ -176,6 +177,45 @@ export class StorageService {
   static async getContactFormsByKnockIds(knockIds: string[]): Promise<ContactForm[]> {
     const forms = await this.getContactForms();
     return forms.filter(f => knockIds.includes(f.knockId));
+  }
+
+  // Notification Log
+  static async saveNotificationLogEntry(entry: NotificationLogEntry): Promise<void> {
+    const log = await this.getNotificationLog();
+    
+    // Add new entry at the beginning
+    log.unshift(entry);
+    
+    // Keep only the most recent 20 entries (FIFO)
+    if (log.length > 20) {
+      log.splice(20);
+    }
+    
+    await AsyncStorage.setItem(KEYS.NOTIFICATION_LOG, JSON.stringify(log));
+  }
+
+  static async getNotificationLog(): Promise<NotificationLogEntry[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.NOTIFICATION_LOG);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting notification log:', error);
+      return [];
+    }
+  }
+
+  static async markNotificationActioned(notificationId: string): Promise<void> {
+    const log = await this.getNotificationLog();
+    const index = log.findIndex(entry => entry.id === notificationId);
+    
+    if (index >= 0) {
+      log[index].actioned = true;
+      await AsyncStorage.setItem(KEYS.NOTIFICATION_LOG, JSON.stringify(log));
+    }
+  }
+
+  static async clearNotificationLog(): Promise<void> {
+    await AsyncStorage.removeItem(KEYS.NOTIFICATION_LOG);
   }
 
   // Clear all data

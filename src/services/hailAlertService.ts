@@ -248,8 +248,27 @@ export class HailAlertService {
     // Send notification
     await this.sendHailAlert(message, report, alertType);
     
-    // Log alert to console for now (TODO: implement logAlert in MRMSService)
-    console.log('[HailAlert] Alert triggered:', {
+    // Save to notification log
+    const logEntry = {
+      id: `notification_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      timestamp: new Date(),
+      type: alertType,
+      message,
+      location: {
+        latitude: report.latitude,
+        longitude: report.longitude,
+        city: report.city
+      },
+      hailSize: report.size,
+      confidence: report.confidence,
+      stormId: this.activeStormId || undefined,
+      actioned: false,
+      createdAt: new Date()
+    };
+    
+    await StorageService.saveNotificationLogEntry(logEntry);
+    
+    console.log('[HailAlert] Alert triggered and logged:', {
       timestamp: new Date(),
       message,
       hailSize: report.size,
@@ -342,7 +361,7 @@ export class HailAlertService {
     
     if (data.type === 'hail_alert') {
       return {
-        action: 'OPEN_MAP',
+        action: 'OPEN_NOTIFICATION_LOG',
         stormId: data.stormId,
         location: {
           latitude: data.latitude,

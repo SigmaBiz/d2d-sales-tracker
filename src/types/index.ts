@@ -95,3 +95,20 @@ export interface ContactForm {
   formData: ContactFormData;
   createdAt: Date;
 }
+
+export interface NotificationLogEntry {
+  id: string;
+  timestamp: Date;
+  type: 'initial' | 'escalation' | 'expansion';
+  message: string;
+  location: {
+    latitude: number;
+    longitude: number;
+    city?: string;
+  };
+  hailSize: number; // in inches
+  confidence: number; // percentage
+  stormId?: string;
+  actioned: boolean;
+  createdAt: Date;
+}

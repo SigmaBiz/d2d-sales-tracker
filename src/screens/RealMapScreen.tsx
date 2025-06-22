@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 // SOLUTION SWITCHER: Comment/uncomment to try different solutions
 import WebMap from '../components/WebMap'; // Original version
 // import WebMap from '../components/WebMapFixed'; // Fixed version with proper message queuing
@@ -15,13 +16,15 @@ import { SimpleContourService } from '../services/simpleContourService';
 import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
-import { Knock } from '../types';
+import NotificationLogPanel from '../components/NotificationLogPanel';
+import { Knock, NotificationLogEntry } from '../types';
 import { testContourGeneration } from '../utils/testContourGeneration';
 
 // DEVELOPMENT FLAGS - REMEMBER TO RESTORE BEFORE PRODUCTION
 const DEV_DISABLE_GPS_UPDATES = __DEV__; // Automatically false in production builds
 
 export default function RealMapScreen({ navigation }: any) {
+  const isFocused = useIsFocused();
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +36,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [mapType, setMapType] = useState<'street' | 'satellite'>('street');
   const [isGeneratingContours, setIsGeneratingContours] = useState(false);
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
+  const [showNotificationLog, setShowNotificationLog] = useState(false);
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -68,6 +72,12 @@ export default function RealMapScreen({ navigation }: any) {
     const unsubscribe = navigation.addListener('focus', () => {
       loadKnocks();
       loadHailData(); // Also reload hail data to show newly added storms
+      
+      // Check if we should open notification log
+      if ((global as any).openNotificationLog) {
+        setShowNotificationLog(true);
+        (global as any).openNotificationLog = false; // Clear the flag
+      }
     });
 
     return unsubscribe;
@@ -338,6 +348,17 @@ export default function RealMapScreen({ navigation }: any) {
           }
         />
       )}
+
+      {/* Notification Log Panel */}
+      <NotificationLogPanel
+        visible={showNotificationLog}
+        onClose={() => setShowNotificationLog(false)}
+        onCreateOverlay={() => {
+          // Refresh hail data to show the new overlay
+          loadHailData();
+          setShowNotificationLog(false);
+        }}
+      />
       
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
@@ -365,6 +386,14 @@ export default function RealMapScreen({ navigation }: any) {
 
       {/* Right Button Stack - Storm related */}
       <View style={styles.rightButtonStack}>
+        {/* Notification Log Button */}
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => setShowNotificationLog(!showNotificationLog)}
+        >
+          <Ionicons name="notifications" size={24} color="#FF6B6B" />
+        </TouchableOpacity>
+
         {/* Focus on Hail Button */}
         {hailContours && (
           <TouchableOpacity 
@@ -503,7 +532,7 @@ const styles = StyleSheet.create({
     bottom: 80, // Above the tab bar
   },
   actionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Transparent white
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Almost opaque white
     borderRadius: 30,
     width: 60,
     height: 60,
@@ -515,7 +544,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     marginBottom: 10,
-    backdropFilter: 'blur(10px)', // iOS blur effect
   },
   badge: {
     position: 'absolute',

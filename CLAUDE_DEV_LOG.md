@@ -74,6 +74,13 @@ This log maintains a comprehensive record of all development sessions for the D2
 - **Correct Approach**: Install proper tools, use cloud services, or clearly communicate the limitation
 - **Rationale**: Mock data that appears real undermines user trust and business objectives
 
+**CRITICAL: Test-Driven Development Protocol**
+- **CODE AND TEST ITERATIVELY** - Write small features and test immediately on Expo Go before adding more code
+- **AVOID CODE ACCUMULATION** - Don't stack unverified code on top of unverified structures
+- **LIVE TESTING REQUIRED** - Every feature must be tested in the actual app before proceeding
+- **Example**: After adding notification log, test it fully before implementing auto-populate
+- **Rationale**: Prevents complexity buildup and ensures each feature works as intended
+
 **User's Ultimate Vision for D2D Sales Tracker:**
 This is a canvassing app designed to:
 1. **Save valuable D2D field data** for lead generation

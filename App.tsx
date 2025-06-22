@@ -37,9 +37,11 @@ export default function App() {
     responseListener.current = Notifications.addNotificationResponseReceivedListener(async response => {
       const result = await HailAlertService.handleNotificationResponse(response);
       
-      if (result && result.action === 'OPEN_MAP') {
-        // Map navigation will be handled by the AppNavigator
-        console.log('Hail alert tapped, opening map...');
+      if (result && result.action === 'OPEN_NOTIFICATION_LOG') {
+        // Store the intent to open notification log
+        console.log('Hail alert tapped, will open notification log on map...');
+        // Store the navigation intent globally so map screen can check it
+        (global as any).openNotificationLog = true;
       }
     });
 
