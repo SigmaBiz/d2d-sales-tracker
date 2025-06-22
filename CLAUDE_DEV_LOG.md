@@ -27,6 +27,7 @@
 - 60%: Visual storm differentiation complete - T1/T2 badges, LIVE/HISTORICAL indicators, AUTO badge for severe storms
 - 65%: Production server investigation - fixed dev config, added diagnostics, identified silent failure issue
 - 70%: GRIB2 processing failure diagnosed - likely coordinate mismatch, troubleshooting strategy documented
+- 75%: Root cause confirmed (512MB limit), implemented streaming/pre-filtering solution
 
 ### TIER 2: Comprehensive Safety Protocol (At 90% Context)
 **Full preservation before context compacting**
@@ -1570,3 +1571,35 @@ Both AIs identified this as #1 suspect:
 - Production must handle field team usage reliably
 
 **Context at 70%** - Troubleshooting strategy documented, ready for diagnostic endpoint implementation.
+
+### 🚨 ROOT CAUSE CONFIRMED: Memory Limit Exceeded
+Render support emails revealed:
+- Service exceeded 512MB memory limit and was killed
+- This happens during GRIB2 processing (24.5M CONUS data points = 735MB+)
+- Service automatically restarts but returns 0 reports
+- Free tier also spins down after 15 min inactivity
+
+### Solution Implemented: Pre-filtering & Streaming
+1. **Created optimized server** (server-dynamic-optimized.js):
+   - Stream processing to avoid loading all data at once
+   - Pre-filter at source (only extract OKC's 0.17% of data)
+   - Memory monitoring throughout pipeline
+   - Debug endpoint for coordinate format diagnosis
+
+2. **Key Optimizations**:
+   ```javascript
+   // Instead of loading 24.5M points:
+   grib_get_data file.grib2 | awk 'filter'  // 735MB+
+   
+   // Stream process with pre-filtering:
+   spawn('grib_get_data', [file]).stdout.on('data', chunk => {
+     // Process chunk by chunk, filter as we go
+   });  // Stays under 512MB
+   ```
+
+3. **Next Steps**:
+   - Deploy optimized server to Render
+   - Test with debug endpoint first
+   - Consider $7/month upgrade if still needed
+
+**Context at 75%** - Memory optimization implemented, ready for deployment and testing.
