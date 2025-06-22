@@ -8,6 +8,7 @@ const cors = require('cors');
 const axios = require('axios');
 const fs = require('fs').promises;
 const fsSync = require('fs');
+const { createWriteStream } = require('fs');
 const path = require('path');
 const { exec, spawn } = require('child_process');
 const util = require('util');
@@ -182,6 +183,189 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
     });
   });
 }
+
+// Comprehensive test endpoint for GRIB2 processing
+app.get('/api/test/grib2/:date', async (req, res) => {
+  const startTime = Date.now();
+  const results = {
+    date: req.params.date,
+    steps: {},
+    errors: [],
+    memory: {}
+  };
+  
+  try {
+    // Step 1: Memory check
+    results.memory.start = process.memoryUsage();
+    results.steps.memoryCheck = { status: 'ok', rss: Math.round(results.memory.start.rss / 1024 / 1024) + ' MB' };
+    
+    // Step 2: Date validation
+    const dateMatch = req.params.date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!dateMatch) {
+      throw new Error('Invalid date format');
+    }
+    const requestedDate = new Date(req.params.date + 'T12:00:00Z');
+    results.steps.dateValidation = { status: 'ok', date: requestedDate.toISOString() };
+    
+    // Step 3: Build URL
+    const utcDate = new Date(requestedDate.toISOString().split('T')[0] + 'T00:00:00Z');
+    const nextDay = new Date(utcDate);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    
+    const year = nextDay.getUTCFullYear();
+    const month = String(nextDay.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(nextDay.getUTCDate()).padStart(2, '0');
+    
+    const url = `${CONFIG.IEM_BASE_URL}/${year}/${month}/${day}/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_${year}${month}${day}-000000.grib2.gz`;
+    results.steps.urlBuild = { status: 'ok', url };
+    
+    // Step 4: Download test (HEAD request)
+    const headResponse = await axios.head(url, { timeout: 10000 });
+    results.steps.downloadCheck = { 
+      status: 'ok', 
+      contentLength: headResponse.headers['content-length'],
+      contentType: headResponse.headers['content-type']
+    };
+    
+    // Step 5: Temp directory check
+    const tempStats = await fs.stat(CONFIG.TEMP_DIR);
+    results.steps.tempDirCheck = { status: 'ok', exists: true, isDirectory: tempStats.isDirectory() };
+    
+    // Step 6: ecCodes check
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    
+    const { stdout: ecCodesVersion } = await execPromise('grib_get_data -V 2>&1 || echo "not found"');
+    results.steps.ecCodesCheck = { status: 'ok', version: ecCodesVersion.trim() };
+    
+    // Step 7: Test extraction command
+    const testCmd = `echo "lat lon value" | awk 'NR==1 || (NR>=13400000 && NR<=13400001)'`;
+    const { stdout: awkTest } = await execPromise(testCmd);
+    results.steps.awkTest = { status: 'ok', output: awkTest.trim() };
+    
+    // Final memory check
+    results.memory.end = process.memoryUsage();
+    results.steps.memoryDelta = { 
+      status: 'ok', 
+      rssDelta: Math.round((results.memory.end.rss - results.memory.start.rss) / 1024 / 1024) + ' MB' 
+    };
+    
+    results.success = true;
+    results.elapsed = Date.now() - startTime;
+    
+  } catch (error) {
+    results.success = false;
+    results.error = {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    };
+  }
+  
+  res.json(results);
+});
+
+// Test actual GRIB2 processing with minimal data
+app.get('/api/test/process/:date', async (req, res) => {
+  const testResults = {
+    date: req.params.date,
+    steps: [],
+    memory: {},
+    success: false
+  };
+  
+  try {
+    // Monitor memory
+    testResults.memory.start = Math.round(process.memoryUsage().rss / 1024 / 1024);
+    
+    // Step 1: Download a small chunk
+    testResults.steps.push({ step: 'download', status: 'starting' });
+    
+    const requestedDate = new Date(req.params.date + 'T12:00:00Z');
+    const utcDate = new Date(requestedDate.toISOString().split('T')[0] + 'T00:00:00Z');
+    const nextDay = new Date(utcDate);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    
+    const year = nextDay.getUTCFullYear();
+    const month = String(nextDay.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(nextDay.getUTCDate()).padStart(2, '0');
+    
+    const url = `${CONFIG.IEM_BASE_URL}/${year}/${month}/${day}/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_${year}${month}${day}-000000.grib2.gz`;
+    const fileName = path.basename(url);
+    const gzPath = path.join(CONFIG.TEMP_DIR, 'test_' + fileName);
+    const gribPath = gzPath.replace('.gz', '');
+    
+    // Download with size limit
+    const response = await axios({
+      method: 'GET',
+      url: url,
+      responseType: 'stream',
+      timeout: 20000,
+      maxContentLength: 10 * 1024 * 1024, // 10MB max
+      headers: {
+        'Range': 'bytes=0-524288' // Try to get first 512KB only
+      }
+    });
+    
+    const writer = createWriteStream(gzPath);
+    response.data.pipe(writer);
+    
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+      response.data.on('error', reject);
+    });
+    
+    testResults.steps.push({ 
+      step: 'download', 
+      status: 'complete',
+      size: (await fs.stat(gzPath)).size
+    });
+    
+    // Step 2: Extract
+    await util.promisify(exec)(`gunzip -f ${gzPath}`);
+    testResults.steps.push({ 
+      step: 'extract', 
+      status: 'complete',
+      size: (await fs.stat(gribPath)).size
+    });
+    
+    // Step 3: Test grib_get_data
+    const { stdout: gribInfo } = await util.promisify(exec)(`grib_get_data ${gribPath} | head -n 5`);
+    testResults.steps.push({ 
+      step: 'grib_get_data', 
+      status: 'complete',
+      sample: gribInfo.trim().split('\n').slice(0, 3)
+    });
+    
+    // Step 4: Test extraction
+    const { stdout: extracted } = await util.promisify(exec)(
+      `grib_get_data ${gribPath} | awk 'NR==1 || (NR>=100 && NR<=110)'`
+    );
+    testResults.steps.push({ 
+      step: 'awk_extraction', 
+      status: 'complete',
+      lines: extracted.trim().split('\n').length
+    });
+    
+    // Cleanup
+    await fs.unlink(gribPath).catch(() => {});
+    
+    testResults.memory.end = Math.round(process.memoryUsage().rss / 1024 / 1024);
+    testResults.memory.delta = testResults.memory.end - testResults.memory.start;
+    testResults.success = true;
+    
+  } catch (error) {
+    testResults.error = {
+      message: error.message,
+      code: error.code,
+      step: testResults.steps[testResults.steps.length - 1]?.step || 'unknown'
+    };
+  }
+  
+  res.json(testResults);
+});
 
 // Debug endpoint to test awk command
 app.get('/api/debug/awk', async (req, res) => {
