@@ -1694,3 +1694,138 @@ Diagnosed and addressed production 502 timeout errors preventing hail data deliv
 Production must return 426+ reports for Sept 24, 2024 within 30 seconds using <512MB RAM.
 
 **Context at 85%** - Geographic filtering fallback deployed, awaiting test results.
+
+## 🚨 COMPREHENSIVE HANDOFF FOR NEXT AGENT - CONTEXT AT 85% 🚨
+
+### Critical Production Issue In Progress
+**THE CORE HAIL TRACKING FEATURE IS NOT WORKING IN PRODUCTION**
+
+### Session Summary (Context 65-85%)
+**Current Branch**: `feature/grib2-processing`
+**Last Commit**: Longitude format fix for GRIB2 coordinates
+**Session Focus**: Resolving production 502 errors preventing hail data delivery
+
+### The Problem
+Production server on Render.com returns 502 Bad Gateway errors when trying to process GRIB2 hail data, violating our core mission of providing reliable field data for canvassers.
+
+### Root Cause Identified
+1. **Memory Constraint**: Render free tier has 512MB limit
+2. **Data Size**: GRIB2 files contain 24.5M CONUS data points
+3. **Timeout Issue**: `grib_get_data` command times out processing full dataset
+4. **Coordinate Format**: GRIB2 uses 0-360° longitude (OKC = 262-263°)
+
+### Solutions Attempted & Status
+
+#### 1. Line-based Pre-filtering (server-dynamic-precise.js)
+- **Approach**: Extract lines 13.4M-14M where OKC data resides
+- **Local**: Works perfectly (70MB RAM, 10 seconds)
+- **Production**: 502 timeout - `grib_get_data` fails before filtering
+
+#### 2. Geographic Filtering (server-dynamic-fallback.js) - CURRENT
+- **Approach**: Use ecCodes native geographic filtering
+- **Status**: Deployed with longitude fix
+- **Fix Applied**: Convert OKC bounds to 0-360° format (262.2-262.9)
+- **Testing**: Awaiting deployment completion
+
+### Current Deployment Status
+- **Server**: https://d2d-dynamic-server.onrender.com
+- **Branch**: feature/grib2-processing
+- **Service**: mrms-dynamic-server-fallback
+- **Memory Usage**: ~54MB (well under limit)
+
+### Next Steps for Immediate Action
+
+#### If Geographic Filtering Works:
+1. Verify Sept 24, 2024 returns 426+ reports
+2. Test additional dates (03/29/25, 05/17/25)
+3. Monitor performance metrics
+4. Update client config if needed
+5. Tag as production-ready
+
+#### If Geographic Filtering Fails:
+1. **Option A**: Upgrade to Render paid tier ($7/month, 1GB RAM)
+   - Original line-based approach would work
+   - Simplest solution
+   
+2. **Option B**: Pre-process externally
+   - Use GitHub Actions to process daily
+   - Store results in cache
+   - Server just serves pre-computed data
+
+### Critical Files & Locations
+```
+/mrms-proxy-server/
+├── server-dynamic-precise.js      # Line-based extraction (works locally)
+├── server-dynamic-fallback.js     # Geographic filtering (current)
+├── server-dynamic-optimized.js    # Streaming approach (backup)
+├── PRODUCTION_502_ISSUE.md        # Comprehensive issue documentation
+├── package.json                   # Start script configuration
+└── Dockerfile.dynamic             # Container definition
+```
+
+### Test Commands
+```bash
+# Check deployment status
+curl https://d2d-dynamic-server.onrender.com/health
+
+# Test main endpoint (MUST RETURN DATA)
+curl https://d2d-dynamic-server.onrender.com/api/mesh/2024-09-24
+
+# Debug coordinates
+curl https://d2d-dynamic-server.onrender.com/api/test/coords
+```
+
+### Success Criteria
+- **MUST** return 426+ hail reports for Sept 24, 2024
+- **MUST** process in under 30 seconds
+- **MUST** use less than 512MB RAM
+- **NO MOCK DATA** - Real NOAA data only
+
+### Technical Context for Next Agent
+1. ecCodes v2.28.0 is installed and working
+2. AWK/sed commands work fine - not the issue
+3. Issue is `grib_get_data` timeout on 24.5M points
+4. GRIB2 uses 0-360° longitude format
+5. OKC is at ~262.5° longitude in GRIB2 data
+
+### User Requirements
+- Field canvassers need reliable hail data
+- This is the PRIMARY FEATURE of the app
+- Must work in production, not just locally
+- NO MOCK DATA - violates trust
+
+### Current Work In Progress
+Waiting for deployment of longitude format fix. Once deployed:
+1. Test if it returns real data
+2. If yes → verify quality and performance
+3. If no → implement fallback Option A or B
+
+**THE APP'S CORE FUNCTIONALITY IS BROKEN IN PRODUCTION - THIS MUST BE FIXED**
+
+**Context at 85%** - Critical production issue blocking core functionality.
+
+### Final Update at 88%: Geographic Filtering Failed
+
+**Status**: Geographic filtering approach did not work. Server still returns 0 reports.
+
+**Key Finding**: Local cache shows 426 reports exist, but production cannot extract them due to:
+1. `grib_filter` command may not work as expected in container
+2. Coordinate filtering logic still failing despite 0-360° fix
+3. Fundamental timeout issue with processing 24.5M points remains
+
+**URGENT RECOMMENDATION FOR NEXT AGENT**:
+The line-based approach (server-dynamic-precise.js) works perfectly locally. The ONLY issue is Render's timeout/memory constraints. 
+
+**IMMEDIATE ACTION REQUIRED**:
+1. **Option A (Fastest)**: Upgrade Render to $7/month paid tier
+   - This will solve everything immediately
+   - The precise extraction code already works
+   
+2. **Option B**: Pre-compute data using GitHub Actions
+   - Process GRIB2 files daily at 2 AM
+   - Store results as JSON in repo or S3
+   - Server just serves pre-computed data
+
+**DO NOT** spend more time trying to make real-time processing work on free tier. The 512MB limit + timeout is insurmountable for 24.5M data points.
+
+**Context at 88%** - Approaching limit. UPGRADE RENDER OR PRE-COMPUTE DATA.
