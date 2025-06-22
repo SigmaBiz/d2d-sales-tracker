@@ -127,12 +127,20 @@ export default function HailOverlay({
                 onPress={() => handleFocus(storm.id)}
               >
                 <View style={styles.stormHeader}>
-                  <Text style={[
-                    styles.stormName,
-                    !storm.enabled && styles.disabledText
-                  ]}>
-                    {storm.name}
-                  </Text>
+                  <View style={styles.stormTitleRow}>
+                    <Text style={[
+                      styles.stormName,
+                      !storm.enabled && styles.disabledText
+                    ]}>
+                      {storm.name}
+                    </Text>
+                    {(storm as any).autoPopulated && (
+                      <View style={styles.autoPopulatedBadge}>
+                        <Ionicons name="flash" size={12} color="#FFF" />
+                        <Text style={styles.autoPopulatedText}>AUTO</Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.sizeIndicator}>
                     <Text style={styles.sizeEmoji}>
                       {getHailSizeEmoji(storm.maxSize)}
@@ -378,5 +386,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#10b981',
     fontWeight: '500',
+  },
+  stormTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  autoPopulatedBadge: {
+    backgroundColor: '#FF6B6B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  autoPopulatedText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 2,
   },
 });

@@ -238,6 +238,17 @@ export class HailAlertService {
       message = `${sizeEmoji} Hail detected in ${report.city || 'Oklahoma'} - ${report.size.toFixed(1)}" hail`;
       
       const newStorm = await MRMSService.groupIntoStormEvents([report]);
+      
+      // Auto-populate severe storms (≥2 inches)
+      if (report.size >= 2.0) {
+        console.log('[HailAlert] Auto-populating severe storm with', report.size.toFixed(1), 'inch hail');
+        // Ensure storm is enabled for display
+        newStorm.enabled = true;
+        // Mark as auto-populated for tracking
+        (newStorm as any).autoPopulated = true;
+        (newStorm as any).autoPopulatedAt = new Date();
+      }
+      
       await MRMSService.saveStormEvent(newStorm);
       this.activeStormId = newStorm.id;
       
@@ -262,7 +273,7 @@ export class HailAlertService {
       hailSize: report.size,
       confidence: report.confidence,
       stormId: this.activeStormId || undefined,
-      actioned: false,
+      actioned: report.size >= 2.0, // Auto-actioned for severe storms
       createdAt: new Date()
     };
     

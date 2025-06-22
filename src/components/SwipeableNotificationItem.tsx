@@ -116,7 +116,9 @@ export default function SwipeableNotificationItem({
             {item.actioned && (
               <View style={styles.actionedBadge}>
                 <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={styles.actionedText}>Overlay Created</Text>
+                <Text style={styles.actionedText}>
+                  {item.hailSize >= 2.0 ? 'Auto-Created' : 'Overlay Created'}
+                </Text>
               </View>
             )}
           </View>
