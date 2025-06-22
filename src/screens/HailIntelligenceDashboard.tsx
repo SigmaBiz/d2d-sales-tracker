@@ -13,11 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { IntegratedHailIntelligence } from '../services/integratedHailIntelligence';
 import { HailAlertService } from '../services/hailAlertService';
 import { useNavigation } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
 import { testVisualDifferentiation } from '../utils/testStormDifferentiation';
 import { MRMSService } from '../services/mrmsService';
 
 export default function HailIntelligenceDashboard() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [systemStatus, setSystemStatus] = useState<any>(null);
@@ -25,23 +26,57 @@ export default function HailIntelligenceDashboard() {
   const [accuracy, setAccuracy] = useState<any>(null);
 
   useEffect(() => {
+    // Add a timeout to prevent indefinite loading
+    const loadTimeout = setTimeout(() => {
+      if (loading) {
+        console.log('[Dashboard] Loading timeout - showing partial data');
+        setLoading(false);
+      }
+    }, 3000); // 3 second timeout
+
     loadDashboard();
+
+    return () => clearTimeout(loadTimeout);
   }, []);
 
   const loadDashboard = async () => {
     try {
-      const [status, tracker, accuracyData] = await Promise.all([
+      // Use Promise.allSettled to handle individual failures gracefully
+      const [statusResult, trackerResult, accuracyResult] = await Promise.allSettled([
         IntegratedHailIntelligence.getSystemStatus(),
         IntegratedHailIntelligence.getStormTracker(),
         IntegratedHailIntelligence.getAccuracyDashboard()
       ]);
 
-      setSystemStatus(status);
-      setStormTracker(tracker);
-      setAccuracy(accuracyData);
+      // Set each result if it succeeded
+      if (statusResult.status === 'fulfilled') {
+        setSystemStatus(statusResult.value);
+      } else {
+        console.warn('[Dashboard] Failed to load system status:', statusResult.reason);
+        // Set a default status to show something
+        setSystemStatus({
+          tiers: {
+            realTime: { status: 'error', serverStatus: 'offline' },
+            historical: { status: 'partial' },
+            validation: { status: 'inactive' }
+          }
+        });
+      }
+      
+      if (trackerResult.status === 'fulfilled') {
+        setStormTracker(trackerResult.value);
+      } else {
+        console.warn('[Dashboard] Failed to load storm tracker:', trackerResult.reason);
+        setStormTracker({ activeStorms: [] });
+      }
+      
+      if (accuracyResult.status === 'fulfilled') {
+        setAccuracy(accuracyResult.value);
+      } else {
+        console.warn('[Dashboard] Failed to load accuracy data:', accuracyResult.reason);
+      }
     } catch (error) {
-      console.error('Error loading dashboard:', error);
-      Alert.alert('Error', 'Failed to load hail intelligence data');
+      console.error('[Dashboard] Critical error loading dashboard:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,7 +154,10 @@ export default function HailIntelligenceDashboard() {
                 'Test Storms Created', 
                 'Created 3 test storms:\n\n• T1 LIVE - Edmond (2.5") with AUTO badge\n• T2 HISTORICAL - Moore (1.75")\n• T1 LIVE - Norman (1.25") disabled\n\nGo to Map to see visual differences.',
                 [
-                  { text: 'View on Map', onPress: () => navigation.navigate('Map' as never) },
+                  { text: 'View on Map', onPress: () => {
+                    // Navigate to the main tab navigator first, then to the Map tab
+                    navigation.navigate('Main', { screen: 'Map' });
+                  }},
                   { text: 'OK' }
                 ]
               );
