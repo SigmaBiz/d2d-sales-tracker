@@ -82,8 +82,8 @@ export default function HailOverlay({
                                    dataSource === 'IEM' ? '#3b82f6' : '#f59e0b' }
                 ]} />
                 <Text style={styles.dataSourceText}>
-                  {dataSource === 'MRMS' ? 'NOAA MRMS' : 
-                   dataSource === 'IEM' ? 'IEM Archive' : 'Mock Data'}
+                  {dataSource === 'MRMS' ? 'TIER 1: LIVE' : 
+                   dataSource === 'IEM' ? 'TIER 2: HISTORICAL' : 'Mock Data'}
                 </Text>
               </View>
             )}
@@ -134,12 +134,24 @@ export default function HailOverlay({
                     ]}>
                       {storm.name}
                     </Text>
-                    {(storm as any).autoPopulated && (
-                      <View style={styles.autoPopulatedBadge}>
-                        <Ionicons name="flash" size={12} color="#FFF" />
-                        <Text style={styles.autoPopulatedText}>AUTO</Text>
-                      </View>
-                    )}
+                    <View style={styles.badgeContainer}>
+                      {storm.source === 'MRMS' && (
+                        <View style={styles.tierBadge}>
+                          <Text style={styles.tierBadgeText}>T1</Text>
+                        </View>
+                      )}
+                      {storm.source === 'IEM' && (
+                        <View style={[styles.tierBadge, styles.tier2Badge]}>
+                          <Text style={styles.tierBadgeText}>T2</Text>
+                        </View>
+                      )}
+                      {(storm as any).autoPopulated && (
+                        <View style={styles.autoPopulatedBadge}>
+                          <Ionicons name="flash" size={12} color="#FFF" />
+                          <Text style={styles.autoPopulatedText}>AUTO</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <View style={styles.sizeIndicator}>
                     <Text style={styles.sizeEmoji}>
@@ -174,9 +186,19 @@ export default function HailOverlay({
                 )}
                 
                 {storm.enabled && storm.reports.length > 0 && (
-                  <Text style={styles.liveIndicator}>
-                    🔴 LIVE
-                  </Text>
+                  <View style={styles.dataSourceIndicator}>
+                    {storm.source === 'MRMS' ? (
+                      <>
+                        <View style={styles.liveIndicatorDot} />
+                        <Text style={styles.liveIndicatorText}>LIVE</Text>
+                      </>
+                    ) : storm.source === 'IEM' ? (
+                      <>
+                        <View style={styles.historicalIndicatorDot} />
+                        <Text style={styles.historicalIndicatorText}>HISTORICAL</Text>
+                      </>
+                    ) : null}
+                  </View>
                 )}
               </TouchableOpacity>
 
@@ -315,10 +337,34 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
   },
-  liveIndicator: {
-    fontSize: 10,
+  dataSourceIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  liveIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ef4444',
+    marginRight: 4,
+  },
+  liveIndicatorText: {
+    fontSize: 11,
     color: '#ef4444',
-    marginTop: 2,
+    fontWeight: '600',
+  },
+  historicalIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3b82f6',
+    marginRight: 4,
+  },
+  historicalIndicatorText: {
+    fontSize: 11,
+    color: '#3b82f6',
+    fontWeight: '600',
   },
   deleteButton: {
     padding: 8,
@@ -360,10 +406,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     backgroundColor: '#f3f4f6',
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   dataSourceDot: {
     width: 6,
@@ -372,9 +420,9 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   dataSourceText: {
-    fontSize: 10,
-    color: '#6b7280',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#1f2937',
+    fontWeight: '600',
   },
   verifiedBadge: {
     flexDirection: 'row',
@@ -406,5 +454,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     marginLeft: 2,
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tierBadge: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  tier2Badge: {
+    backgroundColor: '#3b82f6',
+  },
+  tierBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

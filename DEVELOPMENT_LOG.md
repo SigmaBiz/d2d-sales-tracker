@@ -431,6 +431,19 @@ web-build/
 
 ## Handoff Context
 
+### Agent Handoff Protocol
+When context reaches critical levels or a new agent takes over:
+
+1. **Read the DEVELOPMENT_LOG.md** to get full project context and nuance
+2. **Summarize your interpretation** of the project's overarching objective
+3. **Confirm understanding** before proceeding with execution
+4. **Use TodoRead** to check current task status
+5. **Continue from in-progress tasks** rather than starting new work
+
+This ensures continuity and prevents duplicate or conflicting implementations.
+
+## Project Context
+
 ### 🎯 CORNERSTONE: Professional-Grade Hail Intelligence System 🎯
 **Replace fake "MRMS" (WeatherAPI.com) with real NOAA MRMS/MESH data**
 
