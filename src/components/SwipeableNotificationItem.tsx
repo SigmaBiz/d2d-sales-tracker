@@ -1,19 +1,22 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Animated,
-  PanResponder,
-  Dimensions,
   TouchableOpacity,
+  LayoutAnimation,
+  UIManager,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { NotificationLogEntry } from '../types';
 
-const { width: screenWidth } = Dimensions.get('window');
-const SWIPE_THRESHOLD = screenWidth * 0.25; // Reduced threshold for easier swiping
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface SwipeableNotificationItemProps {
   item: NotificationLogEntry;
@@ -28,136 +31,98 @@ export default function SwipeableNotificationItem({
   onCreateOverlay,
   getTypeColor,
 }: SwipeableNotificationItemProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const itemOpacity = useRef(new Animated.Value(1)).current;
+  const [showDelete, setShowDelete] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Activate pan responder on horizontal swipe
-        const shouldSet = Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 5;
-        if (shouldSet) {
-          console.log('Pan responder activated', gestureState.dx);
-        }
-        return shouldSet;
-      },
-      onPanResponderGrant: () => {
-        // Start of gesture
-        console.log('Swipe gesture started');
-      },
-      onPanResponderMove: (_, gestureState) => {
-        // Only allow left swipe
-        console.log('Moving:', gestureState.dx);
-        if (gestureState.dx < 0) {
-          translateX.setValue(gestureState.dx);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Animate delete
-          Animated.parallel([
-            Animated.timing(translateX, {
-              toValue: -screenWidth,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-            Animated.timing(itemOpacity, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            onDelete(item.id);
-          });
-        } else {
-          // Snap back
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 5,
-          }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
-        // Another component has become the responder, snap back
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          friction: 5,
-        }).start();
-      },
-    })
-  ).current;
+  const handleDelete = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      onDelete(item.id);
+    });
+  };
+
+  const toggleDelete = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowDelete(!showDelete);
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Delete background */}
-      <View style={styles.deleteBackground}>
-        <Ionicons name="trash-outline" size={24} color="#FFF" />
-        <Text style={styles.deleteText}>Delete</Text>
-      </View>
-
-      {/* Swipeable content */}
-      <Animated.View
-        style={[
-          styles.notificationItem,
-          item.actioned && styles.actionedItem,
-          {
-            transform: [{ translateX }],
-            opacity: itemOpacity,
-          },
-        ]}
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onLongPress={toggleDelete}
+        delayLongPress={300}
       >
-        <View style={{ flex: 1 }} {...panResponder.panHandlers}>
-        <View style={styles.notificationHeader}>
-          <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.type) }]}>
-            <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
-          </View>
-          <Text style={styles.timestamp}>
-            {format(new Date(item.timestamp), 'MMM d, h:mm a')}
-          </Text>
-        </View>
-        
-        <Text style={styles.message}>{item.message}</Text>
-        
-        <View style={styles.detailsRow}>
-          <View style={styles.detail}>
-            <Ionicons name="resize" size={16} color="#666" />
-            <Text style={styles.detailText}>{item.hailSize.toFixed(1)}"</Text>
-          </View>
-          <View style={styles.detail}>
-            <Ionicons name="analytics" size={16} color="#666" />
-            <Text style={styles.detailText}>{item.confidence}%</Text>
-          </View>
-          {item.location.city && (
-            <View style={styles.detail}>
-              <Ionicons name="location" size={16} color="#666" />
-              <Text style={styles.detailText}>{item.location.city}</Text>
-            </View>
+        <View style={styles.notificationWrapper}>
+          {showDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDelete}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="trash-outline" size={20} color="#FFF" />
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </TouchableOpacity>
           )}
-        </View>
+          
+          <View style={[
+            styles.notificationItem,
+            item.actioned && styles.actionedItem,
+            showDelete && styles.notificationItemShifted
+          ]}>
+            <View style={styles.notificationHeader}>
+              <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.type) }]}>
+                <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
+              </View>
+              <Text style={styles.timestamp}>
+                {format(new Date(item.timestamp), 'MMM d, h:mm a')}
+              </Text>
+            </View>
+            
+            <Text style={styles.message}>{item.message}</Text>
+            
+            <View style={styles.detailsRow}>
+              <View style={styles.detail}>
+                <Ionicons name="resize" size={16} color="#666" />
+                <Text style={styles.detailText}>{item.hailSize.toFixed(1)}"</Text>
+              </View>
+              <View style={styles.detail}>
+                <Ionicons name="analytics" size={16} color="#666" />
+                <Text style={styles.detailText}>{item.confidence}%</Text>
+              </View>
+              {item.location.city && (
+                <View style={styles.detail}>
+                  <Ionicons name="location" size={16} color="#666" />
+                  <Text style={styles.detailText}>{item.location.city}</Text>
+                </View>
+              )}
+            </View>
 
-        {!item.actioned && (
-          <TouchableOpacity
-            style={styles.createOverlayButton}
-            onPress={() => onCreateOverlay(item)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="map" size={20} color="#FFF" />
-            <Text style={styles.buttonText}>Create Overlay</Text>
-          </TouchableOpacity>
-        )}
-        
-        {item.actioned && (
-          <View style={styles.actionedBadge}>
-            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-            <Text style={styles.actionedText}>Overlay Created</Text>
+            {!item.actioned && (
+              <TouchableOpacity
+                style={styles.createOverlayButton}
+                onPress={() => onCreateOverlay(item)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="map" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Create Overlay</Text>
+              </TouchableOpacity>
+            )}
+            
+            {item.actioned && (
+              <View style={styles.actionedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                <Text style={styles.actionedText}>Overlay Created</Text>
+              </View>
+            )}
           </View>
-        )}
         </View>
-      </Animated.View>
-    </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -166,24 +131,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
     marginVertical: 5,
   },
-  deleteBackground: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '100%',
-    backgroundColor: '#FF4444',
-    borderRadius: 10,
+  notificationWrapper: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingRight: 20,
+    alignItems: 'stretch',
   },
-  deleteText: {
+  deleteButton: {
+    backgroundColor: '#FF4444',
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  deleteButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginLeft: 10,
+    marginLeft: 5,
   },
   notificationItem: {
     backgroundColor: '#F9F9F9',
@@ -191,6 +156,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    flex: 1,
+  },
+  notificationItemShifted: {
+    marginLeft: 0,
   },
   actionedItem: {
     opacity: 0.6,

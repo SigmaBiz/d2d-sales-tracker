@@ -176,7 +176,7 @@ export default function NotificationLogPanel({ visible, onClose, onCreateOverlay
           ) : (
             <>
               <View style={styles.swipeHint}>
-                <Text style={styles.swipeHintText}>Swipe left to delete notifications</Text>
+                <Text style={styles.swipeHintText}>Long press any notification to delete</Text>
               </View>
               <FlatList
                 data={notifications}
