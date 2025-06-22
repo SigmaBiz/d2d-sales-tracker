@@ -214,6 +214,12 @@ export class StorageService {
     }
   }
 
+  static async deleteNotificationLogEntry(notificationId: string): Promise<void> {
+    const log = await this.getNotificationLog();
+    const filteredLog = log.filter(entry => entry.id !== notificationId);
+    await AsyncStorage.setItem(KEYS.NOTIFICATION_LOG, JSON.stringify(filteredLog));
+  }
+
   static async clearNotificationLog(): Promise<void> {
     await AsyncStorage.removeItem(KEYS.NOTIFICATION_LOG);
   }

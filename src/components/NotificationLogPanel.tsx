@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { StorageService } from '../services/storageService';
 import { MRMSService } from '../services/mrmsService';
 import { NotificationLogEntry } from '../types';
+import SwipeableNotificationItem from './SwipeableNotificationItem';
 
 interface NotificationLogPanelProps {
   visible: boolean;
@@ -52,7 +53,12 @@ export default function NotificationLogPanel({ visible, onClose, onCreateOverlay
       // Create storm overlay from notification data
       const storm = {
         id: notification.stormId || `storm_${Date.now()}`,
+        name: `Storm ${format(new Date(notification.timestamp), 'MMM d')}`,
         startTime: notification.timestamp,
+        center: {
+          lat: notification.location.latitude,
+          lng: notification.location.longitude
+        },
         reports: [{
           id: `report_${Date.now()}`,
           latitude: notification.location.latitude,
@@ -65,7 +71,10 @@ export default function NotificationLogPanel({ visible, onClose, onCreateOverlay
         }],
         maxSize: notification.hailSize,
         active: false,
-        enabled: true
+        enabled: true,
+        isActive: false,
+        source: 'notification' as const,
+        confidence: notification.confidence
       };
 
       await MRMSService.saveStormEvent(storm);
@@ -101,53 +110,18 @@ export default function NotificationLogPanel({ visible, onClose, onCreateOverlay
     }
   };
 
-  const renderNotification = ({ item }: { item: NotificationLogEntry }) => (
-    <View style={[styles.notificationItem, item.actioned && styles.actionedItem]}>
-      <View style={styles.notificationHeader}>
-        <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.type) }]}>
-          <Text style={styles.typeText}>{item.type.toUpperCase()}</Text>
-        </View>
-        <Text style={styles.timestamp}>
-          {format(new Date(item.timestamp), 'MMM d, h:mm a')}
-        </Text>
-      </View>
-      
-      <Text style={styles.message}>{item.message}</Text>
-      
-      <View style={styles.detailsRow}>
-        <View style={styles.detail}>
-          <Ionicons name="resize" size={16} color="#666" />
-          <Text style={styles.detailText}>{item.hailSize.toFixed(1)}"</Text>
-        </View>
-        <View style={styles.detail}>
-          <Ionicons name="analytics" size={16} color="#666" />
-          <Text style={styles.detailText}>{item.confidence}%</Text>
-        </View>
-        {item.location.city && (
-          <View style={styles.detail}>
-            <Ionicons name="location" size={16} color="#666" />
-            <Text style={styles.detailText}>{item.location.city}</Text>
-          </View>
-        )}
-      </View>
+  const handleDeleteNotification = async (notificationId: string) => {
+    await StorageService.deleteNotificationLogEntry(notificationId);
+    await loadNotifications();
+  };
 
-      {!item.actioned && (
-        <TouchableOpacity
-          style={styles.createOverlayButton}
-          onPress={() => handleCreateOverlay(item)}
-        >
-          <Ionicons name="map" size={20} color="#FFF" />
-          <Text style={styles.buttonText}>Create Overlay</Text>
-        </TouchableOpacity>
-      )}
-      
-      {item.actioned && (
-        <View style={styles.actionedBadge}>
-          <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-          <Text style={styles.actionedText}>Overlay Created</Text>
-        </View>
-      )}
-    </View>
+  const renderNotification = ({ item }: { item: NotificationLogEntry }) => (
+    <SwipeableNotificationItem
+      item={item}
+      onDelete={handleDeleteNotification}
+      onCreateOverlay={handleCreateOverlay}
+      getTypeColor={getTypeColor}
+    />
   );
 
   const clearLog = () => {
@@ -200,15 +174,20 @@ export default function NotificationLogPanel({ visible, onClose, onCreateOverlay
               </Text>
             </View>
           ) : (
-            <FlatList
-              data={notifications}
-              keyExtractor={(item) => item.id}
-              renderItem={renderNotification}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              }
-              contentContainerStyle={styles.listContent}
-            />
+            <>
+              <View style={styles.swipeHint}>
+                <Text style={styles.swipeHintText}>Swipe left to delete notifications</Text>
+              </View>
+              <FlatList
+                data={notifications}
+                keyExtractor={(item) => item.id}
+                renderItem={renderNotification}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                contentContainerStyle={styles.listContent}
+              />
+            </>
           )}
         </View>
       </SafeAreaView>
@@ -257,84 +236,16 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: 10,
   },
-  notificationItem: {
-    backgroundColor: '#F9F9F9',
-    marginHorizontal: 15,
-    marginVertical: 5,
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  actionedItem: {
-    opacity: 0.6,
-  },
-  notificationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  swipeHint: {
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginBottom: 10,
   },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  typeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  timestamp: {
+  swipeHintText: {
     fontSize: 12,
     color: '#666',
-  },
-  message: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 10,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  detail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 15,
-    marginBottom: 5,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  createOverlayButton: {
-    backgroundColor: '#4CAF50',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  actionedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  actionedText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    marginLeft: 4,
+    fontStyle: 'italic',
   },
   emptyState: {
     flex: 1,
