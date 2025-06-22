@@ -2,11 +2,13 @@
   "name": "mrms-proxy-server",
   "version": "1.0.0",
   "description": "Proxy server for processing NOAA MRMS GRIB2 data",
-  "main": "server-v2.js",
+  "main": "server-dynamic-precise.js",
   "scripts": {
-    "start": "node server-v2.js",
-    "dev": "nodemon server-v2.js",
-    "start-v1": "node server.js"
+    "start": "node server-dynamic-precise.js",
+    "dev": "nodemon server-dynamic-precise.js",
+    "start-v2": "node server-v2.js",
+    "start-v1": "node server.js",
+    "start-optimized": "node server-dynamic-optimized.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.10",
