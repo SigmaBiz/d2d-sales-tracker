@@ -274,6 +274,12 @@ app.get('/api/mesh/:date', async (req, res) => {
     // Fetch and process GRIB2 data
     const data = await fetchAndProcessMESH(requestedDate);
     
+    // Verify we got actual data
+    if (!data.reports || data.reports.length === 0) {
+      console.log('[DYNAMIC] Warning: No hail data found for', req.params.date);
+      // Still return the empty result but log it
+    }
+    
     // Cache the results
     await fs.writeFile(cacheFile, JSON.stringify(data, null, 2));
     
@@ -409,16 +415,22 @@ async function fetchAndProcessMESH(date) {
     // Check if ecCodes is available
     const hasEccodes = await checkEccodes();
     if (!hasEccodes) {
-      throw new Error('ecCodes not installed. Cannot process GRIB2 files.');
+      throw new Error('ecCodes not installed. Cannot process GRIB2 files. Please install with: apt-get install libeccodes-tools');
     }
     
     // Download file
     console.log(`[DYNAMIC] Downloading from: ${url}`);
+    console.log(`[DYNAMIC] Date requested: ${date.toISOString()}`);
+    console.log(`[DYNAMIC] File will be saved to: ${gzPath}`);
+    
     const response = await axios({
       method: 'GET',
       url: url,
       responseType: 'stream',
       timeout: 30000,
+      headers: {
+        'User-Agent': 'D2D-Sales-Tracker/1.0 (Hail Intelligence System)'
+      },
       onDownloadProgress: (progressEvent) => {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         if (percent % 25 === 0) {
@@ -566,7 +578,9 @@ async function extractOKCMetroData(gribPath, date) {
   } catch (error) {
     console.error('[DYNAMIC] Error extracting data:', error);
     console.error('[DYNAMIC] Error details:', error.message);
-    return [];
+    // CRITICAL: Must throw error instead of returning empty array
+    // This ensures we follow NO MOCK DATA protocol - fail explicitly
+    throw new Error(`Failed to extract GRIB2 data: ${error.message}`);
   }
 }
 
