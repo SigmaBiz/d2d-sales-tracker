@@ -65,10 +65,13 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
     // Use awk for efficient line extraction (more compatible with Linux)
     const extractCommand = spawn('sh', ['-c', 
       `grib_get_data ${gribPath} | awk 'NR==1 || (NR>=${CONFIG.OKC_LINE_RANGE.start} && NR<=${CONFIG.OKC_LINE_RANGE.end})'`
-    ], {
-      timeout: 30000, // 30 second timeout
-      maxBuffer: 100 * 1024 * 1024 // 100MB buffer
-    });
+    ]);
+    
+    // Add manual timeout
+    const timeout = setTimeout(() => {
+      extractCommand.kill('SIGTERM');
+      reject(new Error('Extract command timed out after 30 seconds'));
+    }, 30000);
     
     let buffer = '';
     let processedLines = 0;
@@ -161,6 +164,7 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
     });
     
     extractCommand.on('close', (code) => {
+      clearTimeout(timeout);
       const elapsed = Date.now() - startTime;
       console.log(`[PRECISE] Extraction complete in ${elapsed}ms`);
       console.log(`[PRECISE] Processed ${processedLines} lines, found ${reports.length} reports`);
@@ -173,10 +177,42 @@ async function extractOKCMetroDataPrecise(gribPath, date) {
     });
     
     extractCommand.on('error', (err) => {
+      clearTimeout(timeout);
       reject(err);
     });
   });
 }
+
+// Debug endpoint to test awk command
+app.get('/api/debug/awk', async (req, res) => {
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execPromise = util.promisify(exec);
+  
+  try {
+    // Test basic awk functionality
+    const { stdout: awkTest } = await execPromise('echo -e "line1\\nline2\\nline3" | awk "NR==1 || NR==3"');
+    
+    // Test awk version
+    const { stdout: awkVersion } = await execPromise('awk --version 2>&1 || echo "awk version not available"');
+    
+    // Test with large numbers
+    const { stdout: largeTest } = await execPromise('seq 1 5 | awk "NR==1 || (NR>=3 && NR<=4)"');
+    
+    res.json({
+      awkTest: awkTest.trim().split('\n'),
+      awkVersion: awkVersion.trim().split('\n')[0],
+      largeNumberTest: largeTest.trim().split('\n'),
+      extraction_command: `grib_get_data file.grib2 | awk 'NR==1 || (NR>=${CONFIG.OKC_LINE_RANGE.start} && NR<=${CONFIG.OKC_LINE_RANGE.end})'`
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'AWK test failed',
+      message: error.message,
+      stderr: error.stderr
+    });
+  }
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
