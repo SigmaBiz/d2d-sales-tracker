@@ -142,8 +142,12 @@ async function extractOKCMetroDataChunked(gribPath, date) {
       const chunkEnd = Math.min(i + chunkSize, endLine);
       console.log(`[FALLBACK] Processing chunk ${i}-${chunkEnd}...`);
       
+      // Convert western hemisphere bounds to 0-360 format
+      const lonMin = 360 + CONFIG.OKC_METRO_BOUNDS.west; // 262.2
+      const lonMax = 360 + CONFIG.OKC_METRO_BOUNDS.east; // 262.9
+      
       const { stdout } = await execPromise(
-        `grib_get_data ${gribPath} | sed -n '1p;${i},${chunkEnd}p' | awk 'NR==1 || ($1 >= ${CONFIG.OKC_METRO_BOUNDS.south} && $1 <= ${CONFIG.OKC_METRO_BOUNDS.north} && $2 >= ${CONFIG.OKC_METRO_BOUNDS.west} && $2 <= ${CONFIG.OKC_METRO_BOUNDS.east})'`,
+        `grib_get_data ${gribPath} | sed -n '1p;${i},${chunkEnd}p' | awk 'NR==1 || ($1 >= ${CONFIG.OKC_METRO_BOUNDS.south} && $1 <= ${CONFIG.OKC_METRO_BOUNDS.north} && $2 >= ${lonMin} && $2 <= ${lonMax})'`,
         { maxBuffer: 50 * 1024 * 1024, timeout: 20000 }
       );
       
@@ -157,14 +161,17 @@ async function extractOKCMetroDataChunked(gribPath, date) {
           const sizeInches = meshValue / 25.4;
           
           if (sizeInches >= CONFIG.MIN_HAIL_SIZE) {
+            // Convert 0-360 longitude to -180-180
+            const adjustedLon = lon > 180 ? lon - 360 : lon;
+            
             reports.push({
               id: `mesh_${date.getTime()}_${reports.length}`,
               latitude: lat,
-              longitude: lon < -180 ? lon + 360 : lon,
+              longitude: adjustedLon,
               size: Math.round(sizeInches * 100) / 100,
               timestamp: date.toISOString(),
               confidence: calculateConfidence(sizeInches),
-              city: getCityName(lat, lon),
+              city: getCityName(lat, adjustedLon),
               source: 'IEM MRMS Archive',
               meshValue: meshValue
             });
@@ -186,6 +193,67 @@ async function extractOKCMetroDataChunked(gribPath, date) {
     throw error;
   }
 }
+
+// Test endpoint for debugging geographic filtering
+app.get('/api/test/coords', async (req, res) => {
+  try {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    
+    // Test data
+    const testGrib = path.join(CONFIG.TEMP_DIR, 'test_coords.grib2');
+    
+    // Check if we have a GRIB file to test with
+    const gribFiles = await fs.readdir(CONFIG.TEMP_DIR);
+    const gribFile = gribFiles.find(f => f.endsWith('.grib2'));
+    
+    if (!gribFile) {
+      return res.json({ error: 'No GRIB2 file available for testing' });
+    }
+    
+    const fullPath = path.join(CONFIG.TEMP_DIR, gribFile);
+    
+    // Get first 100 lines to check coordinate format
+    const { stdout: sample } = await execPromise(
+      `grib_get_data ${fullPath} | head -n 100`,
+      { timeout: 10000 }
+    );
+    
+    const lines = sample.trim().split('\n');
+    const coords = [];
+    
+    for (let i = 1; i < Math.min(10, lines.length); i++) {
+      const parts = lines[i].trim().split(/\s+/);
+      if (parts.length >= 3) {
+        coords.push({
+          lat: parseFloat(parts[0]),
+          lon: parseFloat(parts[1]),
+          value: parseFloat(parts[2])
+        });
+      }
+    }
+    
+    // Test OKC area extraction
+    const { stdout: okcTest } = await execPromise(
+      `grib_get_data ${fullPath} | awk '$1 >= 35.1 && $1 <= 35.7 && $2 >= -98 && $2 <= -97' | head -n 10`,
+      { timeout: 10000 }
+    );
+    
+    res.json({
+      sample_coords: coords,
+      okc_test: okcTest.trim().split('\n').filter(l => l),
+      bounds: CONFIG.OKC_METRO_BOUNDS,
+      expected_lon_range: {
+        western: [-97.8, -97.1],
+        eastern_360: [262.2, 262.9]
+      }
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
