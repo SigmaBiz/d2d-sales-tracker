@@ -1,0 +1,255 @@
+{
+  "date": "2024-08-17",
+  "generated_at": "2025-06-23T05:59:57.617Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": [
+    {
+      "id": "mesh_2024-08-17_0",
+      "latitude": 35.155,
+      "longitude": -97.76499999999999,
+      "size": 0.99,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 25.2
+    },
+    {
+      "id": "mesh_2024-08-17_1",
+      "latitude": 35.155,
+      "longitude": -97.755,
+      "size": 1.14,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 28.9
+    },
+    {
+      "id": "mesh_2024-08-17_2",
+      "latitude": 35.155,
+      "longitude": -97.745,
+      "size": 1.09,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 27.6
+    },
+    {
+      "id": "mesh_2024-08-17_3",
+      "latitude": 35.145,
+      "longitude": -97.79500000000002,
+      "size": 0.95,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 24.2
+    },
+    {
+      "id": "mesh_2024-08-17_4",
+      "latitude": 35.145,
+      "longitude": -97.77499999999998,
+      "size": 0.85,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 21.5
+    },
+    {
+      "id": "mesh_2024-08-17_5",
+      "latitude": 35.145,
+      "longitude": -97.76499999999999,
+      "size": 1.14,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 29
+    },
+    {
+      "id": "mesh_2024-08-17_6",
+      "latitude": 35.145,
+      "longitude": -97.755,
+      "size": 1.31,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 33.3
+    },
+    {
+      "id": "mesh_2024-08-17_7",
+      "latitude": 35.145,
+      "longitude": -97.745,
+      "size": 1.51,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 38.3
+    },
+    {
+      "id": "mesh_2024-08-17_8",
+      "latitude": 35.145,
+      "longitude": -97.73500000000001,
+      "size": 1.05,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 26.6
+    },
+    {
+      "id": "mesh_2024-08-17_9",
+      "latitude": 35.145,
+      "longitude": -97.72500000000002,
+      "size": 0.78,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.7
+    },
+    {
+      "id": "mesh_2024-08-17_10",
+      "latitude": 35.135,
+      "longitude": -97.79500000000002,
+      "size": 1,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 25.5
+    },
+    {
+      "id": "mesh_2024-08-17_11",
+      "latitude": 35.135,
+      "longitude": -97.78500000000003,
+      "size": 0.83,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 21
+    },
+    {
+      "id": "mesh_2024-08-17_12",
+      "latitude": 35.135,
+      "longitude": -97.76499999999999,
+      "size": 0.99,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 25.1
+    },
+    {
+      "id": "mesh_2024-08-17_13",
+      "latitude": 35.135,
+      "longitude": -97.755,
+      "size": 0.94,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 23.8
+    },
+    {
+      "id": "mesh_2024-08-17_14",
+      "latitude": 35.135,
+      "longitude": -97.745,
+      "size": 1.18,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 29.9
+    },
+    {
+      "id": "mesh_2024-08-17_15",
+      "latitude": 35.135,
+      "longitude": -97.73500000000001,
+      "size": 1.13,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 28.6
+    },
+    {
+      "id": "mesh_2024-08-17_16",
+      "latitude": 35.135,
+      "longitude": -97.72500000000002,
+      "size": 0.93,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 23.7
+    },
+    {
+      "id": "mesh_2024-08-17_17",
+      "latitude": 35.135,
+      "longitude": -97.71499999999997,
+      "size": 0.77,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.6
+    },
+    {
+      "id": "mesh_2024-08-17_18",
+      "latitude": 35.125,
+      "longitude": -97.79500000000002,
+      "size": 0.83,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 21.2
+    },
+    {
+      "id": "mesh_2024-08-17_19",
+      "latitude": 35.125,
+      "longitude": -97.78500000000003,
+      "size": 0.83,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 21.2
+    },
+    {
+      "id": "mesh_2024-08-17_20",
+      "latitude": 35.125,
+      "longitude": -97.73500000000001,
+      "size": 0.91,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 23.1
+    },
+    {
+      "id": "mesh_2024-08-17_21",
+      "latitude": 35.125,
+      "longitude": -97.72500000000002,
+      "size": 0.82,
+      "timestamp": "2024-08-17T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 20.8
+    }
+  ]
+}

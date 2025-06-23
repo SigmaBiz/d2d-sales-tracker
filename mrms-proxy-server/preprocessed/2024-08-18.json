@@ -1,0 +1,46 @@
+{
+  "date": "2024-08-18",
+  "generated_at": "2025-06-23T05:59:31.509Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": [
+    {
+      "id": "mesh_2024-08-18_0",
+      "latitude": 35.335,
+      "longitude": -97.78500000000003,
+      "size": 0.96,
+      "timestamp": "2024-08-18T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 24.4
+    },
+    {
+      "id": "mesh_2024-08-18_1",
+      "latitude": 35.335,
+      "longitude": -97.77499999999998,
+      "size": 0.76,
+      "timestamp": "2024-08-18T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.4
+    },
+    {
+      "id": "mesh_2024-08-18_2",
+      "latitude": 35.325,
+      "longitude": -97.78500000000003,
+      "size": 0.83,
+      "timestamp": "2024-08-18T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 21.1
+    }
+  ]
+}

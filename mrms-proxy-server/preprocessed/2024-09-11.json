@@ -1,0 +1,167 @@
+{
+  "date": "2024-09-11",
+  "generated_at": "2025-06-23T05:49:05.443Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": [
+    {
+      "id": "mesh_2024-09-11_0",
+      "latitude": 35.665,
+      "longitude": -97.565,
+      "size": 3.94,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 85,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 100
+    },
+    {
+      "id": "mesh_2024-09-11_1",
+      "latitude": 35.665,
+      "longitude": -97.555,
+      "size": 3.94,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 85,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 100
+    },
+    {
+      "id": "mesh_2024-09-11_2",
+      "latitude": 35.655,
+      "longitude": -97.565,
+      "size": 3.57,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 85,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 90.7
+    },
+    {
+      "id": "mesh_2024-09-11_3",
+      "latitude": 35.655,
+      "longitude": -97.555,
+      "size": 3.75,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 85,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 95.2
+    },
+    {
+      "id": "mesh_2024-09-11_4",
+      "latitude": 35.605,
+      "longitude": -97.565,
+      "size": 1.81,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 46.1
+    },
+    {
+      "id": "mesh_2024-09-11_5",
+      "latitude": 35.595,
+      "longitude": -97.57499999999999,
+      "size": 1.5,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 38
+    },
+    {
+      "id": "mesh_2024-09-11_6",
+      "latitude": 35.595,
+      "longitude": -97.565,
+      "size": 1.5,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 38
+    },
+    {
+      "id": "mesh_2024-09-11_7",
+      "latitude": 35.595,
+      "longitude": -97.555,
+      "size": 1.5,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 38
+    },
+    {
+      "id": "mesh_2024-09-11_8",
+      "latitude": 35.585,
+      "longitude": -97.57499999999999,
+      "size": 1.12,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 28.4
+    },
+    {
+      "id": "mesh_2024-09-11_9",
+      "latitude": 35.585,
+      "longitude": -97.565,
+      "size": 1.12,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 28.4
+    },
+    {
+      "id": "mesh_2024-09-11_10",
+      "latitude": 35.585,
+      "longitude": -97.555,
+      "size": 1.17,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 29.8
+    },
+    {
+      "id": "mesh_2024-09-11_11",
+      "latitude": 35.575,
+      "longitude": -97.57499999999999,
+      "size": 0.76,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.3
+    },
+    {
+      "id": "mesh_2024-09-11_12",
+      "latitude": 35.575,
+      "longitude": -97.565,
+      "size": 0.76,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.3
+    },
+    {
+      "id": "mesh_2024-09-11_13",
+      "latitude": 35.575,
+      "longitude": -97.555,
+      "size": 0.76,
+      "timestamp": "2024-09-11T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Edmond",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.3
+    }
+  ]
+}

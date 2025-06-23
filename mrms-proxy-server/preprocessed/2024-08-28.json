@@ -1,0 +1,12 @@
+{
+  "date": "2024-08-28",
+  "generated_at": "2025-06-23T05:55:10.296Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": []
+}

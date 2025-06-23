@@ -1,0 +1,24 @@
+{
+  "date": "2024-07-08",
+  "generated_at": "2025-06-23T06:17:22.087Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": [
+    {
+      "id": "mesh_2024-07-08_0",
+      "latitude": 35.125,
+      "longitude": -97.15499999999997,
+      "size": 0.8,
+      "timestamp": "2024-07-08T12:00:00.000Z",
+      "confidence": 65,
+      "city": "Moore",
+      "source": "IEM MRMS Archive",
+      "meshValue": 20.4
+    }
+  ]
+}
