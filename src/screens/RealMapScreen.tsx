@@ -255,14 +255,20 @@ export default function RealMapScreen({ navigation }: any) {
           setHailContours(contourData);
           setIsGeneratingContours(false);
         } else {
-          console.log('No hail reports available for contour generation - clearing contours');
-          setHailContours(null);
-          // Force clear by sending empty feature collection
-          const emptyContours = {
-            type: 'FeatureCollection',
-            features: []
-          };
-          setHailContours(emptyContours);
+          // Only clear contours if we don't already have them
+          // This prevents flickering when the data is temporarily unavailable
+          if (hailContours && hailContours.features && hailContours.features.length > 0) {
+            console.log('Keeping existing contours - no new hail reports to process');
+          } else {
+            console.log('No hail reports available for contour generation - clearing contours');
+            setHailContours(null);
+            // Force clear by sending empty feature collection
+            const emptyContours = {
+              type: 'FeatureCollection',
+              features: []
+            };
+            setHailContours(emptyContours);
+          }
           setIsGeneratingContours(false);
         }
       }, 300); // 300ms debounce delay
