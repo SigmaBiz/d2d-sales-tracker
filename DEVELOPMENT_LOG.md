@@ -1389,4 +1389,64 @@ Format: `checkpoint-YYYYMMDD-HHMM`
 - HH: Hour in 24h format (2 digits)
 - MM: Minutes (2 digits)
 
+---
+
+## Session Summary - June 23, 2025
+
+### MRMS GRIB2 Processing Complete
+- Successfully preprocessed **372 dates** of MRMS data overnight
+- Total of **4,995 hail reports** processed across **31 storm days**
+- Data stored in `mrms-proxy-server/preprocessed/` directory
+- Preprocessing progress tracked in `preprocess-progress.json`
+
+### Critical Date Offset Bug Discovered
+**⚠️ IMPORTANT: All preprocessed MRMS data has dates that are off by one day**
+- MRMS 24-hour maximum files are dated for when they END, not when storms occurred
+- Example: May 18 file contains May 17's storm data
+- Bug documented in `CRITICAL_DATE_OFFSET_BUG.md`
+- Fix scheduled for after TestFlight deployment
+
+### Google Maps Integration Complete
+**New Branch: `feature/google-maps-integration`**
+
+Successfully migrated from OpenStreetMap/Leaflet to Google Maps:
+- ✅ **Zoom level 21** support (individual house detail vs OSM's 18-19)
+- ✅ **Google Places** address search with autocomplete
+- ✅ **Click-to-get-address** functionality via Geocoding API
+- ✅ **Free tier usage** ($200/month credit easily covers single user)
+- ✅ **MultiPolygon geometry** support added for complex hail overlays
+
+### Performance Optimizations Applied
+1. **Console logging removed** - Eliminated verbose logging during polygon creation
+2. **Overlay persistence fixed** - Overlays no longer disappear when focusing on storms
+3. **Location button optimized** - Changed from setCenter to panTo for smoother animation
+4. **Defensive contour preservation** - Prevents unnecessary overlay clearing
+5. **State update isolation** - Fixed interference when centering on user location
+
+### Branch Organization
+```
+main (v0.8.0) - Production ready
+├── develop - Integration branch
+├── feature/grib2-processing - MRMS processing (milestone completed)
+└── feature/google-maps-integration - Current branch (includes all above)
+```
+
+### Environment Updates
+```env
+EXPO_PUBLIC_MRMS_PROXY_URL=https://d2d-dynamic-server.onrender.com
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyAGXxvULS4Gl3vGiHIS-tC95AL-IDbnJJM
+```
+
+### Next Steps
+1. **Deploy to TestFlight** - Current version with Google Maps
+2. **Fix date offset bug** - After TestFlight deployment
+3. **Set up GitHub Actions** - For automated daily MRMS updates
+4. **Implement Storm Events proxy** - Currently returning 404
+
+### Testing Notes
+- Google Maps integration tested successfully in Expo Go
+- Minor lag with complex overlays reported and addressed
+- Location button no longer causes overlay flicker
+- All knock tracking features remain functional
+
 This follows semantic versioning principles while maintaining chronological ordering.
