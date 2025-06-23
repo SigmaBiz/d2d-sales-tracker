@@ -194,6 +194,115 @@ async function extractOKCMetroDataChunked(gribPath, date) {
   }
 }
 
+// Memory profiling endpoint
+app.get('/api/test/memory/:date', async (req, res) => {
+  const { date } = req.params;
+  const memoryLog = [];
+  
+  const logMemory = (step) => {
+    const usage = process.memoryUsage();
+    memoryLog.push({
+      step,
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
+      rss: Math.round(usage.rss / 1024 / 1024),
+      external: Math.round(usage.external / 1024 / 1024)
+    });
+  };
+  
+  try {
+    logMemory('start');
+    
+    // Build URL
+    const utcDate = new Date(date + 'T00:00:00Z');
+    const nextDay = new Date(utcDate);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    
+    const year = nextDay.getUTCFullYear();
+    const month = String(nextDay.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(nextDay.getUTCDate()).padStart(2, '0');
+    
+    const url = `${CONFIG.IEM_BASE_URL}/${year}/${month}/${day}/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_${year}${month}${day}-000000.grib2.gz`;
+    
+    logMemory('url_built');
+    
+    // Download file
+    const fileName = path.basename(url);
+    const gzPath = path.join(CONFIG.TEMP_DIR, fileName);
+    const gribPath = gzPath.replace('.gz', '');
+    
+    console.log('Downloading:', url);
+    const response = await axios({
+      method: 'GET',
+      url: url,
+      responseType: 'stream',
+      timeout: 30000
+    });
+    
+    logMemory('download_started');
+    
+    const writer = createWriteStream(gzPath);
+    response.data.pipe(writer);
+    
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+    
+    logMemory('download_complete');
+    
+    // Check file size
+    const gzStats = await fs.stat(gzPath);
+    const gzSizeMB = gzStats.size / 1024 / 1024;
+    
+    // Extract GZIP
+    await execPromise(`gunzip -f ${gzPath}`);
+    logMemory('gunzip_complete');
+    
+    // Check extracted size
+    const gribStats = await fs.stat(gribPath);
+    const gribSizeMB = gribStats.size / 1024 / 1024;
+    
+    // Try to count data points without loading all
+    const { stdout: lineCount } = await execPromise(
+      `grib_get_data ${gribPath} | wc -l`,
+      { timeout: 15000 }
+    );
+    
+    logMemory('line_count_complete');
+    
+    // Get sample data
+    const { stdout: sample } = await execPromise(
+      `grib_get_data ${gribPath} | head -n 100`,
+      { timeout: 10000 }
+    );
+    
+    logMemory('sample_complete');
+    
+    // Cleanup
+    await fs.unlink(gribPath).catch(() => {});
+    logMemory('cleanup_complete');
+    
+    res.json({
+      date,
+      files: {
+        compressed: `${gzSizeMB.toFixed(2)} MB`,
+        extracted: `${gribSizeMB.toFixed(2)} MB`
+      },
+      dataPoints: parseInt(lineCount.trim()) - 1,
+      memoryProfile: memoryLog,
+      sampleData: sample.split('\n').slice(0, 5)
+    });
+    
+  } catch (error) {
+    logMemory('error_occurred');
+    res.status(500).json({ 
+      error: error.message,
+      memoryProfile: memoryLog
+    });
+  }
+});
+
 // Test endpoint for debugging geographic filtering
 app.get('/api/test/coords', async (req, res) => {
   try {
