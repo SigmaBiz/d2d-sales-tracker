@@ -21,6 +21,7 @@ RUN npm ci --only=production
 # Copy server files
 COPY server-dynamic-fallback.js ./
 COPY server-dynamic-precise.js ./
+COPY server-dynamic-skipbased.js ./
 
 # Create required directories
 RUN mkdir -p cache temp
@@ -32,5 +33,5 @@ EXPOSE 3002
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3002/health || exit 1
 
-# Start the fallback server with geographic filtering
-CMD ["node", "server-dynamic-fallback.js"]
+# Start the skip-based server optimized for memory
+CMD ["node", "server-dynamic-skipbased.js"]
