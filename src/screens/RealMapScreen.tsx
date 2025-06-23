@@ -3,10 +3,12 @@ import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } fr
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 // SOLUTION SWITCHER: Comment/uncomment to try different solutions
-import WebMap from '../components/WebMap'; // Original version
+// import WebMap from '../components/WebMap'; // Original OSM/Leaflet version
+import WebMapGoogle from '../components/WebMapGoogle'; // Google Maps version
 // import WebMap from '../components/WebMapFixed'; // Fixed version with proper message queuing
 // import WebMap from '../components/WebMapSimple'; // Solution 2: Simple dots (no emojis)
 // import TestWebView from '../components/TestWebView'; // Test WebView
+import { MAPS_CONFIG } from '../config/maps.config';
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
@@ -324,7 +326,7 @@ export default function RealMapScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <WebMap 
+      <WebMapGoogle 
         ref={webMapRef}
         knocks={knocks}
         userLocation={userLocation}
@@ -332,6 +334,7 @@ export default function RealMapScreen({ navigation }: any) {
         hailContours={hailContours}
         activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
         verifiedReports={verifiedReports}
+        googleApiKey={MAPS_CONFIG.GOOGLE_MAPS_API_KEY}
       />
       
       {/* Storm Panel - Only show when toggled */}
