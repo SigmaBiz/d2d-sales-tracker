@@ -100,6 +100,20 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         let hailPolygons = [];
         let verifiedMarkers = [];
         
+        // Error handler
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+          console.error('Error: ' + msg + '\\nURL: ' + url + '\\nLine: ' + lineNo);
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'error',
+              message: msg,
+              url: url,
+              line: lineNo
+            }));
+          }
+          return false;
+        };
+        
         // Colors and emojis for knock outcomes
         const colors = {
           not_home: '#6b7280',
@@ -139,6 +153,19 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         
         // Initialize map
         function initMap() {
+          // Check if Google Maps loaded
+          if (typeof google === 'undefined' || !google.maps) {
+            console.error('Google Maps API not loaded');
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'error',
+                message: 'Google Maps API failed to load. Please check your API key and enabled APIs.'
+              }));
+            }
+            document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center;">Google Maps failed to load. Please check API key.</div>';
+            return;
+          }
+          
           const initialLat = ${userLocation ? userLocation.lat : 35.4676};
           const initialLng = ${userLocation ? userLocation.lng : -97.5164};
           
@@ -303,8 +330,10 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         // Center on user location
         window.centerOnUser = function() {
           if (userMarker) {
-            map.setCenter(userMarker.getPosition());
-            map.setZoom(18);
+            map.panTo(userMarker.getPosition());
+            if (map.getZoom() < 18) {
+              map.setZoom(18);
+            }
           }
         };
         
@@ -322,26 +351,77 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
           hailPolygons.forEach(polygon => polygon.setMap(null));
           hailPolygons = [];
           
-          if (!contours || !contours.features) return;
+          if (!contours || !contours.features) {
+            return;
+          }
           
-          contours.features.forEach(feature => {
-            if (feature.geometry.type === 'Polygon') {
-              const paths = feature.geometry.coordinates[0].map(coord => ({
-                lat: coord[1],
-                lng: coord[0]
-              }));
-              
-              const polygon = new google.maps.Polygon({
-                paths: paths,
-                strokeColor: '#FF0000',
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
-                fillColor: '#FF0000',
-                fillOpacity: 0.35,
-                map: map
-              });
-              
-              hailPolygons.push(polygon);
+          contours.features.forEach((feature, index) => {
+            if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+              try {
+                const fillColor = feature.properties.color || '#FF0000';
+                const strokeColor = feature.properties.color || '#FF0000';
+                
+                // Handle both Polygon and MultiPolygon types
+                let polygonGroups = [];
+                
+                if (feature.geometry.type === 'Polygon') {
+                  // Single polygon
+                  polygonGroups = [feature.geometry.coordinates];
+                } else if (feature.geometry.type === 'MultiPolygon') {
+                  // Multiple polygons
+                  polygonGroups = feature.geometry.coordinates;
+                }
+                
+                // Process each polygon group
+                polygonGroups.forEach((polygonCoords, groupIdx) => {
+                  // For MultiPolygon, each group can have multiple rings (outer + holes)
+                  // For Polygon, this is just the single polygon's rings
+                  const outerRing = polygonCoords[0]; // First ring is always the outer boundary
+                  
+                  if (!outerRing || !Array.isArray(outerRing)) {
+                    return;
+                  }
+                  
+                  // Create path for outer ring
+                  const paths = [];
+                  outerRing.forEach((coord) => {
+                    if (Array.isArray(coord) && coord.length >= 2) {
+                      paths.push(new google.maps.LatLng(coord[1], coord[0]));
+                    }
+                  });
+                  
+                  if (paths.length < 3) {
+                    return;
+                  }
+                  
+                  const polygon = new google.maps.Polygon({
+                    paths: paths,
+                    strokeColor: strokeColor,
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                    fillColor: fillColor,
+                    fillOpacity: 0.3,
+                    map: map
+                  });
+                  
+                  // Store bounds for later use
+                  polygon.bounds = paths;
+                  
+                  // Add click handler for info
+                  polygon.addListener('click', function(event) {
+                    const infoWindow = new google.maps.InfoWindow({
+                      content: '<div style="font-size: 14px;"><strong>Hail Zone</strong><br>' +
+                               'Size Range: ' + feature.properties.description + '</div>',
+                      position: event.latLng
+                    });
+                    infoWindow.open(map);
+                  });
+                  
+                  hailPolygons.push(polygon);
+                });
+              } catch (error) {
+                console.error('Error creating polygon', index, ':', error);
+              }
             }
           });
         };
@@ -380,10 +460,8 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         
         // Handle messages from React Native
         window.addEventListener('message', function(event) {
-          console.log('WebView received message:', event.data);
           try {
             const data = JSON.parse(event.data);
-            console.log('Parsed message type:', data.type);
             
             switch (data.type) {
               case 'centerOnUser':
@@ -391,20 +469,20 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
                 break;
                 
               case 'focusOnHail':
-                console.log('Focusing on hail contours');
                 if (hailPolygons.length > 0) {
                   const bounds = new google.maps.LatLngBounds();
                   hailPolygons.forEach(polygon => {
-                    polygon.getPath().forEach(latlng => {
-                      bounds.extend(latlng);
-                    });
+                    if (polygon.bounds) {
+                      polygon.bounds.forEach(latlng => {
+                        bounds.extend(latlng);
+                      });
+                    }
                   });
                   map.fitBounds(bounds);
                 }
                 break;
                 
               case 'focusOnBounds':
-                console.log('Focusing on specific bounds:', data.bounds);
                 if (data.bounds) {
                   const bounds = new google.maps.LatLngBounds(
                     new google.maps.LatLng(data.bounds.south, data.bounds.west),
@@ -419,13 +497,20 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
                 break;
                 
               case 'centerOnLocation':
-                console.log('Centering on location:', data.lat, data.lng);
                 if (data.lat && data.lng) {
                   map.setCenter({ lat: data.lat, lng: data.lng });
                   if (data.zoom) {
                     map.setZoom(data.zoom);
                   }
                 }
+                break;
+                
+              case 'updateHailContours':
+                updateHailContours(data.contourData);
+                break;
+                
+              case 'updateVerifiedReports':
+                updateVerifiedReports(data.reports || []);
                 break;
             }
           } catch (e) {
@@ -508,6 +593,9 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
       
       if (message.type === 'console') {
         console.log('[WebMap]:', message.message);
+      } else if (message.type === 'error') {
+        console.error('[WebMap Error]:', message.message);
+        setIsLoading(false);
       } else if (message.type === 'editKnock' && onKnockClick) {
         const knock = knocks.find(k => k.id === message.knockId);
         if (knock) {
