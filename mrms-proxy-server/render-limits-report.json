@@ -1,0 +1,36 @@
+{
+  "memory": {
+    "nodePeak": 46.89670467376709,
+    "systemBefore": 23978.5,
+    "systemPeak": 24709.4,
+    "systemAfter": 23936.7,
+    "extractionCost": 730.9000000000015,
+    "status": "FAIL"
+  },
+  "cpu": {
+    "realTime": 11312,
+    "status": "PASS",
+    "note": "Within limits"
+  },
+  "io": {
+    "downloadTime": 288,
+    "extractTime": 13,
+    "diskSpaceMB": null,
+    "status": "FAIL"
+  },
+  "time": {},
+  "processes": {
+    "current": 794,
+    "spawned": 5,
+    "status": "PASS"
+  },
+  "overall": {
+    "success": true,
+    "okcPoints": 4200,
+    "totalTime": 11397,
+    "peakMemory": 24710.2,
+    "memoryIncrease": 796.6000000000022,
+    "fitsIn2GB": false,
+    "fitsIn30s": true
+  }
+}

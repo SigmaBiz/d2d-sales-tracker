@@ -1,0 +1,44 @@
+name: Update MRMS Data
+
+on:
+  schedule:
+    # Run at 2 AM Central Time (8 AM UTC)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install ecCodes
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libeccodes-tools libeccodes-data
+        grib_get_data -V
+    
+    - name: Install dependencies
+      working-directory: ./mrms-proxy-server
+      run: npm ci
+    
+    - name: Run daily update
+      working-directory: ./mrms-proxy-server
+      run: node daily-update.js
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add mrms-proxy-server/preprocessed/
+        git diff --staged --quiet || git commit -m "chore: Update MRMS data for $(date -d yesterday +%Y-%m-%d)"
+        git push
