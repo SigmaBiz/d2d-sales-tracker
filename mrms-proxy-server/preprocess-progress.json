@@ -1,0 +1,371 @@
+{
+  "completed": [],
+  "failed": [
+    {
+      "date": "2025-06-22",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-21",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-20",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-19",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-18",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-17",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-16",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-15",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-14",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-13",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-12",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-11",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-10",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-09",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-08",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-07",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-06",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-05",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-04",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-03",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-02",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-06-01",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-31",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-30",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-29",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-28",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-27",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-26",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-25",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-24",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-23",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-22",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-21",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-20",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-19",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-18",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-17",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-16",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-15",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-14",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-13",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-12",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-11",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-10",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-09",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-08",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-07",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-06",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-05",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-04",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-03",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-02",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-05-01",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-30",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-29",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-28",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-27",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-26",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-25",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-24",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-23",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-22",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-21",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-20",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-19",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-18",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-17",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-16",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-15",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-14",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-13",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-12",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-11",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-10",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-09",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-08",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-07",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-06",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-05",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-04",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-03",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-02",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-04-01",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-31",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-30",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-29",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-28",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-27",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-26",
+      "error": "process.stdout.clearLine is not a function"
+    },
+    {
+      "date": "2025-03-25",
+      "error": "process.stdout.clearLine is not a function"
+    }
+  ],
+  "stats": {
+    "totalProcessed": 0,
+    "totalReports": 0,
+    "datesWithHail": 0,
+    "startTime": "2025-06-23T03:30:04.870Z"
+  }
+}

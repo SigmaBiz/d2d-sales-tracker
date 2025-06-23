@@ -1147,6 +1147,209 @@ TIER 3: Storm Events (Weekly) → Ground Truth → Algorithm Tuning
 - **Competitive Intelligence**: Track competitor activity
 - **Training Mode**: Onboard new reps with guided knocking
 
+## 3-TIER DATA FLOW SYSTEM - COMPREHENSIVE TODO LIST
+
+### 🎯 System Overview
+Professional-grade hail intelligence system using real NOAA MRMS data with three-tier architecture for real-time detection, historical validation, and ground truth verification.
+
+---
+
+### ⚡ TIER 1: Real-Time Storm Detection (NCEP MRMS)
+**Purpose**: Immediate storm detection for rapid canvassing deployment
+**Update Frequency**: Every 2 minutes during active weather
+**Data Source**: NCEP MRMS Real-Time Feed → GRIB2 Processing
+
+#### ✅ COMPLETED:
+- [x] Core service implementation (`tier1NCEPService.ts`)
+- [x] Storm tracking with progression timeline
+- [x] Auto-alert system with push notifications
+- [x] Quick deploy mode for area selection
+- [x] Confidence scoring (60-70% base for real-time)
+- [x] Integration with app's notification system
+- [x] Real-time server deployed at https://d2d-realtime-server.onrender.com
+- [x] Server monitoring OKC Metro bounds every 2 minutes
+- [x] Health check endpoint operational
+- [x] Connection to NCEP MRMS feed established
+
+#### 🔴 TODO:
+- [ ] **Complete Team Push Notifications**
+  - [ ] Integrate Expo Push Service for team broadcasts
+  - [ ] Add team member push tokens to database
+  - [ ] Test multi-device notification delivery
+- [ ] **SMS Alert Integration** (Optional)
+  - [ ] Twilio account setup and configuration
+  - [ ] SMS templates for critical alerts (≥2" hail)
+  - [ ] Team phone number management UI
+  - [ ] Fallback for failed push notifications
+- [ ] **Email Storm Summaries** (Optional)
+  - [ ] SendGrid/AWS SES integration
+  - [ ] Daily storm summary templates
+  - [ ] Weekly territory analysis emails
+  - [ ] Monthly performance reports
+- [ ] **Enhanced Alert Logic**
+  - [ ] Geofencing for specific territories
+  - [ ] Custom alert rules per team member
+  - [ ] Storm severity escalation thresholds
+  - [ ] Integration with calendar for availability
+
+---
+
+### 📊 TIER 2: Historical Data Validation (IEM Archives)
+**Purpose**: Validated storm data for strategic territory planning
+**Processing Time**: 24-48 hours after storm
+**Data Range**: October 2019 - Present
+
+#### ✅ COMPLETED:
+- [x] IEM Archive service implementation (`tier2IEMService.ts`)
+- [x] Pre-processing pipeline architecture designed
+- [x] Static server deployed at https://d2d-dynamic-server.onrender.com
+- [x] Memory optimization (768MB → 50MB)
+- [x] Response time improvement (30s → <10ms)
+- [x] 12 storm dates preprocessed and serving
+- [x] Successfully serving 426 reports for Sept 24, 2024
+- [x] App integration working with storm search
+- [x] Preprocessing scripts created:
+  - [x] `preprocess-all.js` - Full year processing
+  - [x] `daily-update.js` - Daily maintenance
+  - [x] `preprocess-known-storms.js` - Storm date processing
+
+#### 🔴 TODO:
+- [ ] **Complete Historical Data Processing**
+  - [ ] Run `preprocess-all.js` for full 365-day coverage
+  - [ ] Process remaining ~353 days (3-4 hour job)
+  - [ ] Verify all preprocessed files uploaded
+- [ ] **Enable Automated Daily Updates**
+  - [ ] Enable GitHub Actions workflow
+  - [ ] Configure to run at 2 AM CT daily
+  - [ ] Set up error notifications for failed processing
+  - [ ] Monitor disk usage on repository
+- [ ] **Production Optimizations**
+  - [ ] Remove date validation restrictions
+  - [ ] Add CDN for faster global access
+  - [ ] Implement data compression for JSON files
+  - [ ] Add monitoring/alerting for preprocessing failures
+- [ ] **Enhanced Features**
+  - [ ] Multi-year historical analysis
+  - [ ] Storm pattern recognition
+  - [ ] Seasonal trend analysis
+  - [ ] Territory scoring algorithms
+
+---
+
+### 🎯 TIER 3: Ground Truth Validation (Storm Events DB)
+**Purpose**: Compare predictions with actual damage for accuracy improvement
+**Frequency**: Weekly validation runs
+**Data Source**: NOAA Storm Events Database
+
+#### ✅ COMPLETED:
+- [x] Storm Events service implementation (`tier3StormEventsService.ts`)
+- [x] Weekly validation scheduling
+- [x] Accuracy metrics calculation (precision, recall, F1)
+- [x] Algorithm weight adjustment framework
+- [x] Performance analytics dashboard
+- [x] Integration with main service orchestrator
+
+#### 🔴 TODO:
+- [ ] **Storm Events API Endpoint**
+  - [ ] Create `/api/storm-events` endpoint on server
+  - [ ] Implement NOAA Storm Events data fetching
+  - [ ] Add data parsing and formatting
+  - [ ] Cache validation results
+- [ ] **Enhanced Validation Features**
+  - [ ] Historical accuracy trending
+  - [ ] Territory-specific accuracy scores
+  - [ ] Comparison with competitor claims data
+  - [ ] False positive/negative analysis by region
+- [ ] **Machine Learning Integration**
+  - [ ] Implement ML model for prediction improvement
+  - [ ] Train on historical validation data
+  - [ ] A/B testing framework for algorithm changes
+  - [ ] Automated threshold adjustments
+- [ ] **Reporting Dashboard**
+  - [ ] Monthly accuracy reports
+  - [ ] Territory reliability heat maps
+  - [ ] ROI analysis per territory
+  - [ ] Team performance correlation
+
+---
+
+### 🚀 SYSTEM-WIDE ENHANCEMENTS
+
+#### ✅ COMPLETED:
+- [x] Integrated orchestration service (`integratedHailIntelligence.ts`)
+- [x] 3-Tier Dashboard UI (`HailIntelligenceDashboard.tsx`)
+- [x] Automated scheduling for all tiers
+- [x] Fallback mechanisms for each tier
+- [x] Performance monitoring integration
+
+#### 🔴 TODO:
+- [ ] **Social Media Integration**
+  - [ ] Twitter API setup for storm validation
+  - [ ] Keyword monitoring for hail reports
+  - [ ] Confidence boost from social verification
+  - [ ] Automated screenshot capture of reports
+- [ ] **Advanced Analytics**
+  - [ ] Predictive modeling for storm paths
+  - [ ] Competition analysis overlay
+  - [ ] Income data correlation
+  - [ ] Insurance claim density mapping
+- [ ] **Enterprise Features**
+  - [ ] Multi-organization support
+  - [ ] Custom branding per team
+  - [ ] API access for third-party integration
+  - [ ] White-label deployment options
+- [ ] **Performance Optimizations**
+  - [ ] Implement Redis caching layer
+  - [ ] Database indexing for faster queries
+  - [ ] CDN for static assets
+  - [ ] Load balancing for high traffic
+
+---
+
+### 📅 IMPLEMENTATION TIMELINE
+
+#### Week 1 (Immediate):
+1. Complete Tier 2 historical data processing
+2. Enable GitHub Actions for daily updates
+3. Implement team push notifications
+4. Create Storm Events API endpoint
+
+#### Week 2-3:
+1. SMS integration with Twilio
+2. Email summaries with SendGrid
+3. Social media monitoring setup
+4. Enhanced validation features
+
+#### Month 2:
+1. Machine learning model development
+2. Advanced analytics implementation
+3. Performance optimizations
+4. Enterprise feature development
+
+---
+
+### 🛠️ TECHNICAL DEBT & MAINTENANCE
+
+#### Code Quality:
+- [ ] Add comprehensive unit tests for all services
+- [ ] Implement integration tests for data flow
+- [ ] Set up CI/CD pipeline with GitHub Actions
+- [ ] Code documentation and JSDoc comments
+
+#### Infrastructure:
+- [ ] Set up monitoring with Datadog/New Relic
+- [ ] Implement error tracking with Sentry
+- [ ] Database backup automation
+- [ ] Disaster recovery procedures
+
+#### Security:
+- [ ] API rate limiting implementation
+- [ ] Authentication for admin endpoints
+- [ ] Data encryption at rest
+- [ ] Regular security audits
+
+---
+
 ## Git Commit & Checkpoint Protocol
 
 ### Standard Commits
