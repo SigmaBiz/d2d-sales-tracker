@@ -143,7 +143,6 @@ export default function RealMapScreen({ navigation }: any) {
 
 
   const centerOnUser = () => {
-    updateLocation();
     if (webMapRef.current && userLocation) {
       webMapRef.current.postMessage(JSON.stringify({
         type: 'centerOnUser'
