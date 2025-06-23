@@ -1,0 +1,15 @@
+{
+  "startedAt": "2025-06-23T14:26:04.892Z",
+  "completed": [
+    "2025-05-17",
+    "2025-05-18",
+    "2025-05-19",
+    "2025-05-25"
+  ],
+  "failed": [],
+  "stats": {
+    "totalProcessed": 4,
+    "datesWithHail": 3,
+    "totalReports": 1531
+  }
+}

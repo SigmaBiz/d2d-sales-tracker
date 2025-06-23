@@ -1,0 +1,14 @@
+{
+  "date": "2025-05-17",
+  "generated_at": "2025-06-23T14:26:31.400Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "file_date": "2025-05-17",
+  "note": "Data from 2025-05-17 extracted from file dated 2025-05-17",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": []
+}
