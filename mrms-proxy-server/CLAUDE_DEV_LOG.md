@@ -32,3 +32,33 @@ After extensive testing, discovered that:
 - Pre-filtering at the command level is more efficient than post-processing
 - Targeted extraction can achieve massive performance gains without sacrificing accuracy
 - Memory constraints can drive innovative optimization approaches
+
+## 🚨 CRITICAL BUG: Off-by-One Date Error in MRMS Preprocessing
+
+**Date**: 2025-06-23
+**Feature**: Tier 2 - Historical Storm Data
+**Severity**: HIGH - All dates are wrong
+
+### The Bug
+All 372 preprocessed MRMS files have dates that are off by one day. Users searching for May 17 get May 18 data.
+
+### Evidence
+- May 18 MRMS file contains 58 reports (these are May 17's storms)
+- We saved 0 reports for May 17 and 58 for May 18
+- Every date is shifted forward by one day
+
+### Root Cause
+MRMS 24-hour max files are dated for when they END:
+- File 20250518-000000 covers May 17 00:00 to May 18 00:00
+- This file contains May 17's storms
+- We correctly fetch May 18 file for May 17 data
+- BUT we incorrectly save it as May 18 data
+
+### Fix Required
+1. Update preprocessing scripts to save data with correct date label
+2. Re-process all 372 dates
+3. Verify May 17 shows 58 reports (not 0)
+
+### See Also
+- CRITICAL_DATE_OFFSET_BUG.md for detailed analysis and fix instructions
+
