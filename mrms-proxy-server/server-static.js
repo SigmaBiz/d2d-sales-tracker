@@ -101,6 +101,14 @@ app.get('/api/mesh/:date', async (req, res) => {
   }
 });
 
+// Get data for specific date (local timezone endpoint)
+app.get('/api/mesh/local/:date', async (req, res) => {
+  // For now, just redirect to the regular endpoint
+  // In the future, we could handle timezone conversion here
+  req.url = `/api/mesh/${req.params.date}`;
+  app.handle(req, res);
+});
+
 // Get date range
 app.get('/api/mesh/range/:startDate/:endDate', async (req, res) => {
   try {
