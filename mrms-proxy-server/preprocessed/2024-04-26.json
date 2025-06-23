@@ -1,0 +1,29 @@
+{
+  "date": "2024-04-26",
+  "generated_at": "2025-06-23T02:26:53.651Z",
+  "data_source": "NOAA MRMS 24-hour Maximum",
+  "bounds": {
+    "north": 35.7,
+    "south": 35.1,
+    "east": -97.1,
+    "west": -97.8
+  },
+  "reports": [
+    {
+      "id": "mesh_2024-04-26_0",
+      "latitude": 35.245,
+      "longitude": -97.65499999999997,
+      "size": 0.76,
+      "timestamp": "2024-04-26T12:00:00.000Z",
+      "confidence": 75,
+      "city": "Newcastle",
+      "source": "IEM MRMS Archive",
+      "meshValue": 19.4
+    }
+  ],
+  "summary": {
+    "totalReports": 1,
+    "maxSize": 0.76,
+    "avgSize": 0.76
+  }
+}
