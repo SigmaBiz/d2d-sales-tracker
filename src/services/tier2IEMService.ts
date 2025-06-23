@@ -57,7 +57,7 @@ export class IEMArchiveService {
       const reports = data.reports || [];
       return reports.map((report: any) => ({
         ...report,
-        timestamp: new Date(report.timestamp)
+        timestamp: report.timestamp ? new Date(report.timestamp) : new Date()
       }));
     } catch (error) {
       console.error('[TIER 2] Error fetching historical data:', error);
