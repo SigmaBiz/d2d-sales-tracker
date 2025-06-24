@@ -254,7 +254,16 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         window.updateKnocks = function(knocksData) {
           console.log('updateKnocks called with', knocksData.length, 'knocks');
           
+          // Check if map is ready
+          if (!window.map) {
+            console.error('Map not ready, cannot update knocks');
+            return;
+          }
+          
+          console.log('Map is ready, proceeding with marker update');
+          
           // Clear existing markers more thoroughly
+          console.log('Clearing', markers.length, 'existing markers');
           markers.forEach(marker => {
             try {
               if (marker.setMap) {
@@ -278,9 +287,25 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             currentInfoWindow = null;
           }
           
-          knocksData.forEach(knock => {
+          console.log('Starting to process', knocksData.length, 'knocks');
+          
+          knocksData.forEach((knock, index) => {
+            console.log(\`Processing knock \${index + 1}/\${knocksData.length}:\`, {
+              id: knock.id,
+              outcome: knock.outcome,
+              lat: knock.latitude,
+              lng: knock.longitude,
+              address: knock.address
+            });
+            
             const color = colors[knock.outcome] || '#6b7280';
             const emoji = emojis[knock.outcome] || '📍';
+            
+            // Validate coordinates
+            if (!knock.latitude || !knock.longitude || isNaN(knock.latitude) || isNaN(knock.longitude)) {
+              console.error('Invalid coordinates for knock:', knock);
+              return; // Skip this knock
+            }
             
             // Create a custom HTML marker for better click detection
             const MarkerWithLabel = function(position, map) {
@@ -370,13 +395,20 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
               google.maps.OverlayView.prototype.setMap.call(this, map);
             };
             
-            const customMarker = new MarkerWithLabel(
-              new google.maps.LatLng(knock.latitude, knock.longitude),
-              map
-            );
-            
-            markers.push(customMarker);
+            try {
+              const customMarker = new MarkerWithLabel(
+                new google.maps.LatLng(knock.latitude, knock.longitude),
+                map
+              );
+              
+              markers.push(customMarker);
+              console.log(\`Successfully created marker \${index + 1} for knock \${knock.id}\`);
+            } catch (error) {
+              console.error(\`Failed to create marker for knock \${knock.id}:\`, error);
+            }
           });
+          
+          console.log(\`Finished processing knocks. Created \${markers.length} markers out of \${knocksData.length} knocks\`);
         };
         
         // Show knock info
