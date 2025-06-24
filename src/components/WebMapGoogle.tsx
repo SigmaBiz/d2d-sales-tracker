@@ -308,6 +308,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         
         // Update user location
         window.updateUserLocation = function(lat, lng) {
+          console.log('updateUserLocation called with:', lat, lng);
           if (userMarker) {
             userMarker.setPosition({ lat, lng });
           } else {
@@ -324,16 +325,27 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
               },
               zIndex: 1000
             });
+            console.log('Created userMarker at:', lat, lng);
           }
         };
         
         // Center on user location
         window.centerOnUser = function() {
+          console.log('centerOnUser called, userMarker:', userMarker);
           if (userMarker) {
-            map.panTo(userMarker.getPosition());
+            const position = userMarker.getPosition();
+            console.log('Centering on position:', position.lat(), position.lng());
+            map.panTo(position);
             if (map.getZoom() < 18) {
               map.setZoom(18);
             }
+          } else {
+            console.log('No userMarker available');
+            // If no user marker, try to use the initial location
+            const initialLat = ${userLocation ? userLocation.lat : 35.4676};
+            const initialLng = ${userLocation ? userLocation.lng : -97.5164};
+            map.panTo({ lat: initialLat, lng: initialLng });
+            map.setZoom(18);
           }
         };
         
