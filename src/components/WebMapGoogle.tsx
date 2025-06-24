@@ -95,6 +95,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         let map;
         let markers = [];
         let userMarker = null;
+        let userAccuracyCircle = null;
         let searchBox;
         let currentMapType = 'roadmap';
         let hailPolygons = [];
@@ -309,21 +310,41 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         // Update user location
         window.updateUserLocation = function(lat, lng) {
           console.log('updateUserLocation called with:', lat, lng);
+          const position = { lat, lng };
+          
           if (userMarker) {
-            userMarker.setPosition({ lat, lng });
+            userMarker.setPosition(position);
+            if (userAccuracyCircle) {
+              userAccuracyCircle.setCenter(position);
+            }
           } else {
+            // Create accuracy circle (light blue pulse effect)
+            userAccuracyCircle = new google.maps.Circle({
+              center: position,
+              radius: 50, // 50 meters
+              strokeColor: '#3b82f6',
+              strokeOpacity: 0.3,
+              strokeWeight: 1,
+              fillColor: '#3b82f6',
+              fillOpacity: 0.15,
+              map: map,
+              zIndex: 999
+            });
+            
+            // Create the main marker
             userMarker = new google.maps.Marker({
-              position: { lat, lng },
+              position: position,
               map: map,
               icon: {
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
+                scale: 12,
                 fillColor: '#3b82f6',
-                fillOpacity: 0.8,
+                fillOpacity: 1,
                 strokeColor: 'white',
                 strokeWeight: 3
               },
-              zIndex: 1000
+              zIndex: 9999,
+              title: 'Your Location'
             });
             console.log('Created userMarker at:', lat, lng);
           }
