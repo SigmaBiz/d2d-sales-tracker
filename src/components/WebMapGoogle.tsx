@@ -734,7 +734,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
           }
           true;
         `;
-        webViewRef.current.injectJavaScript(jsCode);
+        webViewRef.current?.injectJavaScript(jsCode);
       }, 500);
     }
   }, [userLocation, isLoading]);
