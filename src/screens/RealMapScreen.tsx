@@ -40,10 +40,13 @@ export default function RealMapScreen({ navigation }: any) {
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
   const [showNotificationLog, setShowNotificationLog] = useState(false);
   const [clearedKnockIds, setClearedKnockIds] = useState<Set<string>>(new Set());
+  const [clearedKnocksLoaded, setClearedKnocksLoaded] = useState(false);
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Load cleared knock IDs first
+    loadClearedKnockIds();
     initializeMap();
     loadKnocks();
     loadHailData();
@@ -84,12 +87,19 @@ export default function RealMapScreen({ navigation }: any) {
     });
 
     return unsubscribe;
-  }, [navigation, clearedKnockIds]); // Add clearedKnockIds as dependency
+  }, [navigation]); // Remove clearedKnockIds to prevent loops
 
   // Monitor hailContours state changes
   useEffect(() => {
     console.log('RealMapScreen - hailContours state updated:', hailContours);
   }, [hailContours]);
+
+  // Load knocks when cleared IDs are loaded
+  useEffect(() => {
+    if (clearedKnocksLoaded) {
+      loadKnocks();
+    }
+  }, [clearedKnocksLoaded]);
 
   const initializeMap = async () => {
     const hasPermission = await LocationService.requestPermissions();
@@ -117,7 +127,25 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
+  const loadClearedKnockIds = async () => {
+    try {
+      const clearedIds = await StorageService.getClearedKnockIds();
+      setClearedKnockIds(clearedIds);
+      setClearedKnocksLoaded(true);
+      console.log('Loaded cleared knock IDs:', Array.from(clearedIds));
+    } catch (error) {
+      console.error('Error loading cleared knock IDs:', error);
+      setClearedKnocksLoaded(true);
+    }
+  };
+
   const loadKnocks = async () => {
+    // Wait for cleared knocks to load first
+    if (!clearedKnocksLoaded) {
+      console.log('Waiting for cleared knocks to load...');
+      return;
+    }
+    
     setLoading(true);
     try {
       // First get local knocks
@@ -338,10 +366,20 @@ export default function RealMapScreen({ navigation }: any) {
   const handleKnockDelete = async (knockId: string) => {
     try {
       // Add to cleared set
-      setClearedKnockIds(prev => new Set([...prev, knockId]));
+      setClearedKnockIds(prev => {
+        const newSet = new Set([...prev, knockId]);
+        console.log('Updated clearedKnockIds:', Array.from(newSet));
+        // Persist to storage
+        StorageService.saveClearedKnockIds(newSet);
+        return newSet;
+      });
       
       // Remove from current view
-      setKnocks(prevKnocks => prevKnocks.filter(knock => knock.id !== knockId));
+      setKnocks(prevKnocks => {
+        const filtered = prevKnocks.filter(knock => knock.id !== knockId);
+        console.log('Knocks after clearing:', filtered.length, 'removed:', knockId);
+        return filtered;
+      });
       
       console.log('Knock cleared from map:', knockId);
     } catch (error) {
@@ -496,9 +534,11 @@ export default function RealMapScreen({ navigation }: any) {
         <TouchableOpacity 
           style={styles.actionButton} 
           onPress={loadKnocks}
-          onLongPress={() => {
+          onLongPress={async () => {
             // Clear the cleared knocks set to show all knocks again
             setClearedKnockIds(new Set());
+            await StorageService.clearClearedKnockIds();
+            console.log('Cleared all hidden knocks');
             loadKnocks();
           }}
         >

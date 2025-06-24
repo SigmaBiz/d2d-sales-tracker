@@ -245,14 +245,31 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         
         // Update knock markers
         window.updateKnocks = function(knocksData) {
-          // Clear existing markers
+          console.log('updateKnocks called with', knocksData.length, 'knocks');
+          
+          // Clear existing markers more thoroughly
           markers.forEach(marker => {
-            if (marker.setMap) marker.setMap(null);
-            if (marker.div && marker.div.parentNode) {
-              marker.div.parentNode.removeChild(marker.div);
+            try {
+              if (marker.setMap) {
+                marker.setMap(null);
+              }
+              if (marker.onRemove) {
+                marker.onRemove();
+              }
+              if (marker.div && marker.div.parentNode) {
+                marker.div.parentNode.removeChild(marker.div);
+              }
+            } catch (e) {
+              console.error('Error removing marker:', e);
             }
           });
           markers = [];
+          
+          // Close any open info windows
+          if (currentInfoWindow) {
+            currentInfoWindow.close();
+            currentInfoWindow = null;
+          }
           
           knocksData.forEach(knock => {
             const color = colors[knock.outcome] || '#6b7280';
@@ -329,10 +346,21 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             };
             
             MarkerWithLabel.prototype.onRemove = function() {
-              if (this.div) {
-                this.div.parentNode.removeChild(this.div);
+              if (this.div && this.div.parentNode) {
+                // Remove all event listeners by cloning
+                const parent = this.div.parentNode;
+                const newDiv = this.div.cloneNode(false);
+                parent.replaceChild(newDiv, this.div);
+                parent.removeChild(newDiv);
                 this.div = null;
               }
+            };
+            
+            MarkerWithLabel.prototype.setMap = function(map) {
+              if (map === null) {
+                this.onRemove();
+              }
+              google.maps.OverlayView.prototype.setMap.call(this, map);
             };
             
             const customMarker = new MarkerWithLabel(
@@ -646,20 +674,25 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
 
   // Update knocks when they change
   useEffect(() => {
-    if (webViewRef.current && !isLoading && knocks.length > 0) {
+    if (webViewRef.current && !isLoading) {
+      // Always update, even with empty array to clear old markers
       const knocksString = JSON.stringify(knocks);
-      webViewRef.current.postMessage(JSON.stringify({
-        type: 'updateKnocks',
-        data: knocks
-      }));
       
-      const jsCode = `
-        if (typeof updateKnocks === 'function') {
-          updateKnocks(${knocksString});
+      // Add a small delay to ensure proper cleanup
+      setTimeout(() => {
+        const jsCode = `
+          if (typeof updateKnocks === 'function') {
+            console.log('[WebMap] Updating knocks with ${knocks.length} items');
+            updateKnocks(${knocksString});
+          } else {
+            console.error('[WebMap] updateKnocks function not found!');
+          }
+          true;
+        `;
+        if (webViewRef.current) {
+          webViewRef.current.injectJavaScript(jsCode);
         }
-        true;
-      `;
-      webViewRef.current.injectJavaScript(jsCode);
+      }, 100);
     }
   }, [knocks, isLoading]);
 

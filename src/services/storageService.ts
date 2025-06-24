@@ -9,6 +9,7 @@ const KEYS = {
   SETTINGS: '@settings',
   CONTACT_FORMS: '@contact_forms',
   NOTIFICATION_LOG: '@notification_log',
+  CLEARED_KNOCK_IDS: '@cleared_knock_ids',
 };
 
 export class StorageService {
@@ -228,6 +229,27 @@ export class StorageService {
 
   static async clearNotificationLog(): Promise<void> {
     await AsyncStorage.removeItem(KEYS.NOTIFICATION_LOG);
+  }
+
+  // Cleared Knock IDs
+  static async saveClearedKnockIds(ids: Set<string>): Promise<void> {
+    const idsArray = Array.from(ids);
+    await AsyncStorage.setItem(KEYS.CLEARED_KNOCK_IDS, JSON.stringify(idsArray));
+  }
+
+  static async getClearedKnockIds(): Promise<Set<string>> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.CLEARED_KNOCK_IDS);
+      const idsArray = data ? JSON.parse(data) : [];
+      return new Set(idsArray);
+    } catch (error) {
+      console.error('Error getting cleared knock IDs:', error);
+      return new Set();
+    }
+  }
+
+  static async clearClearedKnockIds(): Promise<void> {
+    await AsyncStorage.removeItem(KEYS.CLEARED_KNOCK_IDS);
   }
 
   // Clear all data
