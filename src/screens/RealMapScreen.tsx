@@ -45,12 +45,17 @@ export default function RealMapScreen({ navigation }: any) {
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Load cleared knock IDs first
-    loadClearedKnockIds();
-    initializeMap();
-    loadKnocks();
-    loadHailData();
-    initializeHailAlerts();
+    // Initialize everything
+    const initialize = async () => {
+      // Load cleared knock IDs first
+      await loadClearedKnockIds();
+      initializeMap();
+      loadKnocks();
+      loadHailData();
+      initializeHailAlerts();
+    };
+    
+    initialize();
     
     // Test contour generation
     console.log('Running contour generation test...');
@@ -94,12 +99,7 @@ export default function RealMapScreen({ navigation }: any) {
     console.log('RealMapScreen - hailContours state updated:', hailContours);
   }, [hailContours]);
 
-  // Load knocks when cleared IDs are loaded
-  useEffect(() => {
-    if (clearedKnocksLoaded) {
-      loadKnocks();
-    }
-  }, [clearedKnocksLoaded]);
+  // Remove the effect that waits for clearedKnocksLoaded since we handle it inside loadKnocks now
 
   const initializeMap = async () => {
     const hasPermission = await LocationService.requestPermissions();
@@ -133,28 +133,30 @@ export default function RealMapScreen({ navigation }: any) {
       setClearedKnockIds(clearedIds);
       setClearedKnocksLoaded(true);
       console.log('Loaded cleared knock IDs:', Array.from(clearedIds));
+      return clearedIds;
     } catch (error) {
       console.error('Error loading cleared knock IDs:', error);
       setClearedKnocksLoaded(true);
+      return new Set<string>();
     }
   };
 
   const loadKnocks = async () => {
-    // Wait for cleared knocks to load first
-    if (!clearedKnocksLoaded) {
-      console.log('Waiting for cleared knocks to load...');
-      return;
-    }
-    
     setLoading(true);
     try {
+      // Ensure cleared knock IDs are loaded
+      let currentClearedIds = clearedKnockIds;
+      if (!clearedKnocksLoaded) {
+        currentClearedIds = await loadClearedKnockIds();
+      }
       // First get local knocks
       const localKnocks = await StorageService.getKnocks();
       console.log('Loaded knocks:', localKnocks.length);
       
-      // Filter out cleared knocks
-      const filteredKnocks = localKnocks.filter(knock => !clearedKnockIds.has(knock.id));
+      // Filter out cleared knocks using current cleared IDs
+      const filteredKnocks = localKnocks.filter(knock => !currentClearedIds.has(knock.id));
       setKnocks(filteredKnocks);
+      console.log(`Loaded ${localKnocks.length} knocks, showing ${filteredKnocks.length} after filtering`);
       
       // Then try to get cloud knocks if connected
       const cloudKnocks = await SupabaseService.getCloudKnocks();
@@ -162,7 +164,7 @@ export default function RealMapScreen({ navigation }: any) {
         // Merge cloud and local knocks, removing duplicates
         const knockMap = new Map();
         [...localKnocks, ...cloudKnocks].forEach(knock => {
-          if (!clearedKnockIds.has(knock.id)) {
+          if (!currentClearedIds.has(knock.id)) {
             knockMap.set(knock.id, knock);
           }
         });

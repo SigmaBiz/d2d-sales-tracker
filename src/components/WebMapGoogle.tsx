@@ -95,6 +95,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
       <button class="map-type-btn" onclick="toggleMapType()">🛰️</button>
       <div id="map"></div>
       <script>
+        console.log('[WebMap] Script started loading');
         let map;
         let markers = [];
         let userMarker = null;
@@ -159,6 +160,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         
         // Initialize map
         function initMap() {
+          console.log('initMap called - checking Google Maps API...');
           // Check if Google Maps loaded
           if (typeof google === 'undefined' || !google.maps) {
             console.error('Google Maps API not loaded');
@@ -186,6 +188,10 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             maxZoom: 21,  // Maximum zoom for individual houses
             mapTypeId: 'roadmap'
           });
+          
+          // Make map globally accessible
+          window.map = map;
+          console.log('Map created and set to window.map');
           
           // Set up address search
           const input = document.getElementById('search-box');
@@ -231,6 +237,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
           });
           
           // Send ready message
+          console.log('Sending mapReady message to React Native');
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'mapReady'
           }));
@@ -674,25 +681,41 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
 
   // Update knocks when they change
   useEffect(() => {
+    console.log('[WebMapGoogle] Knocks effect triggered:', knocks.length, 'isLoading:', isLoading);
     if (webViewRef.current && !isLoading) {
       // Always update, even with empty array to clear old markers
       const knocksString = JSON.stringify(knocks);
       
-      // Add a small delay to ensure proper cleanup
-      setTimeout(() => {
-        const jsCode = `
-          if (typeof updateKnocks === 'function') {
-            console.log('[WebMap] Updating knocks with ${knocks.length} items');
-            updateKnocks(${knocksString});
-          } else {
-            console.error('[WebMap] updateKnocks function not found!');
+      const jsCode = `
+        (function() {
+          const attemptUpdate = () => {
+            if (typeof updateKnocks === 'function' && window.map) {
+              console.log('[WebMap] Updating knocks with ${knocks.length} items');
+              updateKnocks(${knocksString});
+              return true;
+            }
+            return false;
+          };
+          
+          // Try immediately
+          if (!attemptUpdate()) {
+            console.warn('[WebMap] Map or updateKnocks not ready, retrying...');
+            // Retry a few times with increasing delays
+            let attempts = 0;
+            const retryInterval = setInterval(() => {
+              attempts++;
+              if (attemptUpdate() || attempts >= 5) {
+                clearInterval(retryInterval);
+                if (attempts >= 5) {
+                  console.error('[WebMap] Failed to update knocks after 5 attempts');
+                }
+              }
+            }, 200);
           }
-          true;
-        `;
-        if (webViewRef.current) {
-          webViewRef.current.injectJavaScript(jsCode);
-        }
-      }, 100);
+        })();
+        true;
+      `;
+      webViewRef.current.injectJavaScript(jsCode);
     }
   }, [knocks, isLoading]);
 
