@@ -198,14 +198,18 @@ d2d-sales-tracker/
 ✅ **Progressive sales workflow tracking**
 
 ### Map Features Added
-- Full interactive map using Leaflet/OpenStreetMap via WebView
+- Full interactive map using Google Maps via WebView
 - Shows all previous knocks as colored pins with emojis
-- Current location shown with blue pulsing dot
+- Current location shown with Google Maps style blue dot (fixed 2025-06-24)
 - Click pins to see knock details including contact form data
 - Real-time stats bar showing total knocks, sales, leads
 - Refresh button to reload knocks
-- Center-on-user button
+- Center-on-user button (smooth panTo animation)
 - Works in Expo Go with WebView
+- Address search with Google Places autocomplete
+- Click-to-get-address functionality
+- Zoom level 21 support for individual house detail
+- Clear button in popups to temporarily hide knocks
 
 ### Roofing-Specific Customizations (Latest Updates)
 - **Updated knock outcomes with specific emojis:**
@@ -1450,3 +1454,63 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyAGXxvULS4Gl3vGiHIS-tC95AL-IDbnJJM
 - All knock tracking features remain functional
 
 This follows semantic versioning principles while maintaining chronological ordering.
+
+## Session Summary - June 24, 2025
+
+### Google Maps Integration Bug Fixes
+**Branch: `feature/google-maps-integration`**
+
+Fixed multiple critical issues affecting the Google Maps integration:
+
+1. **User Location Marker Fixed**
+   - Issue: userMark (blue dot for user location) was not displaying
+   - Root cause: Marker was being created before map was ready
+   - Solution: Added null check for map instance before creating marker
+   - Result: User location now shows properly with Google Maps style blue dot
+
+2. **WebView Recreation Issue Resolved**
+   - Issue: Map was re-centering on every location update due to WebView recreation
+   - Root cause: HTML content was changing on every render
+   - Solution: Memoized HTML content and separated location updates via postMessage
+   - Result: Smooth location updates without map jumping
+
+3. **User Location Styling Improved**
+   - Changed from large pulsing blue dot to subtle Google Maps style marker
+   - Blue dot with white border, more professional appearance
+   - Consistent with native Google Maps user experience
+
+4. **D2D Label Navigation Fixed**
+   - Issue: Clicking D2D labels was navigating directly to edit screen
+   - Root cause: Click handler was bypassing the popup display
+   - Solution: Fixed event handling to show popup first, then allow edit via button
+   - Result: Proper workflow - click label → see popup → click Edit to modify
+
+5. **Knock Popup Enhancement**
+   - Added "Clear" button to knock popups
+   - Allows removing knock from current view without deleting data
+   - Useful for temporary decluttering of the map
+   - Clear button positioned next to Edit button in popup
+
+6. **Development Settings Restored**
+   - GPS updates disabled for development (DEV_DISABLE_GPS_UPDATES = true)
+   - Reduces console spam and battery usage during development
+   - Remember to enable for production deployment
+
+### Technical Implementation Details
+- Used React.useMemo to stabilize WebView HTML content
+- Separated map initialization from location updates
+- Improved marker creation timing and lifecycle management
+- Enhanced popup button layout and functionality
+
+### Testing Notes
+- All fixes tested successfully in Expo Go
+- User location marker displays correctly
+- Map remains stable during location updates
+- D2D label clicking works as expected
+- Clear button functionality verified
+
+### Current State
+- Google Maps integration fully functional
+- All major UI/UX issues resolved
+- Ready for continued development or deployment
+- GPS updates disabled for development comfort

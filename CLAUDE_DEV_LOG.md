@@ -1829,3 +1829,69 @@ The line-based approach (server-dynamic-precise.js) works perfectly locally. The
 **DO NOT** spend more time trying to make real-time processing work on free tier. The 512MB limit + timeout is insurmountable for 24.5M data points.
 
 **Context at 88%** - Approaching limit. UPGRADE RENDER OR PRE-COMPUTE DATA.
+
+### 2025-06-24 - Google Maps Integration Bug Fixes
+**Session Focus**: Fix critical issues with Google Maps integration
+
+**Branch**: `feature/google-maps-integration`
+
+**Key Issues Fixed**:
+
+1. **User Location Marker Not Displaying**
+   - **Problem**: Blue dot for user location wasn't showing on map
+   - **Root Cause**: Marker was being created before map instance was ready
+   - **Solution**: Added null check for map before creating userMark
+   - **Result**: User location now displays with Google Maps style blue dot
+
+2. **WebView Recreation on Location Updates**
+   - **Problem**: Map was jumping/re-centering on every GPS update
+   - **Root Cause**: HTML content changing on every render caused WebView recreation
+   - **Solution**: Used React.useMemo to memoize HTML, location updates via postMessage
+   - **Result**: Smooth location updates without map disruption
+
+3. **User Location Marker Styling**
+   - **Change**: Replaced large pulsing dot with subtle Google Maps style marker
+   - **Implementation**: Blue dot with white border, smaller size
+   - **Benefit**: More professional appearance consistent with native maps
+
+4. **D2D Label Click Navigation**
+   - **Problem**: Clicking labels went directly to edit screen
+   - **Root Cause**: Click handler bypassed popup display
+   - **Solution**: Fixed event flow to show popup first
+   - **Result**: Proper workflow - click → popup → edit button
+
+5. **Clear Button Added to Popups**
+   - **Feature**: New "Clear" button in knock popups
+   - **Purpose**: Remove knock from view without deleting data
+   - **Use Case**: Temporary map decluttering
+   - **Implementation**: Button positioned next to Edit in popup
+
+6. **Development Settings**
+   - **Change**: Restored DEV_DISABLE_GPS_UPDATES = true
+   - **Benefit**: Reduces console spam during development
+   - **Note**: Must enable for production deployment
+
+**Technical Details**:
+- Memoized WebView HTML content to prevent recreation
+- Separated map initialization from location updates
+- Improved marker lifecycle management
+- Enhanced popup button layout
+
+**Files Modified**:
+- `src/components/WebMapGoogle.tsx` - Main fixes for markers and updates
+- `src/screens/RealMapScreen.tsx` - GPS update settings
+
+**Testing Results**:
+- ✅ User location marker displays correctly
+- ✅ Map remains stable during location updates
+- ✅ D2D label clicks work properly
+- ✅ Clear button functions as expected
+- ✅ All features tested in Expo Go
+
+**Current Status**:
+- Google Maps integration fully functional
+- All major UI/UX issues resolved
+- Ready for continued development or deployment
+- Development-friendly settings in place
+
+**Context**: This session focused on polishing the Google Maps integration to ensure a smooth user experience and fix critical bugs that were impacting usability.

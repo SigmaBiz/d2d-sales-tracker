@@ -329,6 +329,17 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
+  const handleKnockDelete = async (knockId: string) => {
+    try {
+      // Just remove from current view, don't delete permanently
+      setKnocks(prevKnocks => prevKnocks.filter(knock => knock.id !== knockId));
+      
+      console.log('Knock removed from map:', knockId);
+    } catch (error) {
+      console.error('Error removing knock:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <WebMapGoogle 
@@ -336,6 +347,7 @@ export default function RealMapScreen({ navigation }: any) {
         knocks={knocks}
         userLocation={userLocation}
         onKnockClick={handleMapClick}
+        onKnockDelete={handleKnockDelete}
         hailContours={hailContours}
         activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
         verifiedReports={verifiedReports}

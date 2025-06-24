@@ -7,6 +7,7 @@ interface WebMapGoogleProps {
   knocks: Knock[];
   userLocation: { lat: number; lng: number } | null;
   onKnockClick?: (knock: Knock) => void;
+  onKnockDelete?: (knockId: string) => void;
   hailContours?: any;
   activeStorms?: string[];
   verifiedReports?: any[];
@@ -17,6 +18,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
   knocks, 
   userLocation, 
   onKnockClick, 
+  onKnockDelete,
   hailContours = null, 
   activeStorms = [], 
   verifiedReports = [],
@@ -28,6 +30,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
   // Expose WebView methods to parent
   React.useImperativeHandle(ref, () => webViewRef.current as WebView);
 
+  // Only recreate HTML when API key changes, not when location updates
   const mapHTML = React.useMemo(() => `
     <!DOCTYPE html>
     <html>
@@ -100,6 +103,8 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         let currentMapType = 'roadmap';
         let hailPolygons = [];
         let verifiedMarkers = [];
+        let isClickingMarker = false;
+        let currentInfoWindow = null;
         
         // Error handler
         window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -167,8 +172,9 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             return;
           }
           
-          const initialLat = ${userLocation ? userLocation.lat : 35.4676};
-          const initialLng = ${userLocation ? userLocation.lng : -97.5164};
+          // Use OKC as default center
+          const initialLat = 35.4676;
+          const initialLng = -97.5164;
           
           map = new google.maps.Map(document.getElementById('map'), {
             zoom: 16,
@@ -206,6 +212,11 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
           
           // Click to get address
           map.addListener('click', (event) => {
+            // Don't process map clicks if we're clicking on a marker
+            if (isClickingMarker) {
+              return;
+            }
+            
             const geocoder = new google.maps.Geocoder();
             geocoder.geocode({ location: event.latLng }, (results, status) => {
               if (status === 'OK' && results[0]) {
@@ -235,52 +246,101 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         // Update knock markers
         window.updateKnocks = function(knocksData) {
           // Clear existing markers
-          markers.forEach(marker => marker.setMap(null));
+          markers.forEach(marker => {
+            if (marker.setMap) marker.setMap(null);
+            if (marker.div && marker.div.parentNode) {
+              marker.div.parentNode.removeChild(marker.div);
+            }
+          });
           markers = [];
           
           knocksData.forEach(knock => {
             const color = colors[knock.outcome] || '#6b7280';
             const emoji = emojis[knock.outcome] || '📍';
             
-            const marker = new google.maps.Marker({
-              position: { lat: knock.latitude, lng: knock.longitude },
-              map: map,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 0
-              }
-            });
+            // Create a custom HTML marker for better click detection
+            const MarkerWithLabel = function(position, map) {
+              this.position = position;
+              this.map = map;
+              this.div = null;
+              this.setMap(map);
+            };
             
-            // Create custom overlay for emoji marker
-            const overlay = new google.maps.OverlayView();
-            overlay.onAdd = function() {
+            MarkerWithLabel.prototype = new google.maps.OverlayView();
+            
+            MarkerWithLabel.prototype.onAdd = function() {
               const div = document.createElement('div');
               div.style.position = 'absolute';
-              div.innerHTML = '<div style="background-color: ' + color + '; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer;">' + emoji + '</div>';
+              div.style.cursor = 'pointer';
+              div.style.userSelect = 'none';
+              div.style.width = '28px';
+              div.style.height = '28px';
               
-              div.onclick = () => {
+              const innerDiv = document.createElement('div');
+              innerDiv.style.backgroundColor = color;
+              innerDiv.style.width = '24px';
+              innerDiv.style.height = '24px';
+              innerDiv.style.borderRadius = '50%';
+              innerDiv.style.border = '2px solid white';
+              innerDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+              innerDiv.style.display = 'flex';
+              innerDiv.style.alignItems = 'center';
+              innerDiv.style.justifyContent = 'center';
+              innerDiv.style.fontSize = '14px';
+              innerDiv.textContent = emoji;
+              
+              div.appendChild(innerDiv);
+              
+              // Make the click area larger for easier tapping
+              div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                isClickingMarker = true;
                 showKnockInfo(knock);
-              };
+                // Reset flag after a short delay
+                setTimeout(() => { isClickingMarker = false; }, 500);
+              });
+              
+              // Also prevent mousedown to stop any early event propagation
+              div.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                isClickingMarker = true;
+              });
+              
+              div.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                isClickingMarker = true;
+              });
               
               this.div = div;
               const panes = this.getPanes();
-              panes.overlayMouseTarget.appendChild(div);
+              // Use floatPane which is above other map layers
+              panes.floatPane.appendChild(div);
             };
             
-            overlay.draw = function() {
-              const projection = this.getProjection();
-              const position = projection.fromLatLngToDivPixel(marker.getPosition());
+            MarkerWithLabel.prototype.draw = function() {
+              const overlayProjection = this.getProjection();
+              const pos = overlayProjection.fromLatLngToDivPixel(this.position);
               const div = this.div;
-              div.style.left = (position.x - 12) + 'px';
-              div.style.top = (position.y - 12) + 'px';
+              if (div) {
+                div.style.left = (pos.x - 14) + 'px';
+                div.style.top = (pos.y - 14) + 'px';
+              }
             };
             
-            overlay.onRemove = function() {
-              this.div.parentNode.removeChild(this.div);
+            MarkerWithLabel.prototype.onRemove = function() {
+              if (this.div) {
+                this.div.parentNode.removeChild(this.div);
+                this.div = null;
+              }
             };
             
-            overlay.setMap(map);
-            markers.push(overlay);
+            const customMarker = new MarkerWithLabel(
+              new google.maps.LatLng(knock.latitude, knock.longitude),
+              map
+            );
+            
+            markers.push(customMarker);
           });
         };
         
@@ -296,8 +356,16 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             content += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>Notes:</strong><br>' + knock.notes.replace(/\\n/g, '<br>') + '</div>';
           }
           
-          content += '<div style="margin-top: 10px;"><button onclick="window.editKnock(\\\'' + knock.id + '\\\')" style="background-color: #1e40af; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Edit</button></div>';
+          content += '<div style="margin-top: 10px; display: flex; gap: 8px;">';
+          content += '<button onclick="window.editKnock(\\\'' + knock.id + '\\\')" style="background-color: #1e40af; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; flex: 1;">Edit</button>';
+          content += '<button onclick="window.deleteKnock(\\\'' + knock.id + '\\\')" style="background-color: #6b7280; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; flex: 1;">Clear</button>';
           content += '</div>';
+          content += '</div>';
+          
+          // Close any existing info window
+          if (currentInfoWindow) {
+            currentInfoWindow.close();
+          }
           
           const infoWindow = new google.maps.InfoWindow({
             content: content,
@@ -305,6 +373,8 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
           });
           
           infoWindow.open(map);
+          currentInfoWindow = infoWindow;
+          window.currentInfoWindow = infoWindow;
         }
         
         // Update user location
@@ -313,40 +383,44 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
           const position = { lat, lng };
           
           if (userMarker) {
+            console.log('Updating existing userMarker position');
             userMarker.setPosition(position);
             if (userAccuracyCircle) {
               userAccuracyCircle.setCenter(position);
             }
           } else {
-            // Create accuracy circle (light blue pulse effect)
+            console.log('Creating new userMarker and accuracy circle');
+            // Create accuracy circle (light blue, very subtle)
             userAccuracyCircle = new google.maps.Circle({
               center: position,
-              radius: 50, // 50 meters
-              strokeColor: '#3b82f6',
-              strokeOpacity: 0.3,
-              strokeWeight: 1,
-              fillColor: '#3b82f6',
-              fillOpacity: 0.15,
+              radius: 5, // Very small radius, just a subtle glow
+              strokeColor: '#4285F4',
+              strokeOpacity: 0.15,
+              strokeWeight: 0,
+              fillColor: '#4285F4',
+              fillOpacity: 0.08, // Even more subtle
               map: map,
               zIndex: 999
             });
             
-            // Create the main marker
+            // Create the main marker - standard size blue dot
             userMarker = new google.maps.Marker({
               position: position,
               map: map,
               icon: {
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 12,
-                fillColor: '#3b82f6',
+                scale: 9, // Bigger dot
+                fillColor: '#4285F4', // Google Maps blue
                 fillOpacity: 1,
                 strokeColor: 'white',
-                strokeWeight: 3
+                strokeWeight: 2.5
               },
               zIndex: 9999,
               title: 'Your Location'
             });
-            console.log('Created userMarker at:', lat, lng);
+            console.log('Created userMarker:', userMarker);
+            console.log('Created userAccuracyCircle:', userAccuracyCircle);
+            console.log('Map object:', map);
           }
         };
         
@@ -362,11 +436,6 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             }
           } else {
             console.log('No userMarker available');
-            // If no user marker, try to use the initial location
-            const initialLat = ${userLocation ? userLocation.lat : 35.4676};
-            const initialLng = ${userLocation ? userLocation.lng : -97.5164};
-            map.panTo({ lat: initialLat, lng: initialLng });
-            map.setZoom(18);
           }
         };
         
@@ -374,6 +443,19 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
         window.editKnock = function(knockId) {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'editKnock',
+            knockId: knockId
+          }));
+        };
+        
+        // Delete knock handler
+        window.deleteKnock = function(knockId) {
+          // Close any open info windows
+          if (window.currentInfoWindow) {
+            window.currentInfoWindow.close();
+          }
+          
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'deleteKnock',
             knockId: knockId
           }));
         };
@@ -560,7 +642,7 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
       </script>
     </body>
     </html>
-  `, [userLocation, googleApiKey]);
+  `, [googleApiKey]); // Only recreate when API key changes
 
   // Update knocks when they change
   useEffect(() => {
@@ -583,14 +665,21 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
 
   // Update user location
   useEffect(() => {
+    console.log('[WebMapGoogle] userLocation effect triggered:', userLocation, 'isLoading:', isLoading);
     if (webViewRef.current && !isLoading && userLocation) {
-      const jsCode = `
-        if (typeof updateUserLocation === 'function') {
-          updateUserLocation(${userLocation.lat}, ${userLocation.lng});
-        }
-        true;
-      `;
-      webViewRef.current.injectJavaScript(jsCode);
+      // Add a small delay to ensure map is fully initialized
+      setTimeout(() => {
+        const jsCode = `
+          console.log('[WebMap] Injecting updateUserLocation call');
+          if (typeof updateUserLocation === 'function') {
+            updateUserLocation(${userLocation.lat}, ${userLocation.lng});
+          } else {
+            console.error('[WebMap] updateUserLocation function not found!');
+          }
+          true;
+        `;
+        webViewRef.current.injectJavaScript(jsCode);
+      }, 500);
     }
   }, [userLocation, isLoading]);
 
@@ -650,6 +739,12 @@ const WebMapGoogle = React.forwardRef<WebView, WebMapGoogleProps>(({
             notes: '',
             syncStatus: 'pending'
           } as Knock);
+        }
+      } else if (message.type === 'deleteKnock') {
+        // Handle knock deletion
+        console.log('[WebMap]: Delete knock requested:', message.knockId);
+        if (onKnockDelete) {
+          onKnockDelete(message.knockId);
         }
       }
     } catch (e) {

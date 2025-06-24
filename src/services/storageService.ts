@@ -75,6 +75,12 @@ export class StorageService {
     await AsyncStorage.setItem(KEYS.KNOCKS, JSON.stringify(updatedKnocks));
   }
 
+  static async deleteKnock(knockId: string): Promise<void> {
+    const knocks = await this.getKnocks();
+    const filteredKnocks = knocks.filter(knock => knock.id !== knockId);
+    await AsyncStorage.setItem(KEYS.KNOCKS, JSON.stringify(filteredKnocks));
+  }
+
   // Territories
   static async saveTerritories(territories: Territory[]): Promise<void> {
     await AsyncStorage.setItem(KEYS.TERRITORIES, JSON.stringify(territories));

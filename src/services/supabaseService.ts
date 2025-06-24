@@ -173,6 +173,29 @@ export class SupabaseService {
     }
   }
 
+  // Delete a knock from cloud
+  static async deleteCloudKnock(localId: string): Promise<boolean> {
+    if (!this.userId) return false;
+
+    try {
+      const { error } = await supabase
+        .from('knocks')
+        .delete()
+        .eq('user_id', this.userId)
+        .eq('local_id', localId);
+
+      if (error) {
+        console.error('Error deleting cloud knock:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting knock from cloud:', error);
+      return false;
+    }
+  }
+
   // Get storage usage
   static async getStorageUsage(): Promise<StorageUsage | null> {
     if (!this.userId) return null;
