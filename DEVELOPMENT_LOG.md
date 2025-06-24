@@ -1438,7 +1438,7 @@ main (v0.8.0) - Production ready
 ### Environment Updates
 ```env
 EXPO_PUBLIC_MRMS_PROXY_URL=https://d2d-dynamic-server.onrender.com
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyAGXxvULS4Gl3vGiHIS-tC95AL-IDbnJJM
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=[REDACTED - Use your own API key]
 ```
 
 ### Next Steps

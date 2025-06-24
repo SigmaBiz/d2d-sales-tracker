@@ -38,6 +38,7 @@ A mobile app for door-to-door sales teams to track knocks, analyze performance, 
 
 1. Clone the repository
 ```bash
+git clone https://github.com/SigmaBiz/d2d-sales-tracker.git
 cd d2d-sales-tracker
 ```
 
@@ -46,7 +47,18 @@ cd d2d-sales-tracker
 npm install
 ```
 
-3. Start the development server
+3. Set up environment variables
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and add your API keys:
+# - EXPO_PUBLIC_GOOGLE_MAPS_API_KEY (required for Google Maps)
+# - EXPO_PUBLIC_MRMS_PROXY_URL (for hail data)
+# - Supabase keys (optional, for cloud sync)
+```
+
+4. Start the development server
 ```bash
 npx expo start
 ```
@@ -102,6 +114,26 @@ src/
 - CRM integration
 
 ## Development Notes
+
+### Environment Variables & Security
+
+**Important**: Never commit sensitive API keys to version control!
+
+1. **API Key Security**:
+   - Always use environment variables for API keys
+   - Add `.env` to `.gitignore` (already configured)
+   - Use `.env.example` as a template for team members
+   - Restrict API keys in Google Cloud Console:
+     - Add application restrictions (bundle ID for mobile apps)
+     - Add API restrictions (only enable required APIs)
+     - Set up quotas to prevent abuse
+
+2. **Google Maps API Key Setup**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create or select a project
+   - Enable Maps SDK for iOS and Android
+   - Enable Geocoding API (for address lookup)
+   - Create an API key and restrict it to your app
 
 ### Running in Production Mode
 ```bash

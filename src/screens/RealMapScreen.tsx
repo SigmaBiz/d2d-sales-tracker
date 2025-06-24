@@ -39,6 +39,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [isGeneratingContours, setIsGeneratingContours] = useState(false);
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
   const [showNotificationLog, setShowNotificationLog] = useState(false);
+  const [clearedKnockIds, setClearedKnockIds] = useState<Set<string>>(new Set());
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -83,7 +84,7 @@ export default function RealMapScreen({ navigation }: any) {
     });
 
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, clearedKnockIds]); // Add clearedKnockIds as dependency
 
   // Monitor hailContours state changes
   useEffect(() => {
@@ -122,7 +123,10 @@ export default function RealMapScreen({ navigation }: any) {
       // First get local knocks
       const localKnocks = await StorageService.getKnocks();
       console.log('Loaded knocks:', localKnocks.length);
-      setKnocks(localKnocks);
+      
+      // Filter out cleared knocks
+      const filteredKnocks = localKnocks.filter(knock => !clearedKnockIds.has(knock.id));
+      setKnocks(filteredKnocks);
       
       // Then try to get cloud knocks if connected
       const cloudKnocks = await SupabaseService.getCloudKnocks();
@@ -130,7 +134,9 @@ export default function RealMapScreen({ navigation }: any) {
         // Merge cloud and local knocks, removing duplicates
         const knockMap = new Map();
         [...localKnocks, ...cloudKnocks].forEach(knock => {
-          knockMap.set(knock.id, knock);
+          if (!clearedKnockIds.has(knock.id)) {
+            knockMap.set(knock.id, knock);
+          }
         });
         setKnocks(Array.from(knockMap.values()));
       }
@@ -331,12 +337,15 @@ export default function RealMapScreen({ navigation }: any) {
 
   const handleKnockDelete = async (knockId: string) => {
     try {
-      // Just remove from current view, don't delete permanently
+      // Add to cleared set
+      setClearedKnockIds(prev => new Set([...prev, knockId]));
+      
+      // Remove from current view
       setKnocks(prevKnocks => prevKnocks.filter(knock => knock.id !== knockId));
       
-      console.log('Knock removed from map:', knockId);
+      console.log('Knock cleared from map:', knockId);
     } catch (error) {
-      console.error('Error removing knock:', error);
+      console.error('Error clearing knock:', error);
     }
   };
 
@@ -483,10 +492,15 @@ export default function RealMapScreen({ navigation }: any) {
           <Text style={{ fontSize: 24 }}>{mapType === 'street' ? '🗺️' : '🛰️'}</Text>
         </TouchableOpacity>
         
-        {/* Refresh Button */}
+        {/* Refresh Button - Long press to show all cleared knocks */}
         <TouchableOpacity 
           style={styles.actionButton} 
           onPress={loadKnocks}
+          onLongPress={() => {
+            // Clear the cleared knocks set to show all knocks again
+            setClearedKnockIds(new Set());
+            loadKnocks();
+          }}
         >
           <Ionicons name="refresh" size={24} color="#1e40af" />
         </TouchableOpacity>
