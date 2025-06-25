@@ -43,6 +43,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [clearedKnocksLoaded, setClearedKnocksLoaded] = useState(false);
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
+  const needsReloadRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Initialize critical map features in parallel
@@ -97,37 +98,46 @@ export default function RealMapScreen({ navigation }: any) {
     };
   }, []);
 
-  // Reload knocks and hail data when screen comes into focus
+  // Handle screen focus events
   useEffect(() => {
-    let isInitialMount = true;
-    
     const unsubscribe = navigation.addListener('focus', () => {
-      // Skip the first focus event as we already load in the main useEffect
-      if (isInitialMount) {
-        isInitialMount = false;
-        
-        // Just check for notification log on initial mount
-        if ((global as any).openNotificationLog) {
-          setShowNotificationLog(true);
-          (global as any).openNotificationLog = false;
-        }
-        return;
+      // Check for notification log
+      if ((global as any).openNotificationLog) {
+        setShowNotificationLog(true);
+        (global as any).openNotificationLog = false;
       }
       
-      // Only reload on subsequent focuses (coming back from other screens)
-      console.log('[RealMapScreen] Reloading data on focus...');
-      
-      // Add a small delay to ensure knock is saved before reloading
-      setTimeout(() => {
+      // Only reload if we're coming back from KnockScreen
+      if (needsReloadRef.current) {
+        console.log('[RealMapScreen] Reloading after knock save...');
+        needsReloadRef.current = false;
+        
+        // Reload immediately - knock should already be saved
         Promise.all([
           loadKnocks(),
           loadHailData()
         ]);
-      }, 100); // 100ms delay to ensure save completes
+      }
+    });
+    
+    // Listen for navigation state changes to detect Knock screen navigation
+    const stateUnsubscribe = navigation.addListener('state', (e) => {
+      const state = e.data.state;
+      if (state && state.routes && state.index !== undefined) {
+        const currentRoute = state.routes[state.index];
+        // Check if we're on the Knock tab
+        if (currentRoute.name === 'Knock') {
+          needsReloadRef.current = true;
+          console.log('[RealMapScreen] Will reload when returning from Knock screen');
+        }
+      }
     });
 
-    return unsubscribe;
-  }, [navigation]); // Remove clearedKnockIds to prevent loops
+    return () => {
+      unsubscribe();
+      stateUnsubscribe();
+    };
+  }, [navigation]);
 
   // Monitor hailContours state changes
   useEffect(() => {
@@ -177,6 +187,7 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const loadKnocks = async (providedClearedIds?: Set<string>) => {
+    console.log('[loadKnocks] Starting knock load...');
     setLoading(true);
     try {
       // Use provided cleared IDs or get them if not provided
@@ -191,12 +202,25 @@ export default function RealMapScreen({ navigation }: any) {
         SupabaseService.getCloudKnocks()
       ]);
       
-      console.log('Loaded knocks:', localKnocks.length, 'local,', cloudKnocks.length, 'cloud');
+      console.log('[loadKnocks] Raw data:', localKnocks.length, 'local,', cloudKnocks.length, 'cloud');
+      
+      // Log the most recent knock if any
+      if (localKnocks.length > 0) {
+        const mostRecent = localKnocks.reduce((latest, knock) => 
+          new Date(knock.timestamp) > new Date(latest.timestamp) ? knock : latest
+        );
+        console.log('[loadKnocks] Most recent knock:', {
+          id: mostRecent.id,
+          address: mostRecent.address,
+          outcome: mostRecent.outcome,
+          timestamp: mostRecent.timestamp
+        });
+      }
       
       // Filter out cleared knocks using current cleared IDs
       const filteredKnocks = localKnocks.filter(knock => !currentClearedIds.has(knock.id));
       setKnocks(filteredKnocks);
-      console.log(`Loaded ${localKnocks.length} knocks, showing ${filteredKnocks.length} after filtering`);
+      console.log(`[loadKnocks] Loaded ${localKnocks.length} knocks, showing ${filteredKnocks.length} after filtering`);
       
       // Merge cloud knocks if available
       if (cloudKnocks.length > 0) {
@@ -212,7 +236,7 @@ export default function RealMapScreen({ navigation }: any) {
       
       return true; // Return success
     } catch (error) {
-      console.error('Error loading knocks:', error);
+      console.error('[loadKnocks] Error loading knocks:', error);
       return false; // Return failure
     } finally {
       setLoading(false);
@@ -229,6 +253,17 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const handleMapClick = (knockData: Knock) => {
+    // Set the reload flag before navigation
+    const stateListener = navigation.addListener('state', (e) => {
+      const state = e.data.state;
+      if (state && state.routes && state.index !== undefined) {
+        const currentRoute = state.routes[state.index];
+        if (currentRoute.name === 'Knock') {
+          needsReloadRef.current = true;
+        }
+      }
+    });
+    
     // Use requestAnimationFrame to defer navigation for smoother transition
     requestAnimationFrame(() => {
       if (knockData.id) {
@@ -249,6 +284,9 @@ export default function RealMapScreen({ navigation }: any) {
           longitude: knockData.longitude,
         });
       }
+      
+      // Clean up the listener
+      stateListener();
     });
   };
 

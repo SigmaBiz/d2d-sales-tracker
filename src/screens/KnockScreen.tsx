@@ -285,8 +285,10 @@ export default function KnockScreen({ route, navigation }: any) {
       setNotes('');
       setEditingKnockId(null);
       
-      // Navigate to map view after save
-      navigation.navigate('Map');
+      // Add a small delay before navigation to ensure save completes
+      setTimeout(() => {
+        navigation.navigate('Map');
+      }, 50);
       
       return knockId;
     } catch (error) {
