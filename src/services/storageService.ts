@@ -9,6 +9,8 @@ const KEYS = {
   SETTINGS: '@settings',
   CONTACT_FORMS: '@contact_forms',
   NOTIFICATION_LOG: '@notification_log',
+  CLEARED_KNOCKS: '@cleared_knocks',
+  LAST_SYNC: '@last_sync',
 };
 
 export class StorageService {
@@ -58,6 +60,60 @@ export class StorageService {
       console.error('Error getting knocks:', error);
       return [];
     }
+  }
+
+  // Get only visible knocks (excluding cleared ones)
+  static async getVisibleKnocks(): Promise<Knock[]> {
+    try {
+      const allKnocks = await this.getKnocks();
+      const clearedIds = await this.getClearedKnockIds();
+      return allKnocks.filter(knock => !clearedIds.includes(knock.id));
+    } catch (error) {
+      console.error('Error getting visible knocks:', error);
+      return [];
+    }
+  }
+
+  // Knock clearing methods
+  static async clearKnock(knockId: string): Promise<void> {
+    const clearedIds = await this.getClearedKnockIds();
+    if (!clearedIds.includes(knockId)) {
+      clearedIds.push(knockId);
+      await AsyncStorage.setItem(KEYS.CLEARED_KNOCKS, JSON.stringify(clearedIds));
+    }
+  }
+
+  static async getClearedKnockIds(): Promise<string[]> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.CLEARED_KNOCKS);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static async restoreKnock(knockId: string): Promise<void> {
+    const clearedIds = await this.getClearedKnockIds();
+    const filtered = clearedIds.filter(id => id !== knockId);
+    await AsyncStorage.setItem(KEYS.CLEARED_KNOCKS, JSON.stringify(filtered));
+  }
+
+  static async restoreAllKnocks(): Promise<void> {
+    await AsyncStorage.removeItem(KEYS.CLEARED_KNOCKS);
+  }
+
+  // Sync tracking
+  static async getLastSyncTime(): Promise<Date | null> {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.LAST_SYNC);
+      return data ? new Date(data) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  static async setLastSyncTime(time: Date): Promise<void> {
+    await AsyncStorage.setItem(KEYS.LAST_SYNC, time.toISOString());
   }
 
   static async getUnsyncedKnocks(): Promise<Knock[]> {

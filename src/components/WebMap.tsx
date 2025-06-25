@@ -7,12 +7,13 @@ interface WebMapProps {
   knocks: Knock[];
   userLocation: { lat: number; lng: number } | null;
   onKnockClick?: (knock: Knock) => void;
+  onKnockClear?: (knockId: string) => void;
   hailContours?: any; // GeoJSON FeatureCollection
   activeStorms?: string[]; // IDs of storms to display
   verifiedReports?: any[]; // Verified ground truth reports
 }
 
-const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, hailContours = null, activeStorms = [], verifiedReports = [] }, ref) => {
+const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, onKnockClear, hailContours = null, activeStorms = [], verifiedReports = [] }, ref) => {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -171,7 +172,10 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   if (knock.notes) {
                     popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>Notes:</strong><br>' + knock.notes.replace(/\\n/g, '<br>') + '</div>';
                   }
-                  popupContent += '<div style="margin-top: 10px;"><button onclick="window.editKnock(\\\'' + knock.id + '\\\')" style="background-color: #1e40af; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Edit</button></div>';
+                  popupContent += '<div style="margin-top: 10px;">';
+                  popupContent += '<button onclick="window.editKnock(\\\'' + knock.id + '\\\')" style="background-color: #1e40af; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; margin-right: 8px;">Edit</button>';
+                  popupContent += '<button onclick="window.clearKnock(\\\'' + knock.id + '\\\')" style="background-color: #ef4444; color: white; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Clear</button>';
+                  popupContent += '</div>';
                   popupContent += '</div>';
                   
                   var marker = L.marker([knock.latitude, knock.longitude], {icon: icon})
@@ -208,6 +212,15 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                 if (window.ReactNativeWebView) {
                   window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'editKnock',
+                    knockId: knockId
+                  }));
+                }
+              };
+              
+              window.clearKnock = function(knockId) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'clearKnock',
                     knockId: knockId
                   }));
                 }
@@ -607,6 +620,11 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
         const knock = knocks.find(k => k.id === data.knockId);
         if (knock && onKnockClick) {
           onKnockClick(knock);
+        }
+      } else if (data.type === 'clearKnock') {
+        // Handle clear knock
+        if (onKnockClear) {
+          onKnockClear(data.knockId);
         }
       }
     } catch (error) {

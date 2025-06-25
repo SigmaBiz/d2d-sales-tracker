@@ -37,6 +37,8 @@ export default function RealMapScreen({ navigation }: any) {
   const [isGeneratingContours, setIsGeneratingContours] = useState(false);
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
   const [showNotificationLog, setShowNotificationLog] = useState(false);
+  const [showCleared, setShowCleared] = useState(false);
+  const [clearedCount, setClearedCount] = useState(0);
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -117,9 +119,16 @@ export default function RealMapScreen({ navigation }: any) {
   const loadKnocks = async () => {
     setLoading(true);
     try {
-      // First get local knocks
-      const localKnocks = await StorageService.getKnocks();
-      console.log('Loaded knocks:', localKnocks.length);
+      // Get knocks based on showCleared state
+      const localKnocks = showCleared 
+        ? await StorageService.getKnocks()
+        : await StorageService.getVisibleKnocks();
+      
+      // Get cleared count
+      const clearedIds = await StorageService.getClearedKnockIds();
+      setClearedCount(clearedIds.length);
+      
+      console.log('Loaded knocks:', localKnocks.length, 'Cleared:', clearedIds.length);
       setKnocks(localKnocks);
       
       // Then try to get cloud knocks if connected
@@ -128,7 +137,10 @@ export default function RealMapScreen({ navigation }: any) {
         // Merge cloud and local knocks, removing duplicates
         const knockMap = new Map();
         [...localKnocks, ...cloudKnocks].forEach(knock => {
-          knockMap.set(knock.id, knock);
+          // Only include if not cleared (unless showing cleared)
+          if (showCleared || !clearedIds.includes(knock.id)) {
+            knockMap.set(knock.id, knock);
+          }
         });
         setKnocks(Array.from(knockMap.values()));
       }
@@ -146,6 +158,18 @@ export default function RealMapScreen({ navigation }: any) {
       webMapRef.current.postMessage(JSON.stringify({
         type: 'centerOnUser'
       }));
+    }
+  };
+
+  const handleKnockClear = async (knockId: string) => {
+    try {
+      await StorageService.clearKnock(knockId);
+      // Reload knocks to reflect the change
+      loadKnocks();
+      console.log('Knock cleared:', knockId);
+    } catch (error) {
+      console.error('Error clearing knock:', error);
+      Alert.alert('Error', 'Failed to clear knock');
     }
   };
 
@@ -329,6 +353,7 @@ export default function RealMapScreen({ navigation }: any) {
         knocks={knocks}
         userLocation={userLocation}
         onKnockClick={handleMapClick}
+        onKnockClear={handleKnockClear}
         hailContours={hailContours}
         activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
         verifiedReports={verifiedReports}
@@ -463,12 +488,27 @@ export default function RealMapScreen({ navigation }: any) {
           <Text style={{ fontSize: 24 }}>{mapType === 'street' ? '🗺️' : '🛰️'}</Text>
         </TouchableOpacity>
         
-        {/* Refresh Button */}
+        {/* Refresh Button - Long press to show/hide cleared */}
         <TouchableOpacity 
           style={styles.actionButton} 
           onPress={loadKnocks}
+          onLongPress={async () => {
+            // Toggle showing cleared knocks
+            setShowCleared(!showCleared);
+            Alert.alert(
+              showCleared ? 'Hiding Cleared Knocks' : 'Showing All Knocks',
+              showCleared 
+                ? 'Map will now hide cleared knocks' 
+                : `Map will show all knocks including ${clearedCount} cleared ones`,
+              [{ text: 'OK', onPress: () => loadKnocks() }]
+            );
+          }}
         >
-          <Ionicons name="refresh" size={24} color="#1e40af" />
+          <Ionicons 
+            name="refresh" 
+            size={24} 
+            color={showCleared ? "#ef4444" : "#1e40af"} 
+          />
         </TouchableOpacity>
         
         {/* Center on User Button */}

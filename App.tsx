@@ -7,6 +7,8 @@ import { HailAlertService } from './src/services/hailAlertService';
 import { HailDataFlowService } from './src/services/hailDataFlowService';
 import { SupabaseService } from './src/services/supabaseService';
 import { IntegratedHailIntelligence } from './src/services/integratedHailIntelligence';
+import { AutoSyncService } from './src/services/autoSyncService';
+import { StorageService } from './src/services/storageService';
 
 // TEMPORARY: Test utility for visual storm differentiation
 // Moved to RealMapScreen for easier testing
@@ -18,6 +20,20 @@ export default function App() {
   useEffect(() => {
     // Initialize services
     SupabaseService.initialize();
+    
+    // Initialize Auto-Sync Service
+    AutoSyncService.initialize().then(() => {
+      console.log('[App] Auto-sync service initialized');
+    }).catch(error => {
+      console.error('[App] Failed to initialize auto-sync:', error);
+    });
+    
+    // Track knock saves for auto-sync
+    const originalSaveKnock = StorageService.saveKnock;
+    StorageService.saveKnock = async (knock) => {
+      await originalSaveKnock.call(StorageService, knock);
+      AutoSyncService.incrementPendingChanges();
+    };
     
     // Initialize 3-Tier Hail Intelligence System
     IntegratedHailIntelligence.initialize({
