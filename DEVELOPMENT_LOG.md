@@ -61,18 +61,10 @@
 **REMEMBER: Before production deployment, restore these settings to their original values!**
 
 ### Current Branch Status
-- **Branch**: feature/hail-intelligence-v0.9 (detached HEAD at 9a7adfb)
-- **Unpushed**: 0 commits (synced with origin)
-- **Uncommitted**: None (working directory clean)
-- **Remote**: origin/feature/hail-intelligence-v0.9 at 9a7adfb
-- **Latest commit**: 9a7adfb checkpoint: Tier 2 proxy integration debugging
-
-### Proxy Server Status
-- **Location**: /mrms-proxy-server
-- **Running on**: http://localhost:3001
-- **Device Access**: http://192.168.1.111:3001
-- **Status**: Running with nodemon, receiving requests for 2025 dates
-- **Issue**: Sept 24 searches not reaching proxy due to method name mismatch
+- **Branch**: feature/google-maps-integration
+- **Parent Branch**: feature/grib2-processing (includes hail intelligence)
+- **Purpose**: Migrate from OpenStreetMap/Leaflet to Google Maps
+- **Status**: Fully functional with enhanced features
 
 ### Protocol Adaptation for D2D Sales Tracker
 **Project-Specific Guidelines:**
@@ -82,10 +74,81 @@
 - **Priority Files**: Always include WebMap.tsx, mrmsService.ts in safety commits
 - **Recovery Strategy**: Prefer reverting to last stable map state over experimental fixes
 
+### Agent Handoff Protocol
+When context reaches critical levels or a new agent takes over:
+
+1. **Read the DEVELOPMENT_LOG.md** to get full project context and nuance
+2. **Summarize your interpretation** of the project's overarching objective
+3. **Confirm understanding** before proceeding with execution
+4. **Use TodoRead** to check current task status
+5. **Continue from in-progress tasks** rather than starting new work
+
+This ensures continuity and prevents duplicate or conflicting implementations.
+
+### Multi-Agent Debugging Protocol
+For persistent and complex bugs/errors, deploy multiple agents with different perspectives:
+
+**When to Use Multi-Agent Debugging:**
+- Bug persists after 3+ single-agent attempts
+- Error involves multiple interconnected systems
+- Performance issues with unclear origin
+- Platform-specific bugs (iOS vs Android)
+- Race conditions or timing issues
+
+**Multi-Agent Deployment Process:**
+1. **Agent 1 - Code Analyzer**: Focus on code structure, dependencies, and logic flow
+2. **Agent 2 - System Debugger**: Focus on environment, APIs, and system interactions
+3. **Agent 3 - User Flow Specialist**: Focus on UI/UX and user action sequences
+
 ---
 
 ## Project Overview
-A React Native mobile app for door-to-door sales teams to track knocks, analyze performance, and optimize sales routes. Built with Expo for cross-platform compatibility.
+A React Native mobile app for door-to-door roofing sales teams to track knocks, analyze performance, and optimize sales routes. Built with Expo for cross-platform compatibility.
+
+### Core Innovation: Professional-Grade Hail Intelligence System
+The app includes a sophisticated three-tier hail intelligence system using real NOAA MRMS/MESH data to help roofing sales teams identify and canvass hail-damaged neighborhoods.
+
+## Three-Tier Hail Intelligence Architecture
+
+### TIER 1: Real-Time Storm Detection ⚡
+- **Purpose**: Immediate storm detection & canvassing alerts
+- **Frequency**: Every 2-5 minutes
+- **Data Source**: NCEP MRMS real-time feed → MRMS proxy → Mock fallback
+- **Features**:
+  - MESH value extraction for hail size estimation
+  - Live overlays with confidence scoring
+  - Push notifications for active storms
+  - Oklahoma coverage with Metro OKC priority
+- **Status**: ✅ COMPLETE
+
+### TIER 2: Historical Data Archive 📊
+- **Purpose**: Enhanced data for territory planning
+- **Timing**: 24-48 hours after detection
+- **Data Source**: Iowa Environmental Mesonet (IEM) archive
+- **Features**:
+  - GRIB2 processing via proxy server
+  - Date range: October 2019 - Present
+  - Memory optimized: 768MB → 50MB
+  - Response time: 30s → <10ms
+  - Hotspot detection and route optimization
+- **Status**: Partially complete (12 storm dates processed)
+
+### TIER 3: Ground Truth Validation 🎯
+- **Purpose**: Accuracy improvement via ground truth
+- **Frequency**: Weekly validation runs
+- **Data Source**: NOAA Storm Events Database
+- **Features**:
+  - Accuracy metrics: Precision, Recall, F1 Score
+  - Algorithm weight adjustments
+  - Performance analytics dashboard
+  - Comparison with actual damage reports
+- **Status**: Framework complete, API endpoint TODO
+
+### Key Infrastructure
+- **FREE MRMS Proxy**: Deployed on Vercel (https://mrms-proxy-1749991977.vercel.app)
+- **Dynamic Server**: https://d2d-dynamic-server.onrender.com
+- **Data Flow Dashboard**: Settings → Data Flow Monitor
+- **Confidence Scoring**: Multi-factor algorithm (MESH size, density, recency, social validation)
 
 ## Core Features Implemented
 
@@ -1567,3 +1630,44 @@ Fixed critical issues with door knock marker display consistency:
 - Clear functionality persists across app restarts
 - No coordinate validation errors
 - Proper cleanup of old markers before creating new ones
+
+## Git Commit & Checkpoint Protocol
+
+### Standard Commits
+After making changes:
+1. Stage all changes: `git add .`
+2. Commit with descriptive message: `git commit -m "type: Description"`
+3. Push to remote: `git push origin [current-branch]`
+
+### Checkpoint Tags (Version Control Milestones)
+After significant features or stable states:
+1. Create annotated tag: `git tag -a checkpoint-YYYYMMDD-HHMM -m "Description of checkpoint"`
+2. Push tag to remote: `git push origin checkpoint-YYYYMMDD-HHMM`
+
+Example:
+```bash
+git tag -a checkpoint-20250624-1530 -m "Google Maps integration complete with door labeling fixes"
+git push origin checkpoint-20250624-1530
+```
+
+### Viewing Checkpoints
+- List all checkpoints: `git tag -l "checkpoint-*"`
+- Show checkpoint details: `git show checkpoint-YYYYMMDD-HHMM`
+- Checkout a checkpoint: `git checkout checkpoint-YYYYMMDD-HHMM`
+
+### Reverting to Checkpoint
+If needed to restore a stable state:
+```bash
+git checkout checkpoint-YYYYMMDD-HHMM
+git checkout -b recovery-from-checkpoint
+```
+
+### Checkpoint Naming Convention
+Format: `checkpoint-YYYYMMDD-HHMM`
+- YYYY: Year (4 digits)
+- MM: Month (2 digits)
+- DD: Day (2 digits)
+- HH: Hour in 24h format (2 digits)
+- MM: Minutes (2 digits)
+
+This follows semantic versioning principles while maintaining chronological ordering.
