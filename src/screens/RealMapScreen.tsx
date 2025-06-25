@@ -45,23 +45,35 @@ export default function RealMapScreen({ navigation }: any) {
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initialize critical map features first
+    // Initialize critical map features in parallel
     const initialize = async () => {
-      console.log('[RealMapScreen] Starting critical initialization...');
-      // Load cleared knock IDs first
-      await loadClearedKnockIds();
-      initializeMap();
-      loadKnocks();
+      console.log('[RealMapScreen] Starting parallel initialization...');
+      const startTime = Date.now();
+      
+      // First load cleared IDs, then run other operations in parallel
+      // This is needed because loadKnocks depends on cleared IDs
+      const clearedIds = await loadClearedKnockIds();
+      
+      // Now run map init and knock loading in parallel
+      await Promise.all([
+        initializeMap(),
+        loadKnocks(clearedIds)
+      ]);
+      
+      console.log(`[RealMapScreen] Parallel init completed in ${Date.now() - startTime}ms`);
       
       // Defer heavy services to improve initial load time
       setTimeout(() => {
         console.log('[RealMapScreen] Loading deferred services...');
-        loadHailData();
-        initializeHailAlerts();
-        
-        // Test contour generation after hail data loads
-        console.log('Running contour generation test...');
-        testContourGeneration();
+        // These can also run in parallel
+        Promise.all([
+          loadHailData(),
+          initializeHailAlerts()
+        ]).then(() => {
+          // Test contour generation after hail data loads
+          console.log('Running contour generation test...');
+          testContourGeneration();
+        });
       }, 500); // Small delay to let map render first
     };
     
@@ -87,8 +99,11 @@ export default function RealMapScreen({ navigation }: any) {
   // Reload knocks and hail data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      loadKnocks();
-      loadHailData(); // Also reload hail data to show newly added storms
+      // Load both in parallel for faster refresh
+      Promise.all([
+        loadKnocks(),
+        loadHailData()
+      ]);
       
       // Check if we should open notification log
       if ((global as any).openNotificationLog) {
@@ -147,25 +162,29 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
-  const loadKnocks = async () => {
+  const loadKnocks = async (providedClearedIds?: Set<string>) => {
     setLoading(true);
     try {
-      // Ensure cleared knock IDs are loaded
-      let currentClearedIds = clearedKnockIds;
-      if (!clearedKnocksLoaded) {
+      // Use provided cleared IDs or get them if not provided
+      let currentClearedIds = providedClearedIds || clearedKnockIds;
+      if (!providedClearedIds && !clearedKnocksLoaded) {
         currentClearedIds = await loadClearedKnockIds();
       }
-      // First get local knocks
-      const localKnocks = await StorageService.getKnocks();
-      console.log('Loaded knocks:', localKnocks.length);
+      
+      // Load local and cloud knocks in parallel
+      const [localKnocks, cloudKnocks] = await Promise.all([
+        StorageService.getKnocks(),
+        SupabaseService.getCloudKnocks()
+      ]);
+      
+      console.log('Loaded knocks:', localKnocks.length, 'local,', cloudKnocks.length, 'cloud');
       
       // Filter out cleared knocks using current cleared IDs
       const filteredKnocks = localKnocks.filter(knock => !currentClearedIds.has(knock.id));
       setKnocks(filteredKnocks);
       console.log(`Loaded ${localKnocks.length} knocks, showing ${filteredKnocks.length} after filtering`);
       
-      // Then try to get cloud knocks if connected
-      const cloudKnocks = await SupabaseService.getCloudKnocks();
+      // Merge cloud knocks if available
       if (cloudKnocks.length > 0) {
         // Merge cloud and local knocks, removing duplicates
         const knockMap = new Map();
@@ -541,7 +560,7 @@ export default function RealMapScreen({ navigation }: any) {
         {/* Refresh Button - Long press to show all cleared knocks */}
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={loadKnocks}
+          onPress={() => loadKnocks()}
           onLongPress={async () => {
             // Clear the cleared knocks set to show all knocks again
             setClearedKnockIds(new Set());
