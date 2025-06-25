@@ -60,7 +60,8 @@ export default function RealMapScreen({ navigation }: any) {
         loadKnocks(clearedIds)
       ]);
       
-      console.log(`[RealMapScreen] Parallel init completed in ${Date.now() - startTime}ms`);
+      const elapsed = Date.now() - startTime;
+      console.log(`[RealMapScreen] Parallel init completed in ${elapsed}ms`);
       
       // Defer heavy services to improve initial load time
       setTimeout(() => {
@@ -98,18 +99,31 @@ export default function RealMapScreen({ navigation }: any) {
 
   // Reload knocks and hail data when screen comes into focus
   useEffect(() => {
+    let isInitialMount = true;
+    
     const unsubscribe = navigation.addListener('focus', () => {
-      // Load both in parallel for faster refresh
-      Promise.all([
-        loadKnocks(),
-        loadHailData()
-      ]);
-      
-      // Check if we should open notification log
-      if ((global as any).openNotificationLog) {
-        setShowNotificationLog(true);
-        (global as any).openNotificationLog = false; // Clear the flag
+      // Skip the first focus event as we already load in the main useEffect
+      if (isInitialMount) {
+        isInitialMount = false;
+        
+        // Just check for notification log on initial mount
+        if ((global as any).openNotificationLog) {
+          setShowNotificationLog(true);
+          (global as any).openNotificationLog = false;
+        }
+        return;
       }
+      
+      // Only reload on subsequent focuses (coming back from other screens)
+      console.log('[RealMapScreen] Reloading data on focus...');
+      
+      // Add a small delay to ensure knock is saved before reloading
+      setTimeout(() => {
+        Promise.all([
+          loadKnocks(),
+          loadHailData()
+        ]);
+      }, 100); // 100ms delay to ensure save completes
     });
 
     return unsubscribe;
@@ -195,8 +209,11 @@ export default function RealMapScreen({ navigation }: any) {
         });
         setKnocks(Array.from(knockMap.values()));
       }
+      
+      return true; // Return success
     } catch (error) {
       console.error('Error loading knocks:', error);
+      return false; // Return failure
     } finally {
       setLoading(false);
     }
@@ -212,24 +229,27 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const handleMapClick = (knockData: Knock) => {
-    if (knockData.id) {
-      // Editing existing knock
-      navigation.navigate('Knock', {
-        knockId: knockData.id,
-        latitude: knockData.latitude,
-        longitude: knockData.longitude,
-        address: knockData.address,
-        outcome: knockData.outcome,
-        notes: knockData.notes,
-        history: knockData.history,
-      });
-    } else {
-      // Creating new knock
-      navigation.navigate('Knock', {
-        latitude: knockData.latitude,
-        longitude: knockData.longitude,
-      });
-    }
+    // Use requestAnimationFrame to defer navigation for smoother transition
+    requestAnimationFrame(() => {
+      if (knockData.id) {
+        // Editing existing knock
+        navigation.navigate('Knock', {
+          knockId: knockData.id,
+          latitude: knockData.latitude,
+          longitude: knockData.longitude,
+          address: knockData.address,
+          outcome: knockData.outcome,
+          notes: knockData.notes,
+          history: knockData.history,
+        });
+      } else {
+        // Creating new knock
+        navigation.navigate('Knock', {
+          latitude: knockData.latitude,
+          longitude: knockData.longitude,
+        });
+      }
+    });
   };
 
   const initializeHailAlerts = async () => {
