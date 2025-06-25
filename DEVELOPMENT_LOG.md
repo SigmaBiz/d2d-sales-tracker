@@ -1754,3 +1754,98 @@ const knockUpdates = {
 - Solutions architected but not yet implemented
 - App functional but sluggish with large datasets
 - Ready for performance optimization sprint
+
+## Performance Optimization Session - June 25, 2025
+
+### Context
+User reported that the app takes 3-5 seconds to become operational on startup, with buttons unresponsive during initial "loading" phase. Map overlays load slowly and door labeling has lag.
+
+### Optimizations Implemented
+
+#### 1. **Deferred Heavy Service Initialization** ✅
+- **Changes Made**:
+  - Deferred IntegratedHailIntelligence initialization by 1.5s in App.tsx
+  - Deferred loadHailData and initializeHailAlerts by 0.5s in RealMapScreen
+  - Critical services (Supabase, map, knocks) load immediately
+- **Expected Impact**: UI becomes responsive 2-3 seconds faster
+- **Commit**: `2d3bd54` - "perf: defer heavy service initialization for faster startup"
+
+#### 2. **Parallel Loading Implementation** ✅
+- **Changes Made**:
+  - Modified RealMapScreen to load independent operations in parallel
+  - Local and cloud knocks now load simultaneously
+  - Hail data and alert services initialize in parallel
+  - Added timing logs to measure improvements
+- **Expected Impact**: 50-70% faster initial load time
+- **Commit**: `15f3d45` - "perf: implement parallel loading for 50-70% faster startup"
+
+#### 3. **Knock Display & Navigation Fixes** ✅
+- **Changes Made**:
+  - Fixed duplicate knock loading on initial mount
+  - Added requestAnimationFrame for smoother navigation transitions
+  - Added 100ms delay after navigation to ensure saves complete
+  - Fixed parallel init timing log display
+- **Commit**: `344e0b3` - "fix: address knock saving lag and navigation animation issues"
+
+#### 4. **Knock Saving Reliability** ✅
+- **Changes Made**:
+  - Added coordinate validation to prevent invalid saves
+  - Validate lat/lng are within valid ranges (-90 to 90, -180 to 180)
+  - Added detailed logging for debugging save issues
+  - Use default address 'Location' if geocoding fails
+- **Commit**: `1d9fb1d` - "fix: improve knock saving reliability with validation and logging"
+
+#### 5. **Async Fix for Timing Log** ✅
+- **Changes Made**:
+  - Fixed initializeMap to properly await updateLocation
+  - This ensures Promise.all completes correctly
+  - Timing log now displays properly
+- **Commit**: `2f17054` - "fix: await updateLocation in initializeMap to fix timing log"
+
+### Remaining Issues to Address
+
+1. **Double Loading of Knocks**
+   - Knocks are loaded twice when returning to map screen
+   - Need to fix the focus effect to prevent duplicate loads
+
+2. **Knock Display Inconsistency**
+   - Some knocks save successfully but don't display immediately
+   - May be related to the double loading issue
+
+3. **WebView HTML Optimization** (Not started)
+   - 711+ line HTML string still generated on each render
+   - Should be moved to static asset
+
+4. **Differential Updates** (Not started)
+   - Still doing full knock array updates
+   - Should implement add/remove/modify pattern
+
+### Performance Testing Results
+- User reported minimal improvement in startup time
+- Navigation animation "flinching" may be improved but needs verification
+- Knock saving works but display lag persists
+
+### Handoff Notes for Next Agent
+
+#### Current State:
+- Branch: `feature/google-maps-integration`
+- 5 performance optimizations implemented
+- Timing log now working (shows initialization time)
+- Basic performance improvements in place but user reports minimal impact
+
+#### Priority Tasks:
+1. Fix double loading of knocks in focus effect
+2. Investigate why some saved knocks don't display immediately
+3. Implement remaining optimizations (WebView HTML, differential updates)
+4. Consider more aggressive optimizations if current approach insufficient
+
+#### Key Files Modified:
+- `App.tsx` - Deferred service initialization
+- `src/screens/RealMapScreen.tsx` - Parallel loading, focus fixes, timing
+- `src/screens/KnockScreen.tsx` - Knock validation and logging
+
+#### Testing Focus:
+- Watch for `[RealMapScreen] Parallel init completed in XXXms` log
+- Check if knocks load only once when switching screens
+- Verify all saved knocks appear on map without refresh
+- Measure actual startup time improvement
