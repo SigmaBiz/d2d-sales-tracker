@@ -121,7 +121,7 @@ export default function RealMapScreen({ navigation }: any) {
     });
     
     // Listen for navigation state changes to detect Knock screen navigation
-    const stateUnsubscribe = navigation.addListener('state', (e) => {
+    const stateUnsubscribe = navigation.addListener('state', (e: any) => {
       const state = e.data.state;
       if (state && state.routes && state.index !== undefined) {
         const currentRoute = state.routes[state.index];
@@ -254,7 +254,7 @@ export default function RealMapScreen({ navigation }: any) {
 
   const handleMapClick = (knockData: Knock) => {
     // Set the reload flag before navigation
-    const stateListener = navigation.addListener('state', (e) => {
+    const stateListener = navigation.addListener('state', (e: any) => {
       const state = e.data.state;
       if (state && state.routes && state.index !== undefined) {
         const currentRoute = state.routes[state.index];
