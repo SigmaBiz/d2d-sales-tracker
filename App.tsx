@@ -16,20 +16,26 @@ export default function App() {
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
-    // Initialize services
+    // Initialize critical services immediately
+    console.log('[App] Initializing critical services...');
     SupabaseService.initialize();
     
-    // Initialize 3-Tier Hail Intelligence System
-    IntegratedHailIntelligence.initialize({
-      enableRealTime: true,
-      enableHistorical: true,
-      enableValidation: true,
-      alertThreshold: 25  // 1 inch hail
-    }).then(() => {
-      console.log('[App] 3-Tier Hail Intelligence System initialized');
-    }).catch(error => {
-      console.error('[App] Failed to initialize Hail Intelligence:', error);
-    });
+    // Defer heavy services to improve startup time
+    const deferredInitTimeout = setTimeout(() => {
+      console.log('[App] Starting deferred service initialization...');
+      
+      // Initialize 3-Tier Hail Intelligence System after UI loads
+      IntegratedHailIntelligence.initialize({
+        enableRealTime: true,
+        enableHistorical: true,
+        enableValidation: true,
+        alertThreshold: 25  // 1 inch hail
+      }).then(() => {
+        console.log('[App] 3-Tier Hail Intelligence System initialized');
+      }).catch(error => {
+        console.error('[App] Failed to initialize Hail Intelligence:', error);
+      });
+    }, 1500); // Defer by 1.5 seconds to let UI become responsive first
     
     // Handle notifications when app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
@@ -49,6 +55,9 @@ export default function App() {
     });
 
     return () => {
+      // Clean up timeout
+      clearTimeout(deferredInitTimeout);
+      
       if (notificationListener.current) {
         notificationListener.current.remove();
       }

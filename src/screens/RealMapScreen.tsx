@@ -45,21 +45,27 @@ export default function RealMapScreen({ navigation }: any) {
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initialize everything
+    // Initialize critical map features first
     const initialize = async () => {
+      console.log('[RealMapScreen] Starting critical initialization...');
       // Load cleared knock IDs first
       await loadClearedKnockIds();
       initializeMap();
       loadKnocks();
-      loadHailData();
-      initializeHailAlerts();
+      
+      // Defer heavy services to improve initial load time
+      setTimeout(() => {
+        console.log('[RealMapScreen] Loading deferred services...');
+        loadHailData();
+        initializeHailAlerts();
+        
+        // Test contour generation after hail data loads
+        console.log('Running contour generation test...');
+        testContourGeneration();
+      }, 500); // Small delay to let map render first
     };
     
     initialize();
-    
-    // Test contour generation
-    console.log('Running contour generation test...');
-    testContourGeneration();
     
     // Set up location watching (disabled in development)
     let interval: NodeJS.Timeout | null = null;
