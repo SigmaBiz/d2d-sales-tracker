@@ -57,7 +57,7 @@ export class SupabaseService {
   }
 
   // Sync local knocks to Supabase
-  static async syncKnocks(): Promise<{ synced: number; failed: number }> {
+  static async syncKnocks(knocks?: Knock[], metadata?: any): Promise<{ synced: number; failed: number }> {
     if (!this.userId) return { synced: 0, failed: 0 };
 
     try {
@@ -67,13 +67,13 @@ export class SupabaseService {
         return { synced: 0, failed: 0 };
       }
 
-      // Get unsynced knocks
-      const unsyncedKnocks = await StorageService.getUnsyncedKnocks();
+      // Get knocks to sync - either provided or unsynced ones
+      const knocksToProcess = knocks || await StorageService.getUnsyncedKnocks();
       let synced = 0;
       let failed = 0;
 
       // Batch sync for efficiency
-      const knocksToSync: SupabaseKnock[] = unsyncedKnocks.map(knock => ({
+      const knocksToSync: SupabaseKnock[] = knocksToProcess.map(knock => ({
         user_id: this.userId!,
         latitude: knock.latitude,
         longitude: knock.longitude,
@@ -87,7 +87,10 @@ export class SupabaseService {
       if (knocksToSync.length > 0) {
         const { data, error } = await supabase
           .from('knocks')
-          .insert(knocksToSync)
+          .upsert(knocksToSync, {
+            onConflict: 'user_id,local_id',
+            ignoreDuplicates: false
+          })
           .select();
 
         if (error) {
@@ -95,9 +98,11 @@ export class SupabaseService {
           failed = knocksToSync.length;
         } else {
           synced = data?.length || 0;
-          // Mark synced knocks
-          const syncedIds = unsyncedKnocks.slice(0, synced).map(k => k.id);
-          await StorageService.markKnocksSynced(syncedIds);
+          // Mark synced knocks if we're syncing unsynced ones
+          if (!knocks) {
+            const syncedIds = knocksToProcess.slice(0, synced).map(k => k.id);
+            await StorageService.markKnocksSynced(syncedIds);
+          }
         }
       }
 

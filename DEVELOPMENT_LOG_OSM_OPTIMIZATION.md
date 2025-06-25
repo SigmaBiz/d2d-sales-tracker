@@ -268,6 +268,7 @@ When ready to implement Google Maps:
   - Long-press refresh to show/hide cleared knocks
   - Visual indicator (red refresh icon) when showing cleared
 - Preserved data integrity - all knocks remain in cloud
+- Fixed critical Supabase sync error (duplicate key constraint) by switching to upsert
 
 ## Current Status (20% Context)
 
