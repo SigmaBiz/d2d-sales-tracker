@@ -212,17 +212,33 @@ export default function KnockScreen({ route, navigation }: any) {
       return null;
     }
 
-    if (!currentLocation) {
-      Alert.alert('Error', 'Unable to get current location');
+    if (!currentLocation || !currentLocation.lat || !currentLocation.lng) {
+      console.error('Invalid location:', currentLocation);
+      Alert.alert('Error', 'Unable to get valid location. Please try again.');
+      return null;
+    }
+
+    // Validate coordinates are within reasonable bounds
+    if (Math.abs(currentLocation.lat) > 90 || Math.abs(currentLocation.lng) > 180) {
+      console.error('Invalid coordinates:', currentLocation);
+      Alert.alert('Error', 'Invalid GPS coordinates. Please try again.');
       return null;
     }
 
     const knockId = editingKnockId || Date.now().toString();
+    console.log('Saving knock:', {
+      id: knockId,
+      lat: currentLocation.lat,
+      lng: currentLocation.lng,
+      address: address || 'No address',
+      outcome: selectedOutcome
+    });
+    
     const knock: Knock = {
       id: knockId,
       latitude: currentLocation.lat,
       longitude: currentLocation.lng,
-      address,
+      address: address || 'Location',
       outcome: selectedOutcome,
       notes: overrideNotes || notes,
       timestamp: new Date(),
@@ -232,6 +248,7 @@ export default function KnockScreen({ route, navigation }: any) {
 
     try {
       await StorageService.saveKnock(knock);
+      console.log('Knock saved successfully:', knockId);
       
       // Update daily stats
       const today = new Date();
