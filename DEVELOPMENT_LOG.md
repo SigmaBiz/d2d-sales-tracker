@@ -1849,3 +1849,78 @@ User reported that the app takes 3-5 seconds to become operational on startup, w
 - Check if knocks load only once when switching screens
 - Verify all saved knocks appear on map without refresh
 - Measure actual startup time improvement
+
+## Performance Optimization Session - June 25, 2025 (Continued)
+
+### Double Loading Fix Implemented ✅
+
+#### Changes Made:
+1. **Replaced isInitialMount flag with needsReloadRef**
+   - More reliable tracking of when reloads are needed
+   - Works across both tab navigation and stack navigation
+   - Prevents accidental double loads
+
+2. **Improved Navigation State Detection**
+   - Listen for 'state' events instead of 'blur' events
+   - Properly detect when navigating to Knock screen
+   - Set reload flag only when actually going to Knock screen
+
+3. **Enhanced Save Timing**
+   - Added 50ms delay before navigation after knock save
+   - Ensures AsyncStorage write completes before reload
+   - Prevents race condition where knock saves but doesn't display
+
+4. **Added Detailed Logging**
+   - `[loadKnocks]` prefix for all knock loading operations
+   - Log most recent knock details for debugging
+   - Track raw vs filtered knock counts
+
+#### Technical Implementation:
+```javascript
+// Use ref to track reload needs across renders
+const needsReloadRef = useRef<boolean>(false);
+
+// Set flag when navigating to Knock
+if (currentRoute.name === 'Knock') {
+  needsReloadRef.current = true;
+}
+
+// Check flag on focus and reload if needed
+if (needsReloadRef.current) {
+  needsReloadRef.current = false;
+  Promise.all([loadKnocks(), loadHailData()]);
+}
+```
+
+#### Results:
+- Knocks now load only once per save operation
+- No more duplicate loading on initial mount
+- Improved timing reduces knock display lag
+- Better debugging visibility with enhanced logs
+
+### Current Status:
+- Double loading issue: ✅ FIXED
+- Knock save/display timing: ✅ IMPROVED
+- Navigation smoothness: ✅ IMPROVED
+
+### Remaining Performance Issues:
+1. **App startup still takes 3-5 seconds**
+   - Need more aggressive service deferral
+   - Consider lazy loading non-critical features
+   - Implement code splitting
+
+2. **WebView HTML optimization needed**
+   - 711+ line HTML string generated on each render
+   - Should move to static asset file
+   - Implement message-based updates only
+
+3. **Large dataset performance**
+   - Still doing full knock array serialization
+   - Need differential updates (add/remove/modify)
+   - Implement viewport-based filtering
+
+### Next Steps:
+1. Monitor user feedback on double loading fix
+2. If startup time still problematic, implement more aggressive optimizations
+3. Consider WebView alternatives or native map integration
+4. Profile memory usage with large knock datasets

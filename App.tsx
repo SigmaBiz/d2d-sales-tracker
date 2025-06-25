@@ -16,26 +16,31 @@ export default function App() {
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
-    // Initialize critical services immediately
-    console.log('[App] Initializing critical services...');
-    SupabaseService.initialize();
+    // ONLY initialize the absolute minimum needed for the app to function
+    console.log('[App] Minimal startup - deferring all non-critical services...');
     
-    // Defer heavy services to improve startup time
+    // Defer ALL heavy services until user actually needs them
     const deferredInitTimeout = setTimeout(() => {
-      console.log('[App] Starting deferred service initialization...');
+      console.log('[App] Starting background service initialization...');
       
-      // Initialize 3-Tier Hail Intelligence System after UI loads
-      IntegratedHailIntelligence.initialize({
-        enableRealTime: true,
-        enableHistorical: true,
-        enableValidation: true,
-        alertThreshold: 25  // 1 inch hail
-      }).then(() => {
-        console.log('[App] 3-Tier Hail Intelligence System initialized');
-      }).catch(error => {
-        console.error('[App] Failed to initialize Hail Intelligence:', error);
-      });
-    }, 1500); // Defer by 1.5 seconds to let UI become responsive first
+      // Initialize Supabase in background
+      SupabaseService.initialize();
+      
+      // Defer hail intelligence even further - it's not needed for basic door knocking
+      setTimeout(() => {
+        console.log('[App] Starting hail intelligence initialization...');
+        IntegratedHailIntelligence.initialize({
+          enableRealTime: false,  // Disable real-time initially
+          enableHistorical: false, // Disable historical initially
+          enableValidation: false, // Disable validation initially
+          alertThreshold: 25
+        }).then(() => {
+          console.log('[App] Hail Intelligence ready (background)');
+        }).catch(error => {
+          console.error('[App] Hail Intelligence error (non-critical):', error);
+        });
+      }, 10000); // 10 seconds - way after UI is responsive
+    }, 3000); // 3 seconds - let the map load first
     
     // Handle notifications when app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {

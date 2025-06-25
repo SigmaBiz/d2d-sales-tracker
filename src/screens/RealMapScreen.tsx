@@ -20,7 +20,6 @@ import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
 import NotificationLogPanel from '../components/NotificationLogPanel';
 import { Knock, NotificationLogEntry } from '../types';
-import { testContourGeneration } from '../utils/testContourGeneration';
 
 // DEVELOPMENT FLAGS - REMEMBER TO RESTORE BEFORE PRODUCTION
 const DEV_DISABLE_GPS_UPDATES = __DEV__; // Automatically false in production builds
@@ -46,40 +45,37 @@ export default function RealMapScreen({ navigation }: any) {
   const needsReloadRef = useRef<boolean>(false);
 
   useEffect(() => {
-    // Initialize critical map features in parallel
-    const initialize = async () => {
-      console.log('[RealMapScreen] Starting parallel initialization...');
+    // MINIMAL STARTUP - Just get the map working ASAP
+    const fastStartup = async () => {
+      console.log('[RealMapScreen] Fast startup - map only...');
       const startTime = Date.now();
       
-      // First load cleared IDs, then run other operations in parallel
-      // This is needed because loadKnocks depends on cleared IDs
-      const clearedIds = await loadClearedKnockIds();
-      
-      // Now run map init and knock loading in parallel
-      await Promise.all([
-        initializeMap(),
-        loadKnocks(clearedIds)
-      ]);
+      // Just get location and show map - nothing else
+      await initializeMap();
       
       const elapsed = Date.now() - startTime;
-      console.log(`[RealMapScreen] Parallel init completed in ${elapsed}ms`);
+      console.log(`[RealMapScreen] Map ready in ${elapsed}ms`);
       
-      // Defer heavy services to improve initial load time
-      setTimeout(() => {
-        console.log('[RealMapScreen] Loading deferred services...');
-        // These can also run in parallel
-        Promise.all([
-          loadHailData(),
-          initializeHailAlerts()
-        ]).then(() => {
-          // Test contour generation after hail data loads
-          console.log('Running contour generation test...');
-          testContourGeneration();
-        });
-      }, 500); // Small delay to let map render first
+      // Load knocks after map is visible
+      setTimeout(async () => {
+        console.log('[RealMapScreen] Loading knocks...');
+        const clearedIds = await loadClearedKnockIds();
+        await loadKnocks(clearedIds);
+      }, 100); // Just 100ms delay
+      
+      // Defer ALL hail services - they're not critical
+      if (false) { // Disable for now - uncomment when needed
+        setTimeout(() => {
+          loadHailData().catch(err => console.log('Hail error:', err));
+        }, 10000);
+        
+        setTimeout(() => {
+          initializeHailAlerts().catch(err => console.log('Alerts error:', err));
+        }, 15000);
+      }
     };
     
-    initialize();
+    fastStartup();
     
     // Set up location watching (disabled in development)
     let interval: NodeJS.Timeout | null = null;
@@ -196,11 +192,9 @@ export default function RealMapScreen({ navigation }: any) {
         currentClearedIds = await loadClearedKnockIds();
       }
       
-      // Load local and cloud knocks in parallel
-      const [localKnocks, cloudKnocks] = await Promise.all([
-        StorageService.getKnocks(),
-        SupabaseService.getCloudKnocks()
-      ]);
+      // Just load local knocks - skip cloud sync on startup
+      const localKnocks = await StorageService.getKnocks();
+      const cloudKnocks: Knock[] = []; // Skip cloud sync for fast startup
       
       console.log('[loadKnocks] Raw data:', localKnocks.length, 'local,', cloudKnocks.length, 'cloud');
       
