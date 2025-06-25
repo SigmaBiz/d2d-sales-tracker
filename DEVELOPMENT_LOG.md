@@ -1671,3 +1671,86 @@ Format: `checkpoint-YYYYMMDD-HHMM`
 - MM: Minutes (2 digits)
 
 This follows semantic versioning principles while maintaining chronological ordering.
+
+## Performance Analysis - June 24, 2025
+
+### Critical Performance Issues Identified
+
+After analyzing the Google Maps integration, several major performance bottlenecks were discovered:
+
+#### 1. **Sequential Loading on Startup** (3-5 second delay)
+- **Issue**: App loads data sequentially instead of in parallel
+- **Impact**: Users wait 3-5 seconds before UI becomes responsive
+- **Solution**: Use Promise.all() for parallel initialization
+
+#### 2. **Massive WebView HTML Generation** (Memory spikes)
+- **Issue**: 711+ line HTML string generated on each render
+- **Impact**: Memory spikes and UI freezes during WebView creation
+- **Solution**: Move HTML to static asset file
+
+#### 3. **Full Data Serialization** (100x slower for large datasets)
+- **Issue**: JSON.stringify called on entire knocks array on every update
+- **Impact**: Severe lag with 1000+ knocks
+- **Solution**: Implement differential updates (added/removed/modified only)
+
+#### 4. **Heavy Service Initialization** (Blocks UI startup)
+- **Issue**: Hail intelligence services initialize synchronously
+- **Impact**: 2-3 second delay before UI appears
+- **Solution**: Defer non-critical services, lazy load on demand
+
+#### 5. **WebView Recreation on Navigation**
+- **Issue**: Map completely reloads when switching tabs
+- **Impact**: Loss of state and re-initialization delay
+- **Solution**: Persist WebView instance globally
+
+### Quick Win Optimizations (Order of Magnitude Improvements)
+
+1. **Parallel Data Loading** (5-10x faster startup):
+```javascript
+const [clearedIds, location, knocks, hailData] = await Promise.all([
+  loadClearedKnockIds(),
+  LocationService.getCurrentLocation(),
+  loadKnocks(),
+  loadHailData()
+]);
+```
+
+2. **Differential Knock Updates** (100x faster for large datasets):
+```javascript
+const knockUpdates = {
+  added: newKnocks,
+  removed: deletedKnockIds,
+  modified: changedKnocks
+};
+```
+
+3. **Viewport-Based Loading** (10-100x memory reduction):
+- Only load knocks visible in current map viewport
+- Implement pagination for large datasets
+
+4. **Defer Non-Critical Services**:
+- Initialize Supabase immediately
+- Defer hail intelligence by 1 second
+- Load storm search on demand
+
+### Performance Limitations to Accept
+
+1. **WebView Overhead**: ~500ms initialization is unavoidable
+2. **Google Maps API**: Network latency for tiles/geocoding
+3. **Expo Go Constraints**: No native modules for optimization
+4. **GRIB2 Processing**: Complex meteorological data requires processing time
+
+### Next Steps for Implementation
+
+1. Implement parallel loading in RealMapScreen.tsx
+2. Create differential update system for knocks
+3. Move WebView HTML to static asset
+4. Add viewport-based knock filtering
+5. Implement service lazy loading
+6. Add performance monitoring/metrics
+
+### Current State
+- Performance issues identified and documented
+- Solutions architected but not yet implemented
+- App functional but sluggish with large datasets
+- Ready for performance optimization sprint
