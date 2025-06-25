@@ -143,7 +143,7 @@ export default function RealMapScreen({ navigation }: any) {
       return;
     }
 
-    updateLocation();
+    await updateLocation();
   };
 
   const updateLocation = async () => {
