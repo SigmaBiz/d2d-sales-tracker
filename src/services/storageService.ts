@@ -46,6 +46,14 @@ export class StorageService {
         timestamp: existingKnock.timestamp,  // Preserve original timestamp
         history: history
       };
+      
+      // IMPORTANT: Remove from cleared list if it was cleared before
+      const clearedIds = await this.getClearedKnockIds();
+      const updatedClearedIds = clearedIds.filter(id => id !== existingKnock.id);
+      if (clearedIds.length !== updatedClearedIds.length) {
+        await AsyncStorage.setItem(KEYS.CLEARED_KNOCKS, JSON.stringify(updatedClearedIds));
+        console.log('Removed knock from cleared list:', existingKnock.id);
+      }
     } else {
       // Add new knock
       knocks.push(knock);

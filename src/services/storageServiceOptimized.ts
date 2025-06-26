@@ -103,6 +103,14 @@ export class StorageServiceOptimized {
         history: existingKnock.history,
       };
       
+      // IMPORTANT: Remove from cleared list if it was cleared before
+      const clearedIds = await this.getClearedKnockIds();
+      const updatedClearedIds = clearedIds.filter(id => id !== existingKnock.id);
+      if (clearedIds.length !== updatedClearedIds.length) {
+        await AsyncStorage.setItem(KEYS.CLEARED_KNOCKS, JSON.stringify(updatedClearedIds));
+        console.log('🟢 DEBUG - Removed knock from cleared list:', existingKnock.id);
+      }
+      
       console.log('🟢 DEBUG - Knock updated successfully:', {
         id: knocks[existingIndex].id,
         outcome: knocks[existingIndex].outcome,
