@@ -18,7 +18,12 @@ export async function initCore(): Promise<void> {
     
     // 2. Request location permissions (needed for map)
     console.log('[INIT] Requesting location permissions...');
-    await LocationService.requestPermissions();
+    try {
+      await LocationService.requestPermissions();
+    } catch (permError) {
+      console.warn('[INIT] Location permission error (may be Expo Go):', permError.message);
+      // Continue without location permissions - Expo Go handles this differently
+    }
     
     // 3. Initialize Auto-Sync Service
     console.log('[INIT] Initializing auto-sync service...');
@@ -34,7 +39,12 @@ export async function initCore(): Promise<void> {
     console.log('[INIT] Core initialization complete');
   } catch (error) {
     console.error('[INIT] Core initialization failed:', error);
-    throw error; // Core must succeed
+    // Don't throw if it's just a location permission error in Expo Go
+    if (error.message && error.message.includes('NSLocation')) {
+      console.warn('[INIT] Continuing without location permissions (Expo Go)');
+      return; // Let initialization continue
+    }
+    throw error; // Other errors should still fail
   }
 }
 
