@@ -14,7 +14,6 @@ import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
 import NotificationLogPanel from '../components/NotificationLogPanel';
-import DebugPanel from '../components/DebugPanel';
 import { Knock, NotificationLogEntry } from '../types';
 import { testContourGeneration } from '../utils/testContourGeneration';
 import { KnockDebugger } from '../utils/knockDebugger';
@@ -621,9 +620,6 @@ export default function RealMapScreenOptimized({ navigation }: any) {
           <Ionicons name="locate" size={24} color="#1e40af" />
         </TouchableOpacity>
       </View>
-      
-      {/* Debug Panel */}
-      <DebugPanel />
     </View>
   );
 }
