@@ -20,6 +20,9 @@ export const OPTIMIZATIONS = {
   
   // Phase 1 Optimization: Deferred Initialization
   USE_DEFERRED_INIT: true,       // 🚀 Defer non-critical services to background
+  
+  // Phase 2 Optimization: Progressive Data Loading
+  USE_PROGRESSIVE_LOADING: true,  // 🚀 Load knocks in stages for instant UI
 };
 
 // Performance monitoring

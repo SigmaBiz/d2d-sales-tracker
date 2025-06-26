@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 // OPTIMIZATION: Use safer minified WebMap (20-30% smaller)
 import WebMap from '../components/WebMapOptimizedSafe';
+import { OPTIMIZATIONS } from '../config/optimization';
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageServiceWrapper';
 import { SupabaseService } from '../services/supabaseService';
@@ -203,67 +204,119 @@ export default function RealMapScreenOptimized({ navigation }: any) {
     debouncedUpdateLocation();
   };
 
-  // OPTIMIZATION: Memoize loadKnocks to prevent recreation
-  const loadKnocks = useCallback(async () => {
-    console.log('🟠 DEBUG - loadKnocks called');
+  // OPTIMIZATION: Progressive loading implementation
+  const loadKnocksProgressive = useCallback(async () => {
+    console.log('[PHASE2] Starting progressive knock loading...');
+    const startTime = Date.now();
+    
+    try {
+      // Get cleared count for UI
+      const clearedIds = await StorageService.getClearedKnockIds();
+      setClearedCount(clearedIds.length);
+      
+      // Stage 1: Load last 10 knocks immediately (100ms target)
+      const stage1Start = Date.now();
+      const recentKnocks = await StorageService.getRecentKnocks(10, showCleared);
+      setKnocks(recentKnocks);
+      setLoading(false); // UI is ready!
+      console.log(`[PHASE2] Stage 1 complete: ${recentKnocks.length} recent knocks in ${Date.now() - stage1Start}ms`);
+      
+      // Stage 2: Load today's knocks (200ms target)
+      setTimeout(async () => {
+        const stage2Start = Date.now();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const todayKnocks = await StorageService.getKnocksByDateRange(today, tomorrow, showCleared);
+        
+        // Merge with existing, avoiding duplicates
+        const knockMap = new Map();
+        [...recentKnocks, ...todayKnocks].forEach(knock => {
+          knockMap.set(knock.id, knock);
+        });
+        setKnocks(Array.from(knockMap.values()));
+        console.log(`[PHASE2] Stage 2 complete: ${todayKnocks.length} today's knocks in ${Date.now() - stage2Start}ms`);
+        
+        // Stage 3: Load this week's knocks (500ms target)
+        setTimeout(async () => {
+          const stage3Start = Date.now();
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          
+          const weekKnocks = await StorageService.getKnocksByDateRange(weekAgo, tomorrow, showCleared);
+          
+          // Merge with existing
+          [...weekKnocks].forEach(knock => {
+            knockMap.set(knock.id, knock);
+          });
+          setKnocks(Array.from(knockMap.values()));
+          console.log(`[PHASE2] Stage 3 complete: ${weekKnocks.length} week's knocks in ${Date.now() - stage3Start}ms`);
+          
+          // Stage 4: Load all remaining knocks (background)
+          setTimeout(async () => {
+            const stage4Start = Date.now();
+            const allKnocks = showCleared 
+              ? await StorageService.getKnocks()
+              : await StorageService.getVisibleKnocks();
+            
+            // Final merge
+            allKnocks.forEach(knock => {
+              knockMap.set(knock.id, knock);
+            });
+            setKnocks(Array.from(knockMap.values()));
+            console.log(`[PHASE2] Stage 4 complete: ${allKnocks.length} total knocks in ${Date.now() - stage4Start}ms`);
+            console.log(`[PHASE2] Total load time: ${Date.now() - startTime}ms`);
+            
+            // Try cloud sync in background
+            try {
+              const cloudKnocks = await SupabaseService.getCloudKnocks();
+              if (cloudKnocks.length > 0) {
+                cloudKnocks.forEach(knock => {
+                  if (showCleared || !clearedIds.includes(knock.id)) {
+                    knockMap.set(knock.id, knock);
+                  }
+                });
+                setKnocks(Array.from(knockMap.values()));
+                console.log(`[PHASE2] Cloud sync added ${cloudKnocks.length} knocks`);
+              }
+            } catch (error) {
+              console.error('[PHASE2] Cloud sync error:', error);
+            }
+          }, 200); // Stage 4 delay
+        }, 100); // Stage 3 delay
+      }, 50); // Stage 2 delay
+      
+    } catch (error) {
+      console.error('[PHASE2] Error in progressive loading:', error);
+      setLoading(false);
+      // Fallback to full load
+      loadKnocksFullFallback();
+    }
+  }, [showCleared]);
+
+  // Fallback to original loading method
+  const loadKnocksFullFallback = useCallback(async () => {
+    console.log('[PHASE2] Using fallback full load');
     setLoading(true);
     try {
       const localKnocks = showCleared 
         ? await StorageService.getKnocks()
         : await StorageService.getVisibleKnocks();
       
-      const clearedIds = await StorageService.getClearedKnockIds();
-      setClearedCount(clearedIds.length);
-      
-      console.log('🟡 DEBUG - Loaded knocks:', localKnocks.length, 'Cleared:', clearedIds.length);
-      
-      // DEBUG: Show all knocks to find the updated one
-      console.log('🟡 DEBUG - All loaded knocks:');
-      localKnocks.forEach((knock, index) => {
-        console.log(`  [${index}]`, {
-          id: knock.id,
-          outcome: knock.outcome,
-          address: knock.address,
-        });
-      });
-      
-      // DEBUG: Show recently updated knocks
-      const recentlyUpdated = localKnocks.filter(k => {
-        const timeDiff = Date.now() - new Date(k.timestamp).getTime();
-        return timeDiff < 60000; // Updated in last minute
-      });
-      
-      if (recentlyUpdated.length > 0) {
-        console.log('🔴 DEBUG - Recently updated knocks:');
-        recentlyUpdated.forEach(knock => {
-          console.log('  ', {
-            id: knock.id,
-            address: knock.address,
-            outcome: knock.outcome,
-            timestamp: knock.timestamp,
-          });
-        });
-      }
-      console.log('🟢 DEBUG - Setting knocks state with', localKnocks.length, 'knocks');
       setKnocks(localKnocks);
-      
-      // Then try to get cloud knocks if connected
-      const cloudKnocks = await SupabaseService.getCloudKnocks();
-      if (cloudKnocks.length > 0) {
-        const knockMap = new Map();
-        [...localKnocks, ...cloudKnocks].forEach(knock => {
-          if (showCleared || !clearedIds.includes(knock.id)) {
-            knockMap.set(knock.id, knock);
-          }
-        });
-        setKnocks(Array.from(knockMap.values()));
-      }
     } catch (error) {
       console.error('Error loading knocks:', error);
     } finally {
       setLoading(false);
     }
   }, [showCleared]);
+
+  // Choose loading method based on optimization flag
+  const loadKnocks = OPTIMIZATIONS.USE_PROGRESSIVE_LOADING 
+    ? loadKnocksProgressive 
+    : loadKnocksFullFallback;
 
   const centerOnUser = useCallback(() => {
     debouncedUpdateLocation();

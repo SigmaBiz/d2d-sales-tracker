@@ -308,6 +308,40 @@ export class StorageServiceOptimized {
     return allKnocks.filter(knock => !clearedIds.includes(knock.id));
   }
 
+  // PHASE 2: Progressive loading methods
+  static async getRecentKnocks(limit: number, includeCleared: boolean = false): Promise<Knock[]> {
+    const knocks = includeCleared ? await this.getKnocks() : await this.getVisibleKnocks();
+    
+    // Sort by timestamp descending (newest first)
+    const sorted = knocks.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    
+    return sorted.slice(0, limit);
+  }
+
+  static async getKnocksByDateRange(startDate: Date, endDate: Date, includeCleared: boolean = false): Promise<Knock[]> {
+    const knocks = includeCleared ? await this.getKnocks() : await this.getVisibleKnocks();
+    
+    const startTime = startDate.getTime();
+    const endTime = endDate.getTime();
+    
+    return knocks.filter(knock => {
+      const knockTime = new Date(knock.timestamp).getTime();
+      return knockTime >= startTime && knockTime <= endTime;
+    });
+  }
+
+  static async getKnocksNearLocation(lat: number, lng: number, radiusInDegrees: number = 0.01, includeCleared: boolean = false): Promise<Knock[]> {
+    const knocks = includeCleared ? await this.getKnocks() : await this.getVisibleKnocks();
+    
+    return knocks.filter(knock => {
+      const latDiff = Math.abs(knock.latitude - lat);
+      const lngDiff = Math.abs(knock.longitude - lng);
+      return latDiff <= radiusInDegrees && lngDiff <= radiusInDegrees;
+    });
+  }
+
   // PRESERVATION: Sync timing functionality
   static async getLastSyncTime(): Promise<Date | null> {
     try {
