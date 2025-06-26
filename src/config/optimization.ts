@@ -17,12 +17,6 @@ export const OPTIMIZATIONS = {
   USE_MINIFIED_MAP: true,        // ✅ Working - 30% size reduction
   USE_REAL_TIME_UPDATES: true,   // ✅ Working - instant updates
   USE_DIFFERENTIAL_UPDATES: true, // ✅ Working - 99.9% less data
-  USE_VIEWPORT_CULLING: false,   // 🚧 KILL SWITCH - set true to enable
-  
-  // Viewport culling settings
-  VIEWPORT_CULLING_MIN_KNOCKS: 500, // Only cull with 500+ knocks
-  VIEWPORT_BUFFER_PERCENT: 0.5,      // 50% buffer for smooth panning
-  VIEWPORT_DEBUG_LOGS: true,         // Extensive viewport culling logs
 };
 
 // Performance monitoring
