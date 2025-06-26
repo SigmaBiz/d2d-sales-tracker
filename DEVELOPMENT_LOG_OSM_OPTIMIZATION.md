@@ -730,6 +730,11 @@ Successfully implemented three major optimizations:
 2. **Real-time Updates**: Instant marker updates without navigation
 3. **Differential Updates**: Send only changes, not entire array
 
-Ready for testing. Next optimization will be viewport culling.
+### Bug Fix:
+- Fixed differential updates not showing markers on initial load
+- Added mapReady state to coordinate WebView initialization
+- Ensured first update is always a full update, then diffs after
+
+All three optimizations tested and working. Ready for viewport culling (final optimization).
 
 ---
