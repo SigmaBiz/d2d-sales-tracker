@@ -775,10 +775,56 @@ All three optimizations tested and working. Ready for viewport culling (final op
   - Added kill switch to `optimization.ts`
   - Ready to implement safer viewport culling
 
+### Session 9 (June 26, 2025) - Viewport Culling Removal & Bug Fix
+- **Viewport Culling v2 Attempted**:
+  - Implemented with safety-first approach
+  - Extensive logging added
+  - Testing showed it wasn't working as expected
+  - Decision made to remove all viewport culling code
+
+- **Hard Reset to Save Point**:
+  - Used `git reset --hard c3a3302` to revert to checkpoint
+  - Removed all viewport culling files and configuration
+  - Cleaned up optimization.ts
+  - Committed cleanup changes
+
+- **Critical Bug Fix - Cleared Knocks**:
+  - **Issue**: Cleared knocks that were relabeled didn't show on map
+  - **Root Cause**: When updating a knock, it wasn't removed from cleared list
+  - **Fix**: Added logic to remove knock from cleared list when updated
+  - Applied fix to both `storageService.ts` and `storageServiceOptimized.ts`
+  - Relabeled knocks now properly appear on map
+
 ### Current Optimization Status:
 1. ✅ **Minification** - 30% size reduction (WORKING)
-2. ✅ **Real-time updates** - Instant feedback (WORKING)
+2. ✅ **Real-time updates** - Instant feedback (WORKING)  
 3. ✅ **Differential updates** - 99.9% less data (WORKING)
-4. 🚧 **Viewport culling** - In development (v2 planned)
+4. ❌ **Viewport culling** - Removed due to issues
+
+### Session 10 (June 26, 2025) - Performance Planning & Phase 1 Start
+- **Identified Major Performance Bottlenecks**:
+  - App startup takes ~5 seconds to become interactive
+  - Hail Intelligence System initialization blocking UI
+  - All services initializing synchronously
+  - Heavy operations on main thread
+
+- **Created 6-Phase Performance Plan**:
+  1. **Decouple & Defer** - Modularize initialization
+  2. **Progressive Data Loading** - Load data in priority order
+  3. **Background Processing** - Move heavy ops off main thread
+  4. **Code Splitting** - Lazy load non-critical modules
+  5. **Storage Optimization** - SQLite for better queries
+  6. **Native Maps Migration** - Replace WebView (ultimate goal)
+
+- **Starting Phase 1 Implementation**:
+  - Creating initialization modules
+  - Separating core from non-critical systems
+  - No functionality changes, just reorganization
+
+### Milestone: PERFORMANCE_OPTIMIZATION_PHASE_1_START
+- Three successful optimizations in production
+- Cleared knock bug fixed
+- Ready to tackle startup performance
+- 6-phase plan established
 
 ---
