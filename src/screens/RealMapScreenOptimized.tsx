@@ -19,6 +19,7 @@ import { Knock, NotificationLogEntry } from '../types';
 import { testContourGeneration } from '../utils/testContourGeneration';
 import { KnockDebugger } from '../utils/knockDebugger';
 import MapUpdateService from '../services/mapUpdateService';
+import { calculateKnockChanges } from '../utils/knockDifferential';
 
 // OPTIMIZATION: Debounce helper
 const debounce = (func: Function, wait: number) => {
@@ -50,6 +51,10 @@ export default function RealMapScreenOptimized({ navigation }: any) {
   const [clearedCount, setClearedCount] = useState(0);
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // OPTIMIZATION: Track previous knocks for differential updates
+  const previousKnocksRef = useRef<Knock[]>([]);
+  const useDifferentialUpdates = true; // Feature flag
 
   // OPTIMIZATION: Memoize stats calculations
   const stats = useMemo(() => {
@@ -127,6 +132,42 @@ export default function RealMapScreenOptimized({ navigation }: any) {
       console.log('RealMapScreenOptimized: MapUpdateService initialized');
     }
   }, [loading]); // Re-run when loading changes
+
+  // OPTIMIZATION: Send differential updates when knocks change
+  useEffect(() => {
+    if (!loading && webMapRef.current && knocks.length > 0) {
+      if (useDifferentialUpdates && previousKnocksRef.current.length > 0) {
+        // Calculate changes
+        const changes = calculateKnockChanges(previousKnocksRef.current, knocks);
+        
+        if (changes.hasChanges) {
+          console.log('Sending differential update:', {
+            added: changes.added.length,
+            updated: changes.updated.length,
+            removed: changes.removed.length
+          });
+          
+          // Send differential update
+          webMapRef.current.postMessage(JSON.stringify({
+            type: 'updateKnocksDifferential',
+            added: changes.added,
+            updated: changes.updated,
+            removed: changes.removed
+          }));
+        }
+      } else {
+        // Send full update (first load or differential disabled)
+        console.log('Sending full knock update:', knocks.length);
+        webMapRef.current.postMessage(JSON.stringify({
+          type: 'updateKnocks',
+          knocks: knocks
+        }));
+      }
+      
+      // Update reference for next comparison
+      previousKnocksRef.current = [...knocks];
+    }
+  }, [knocks, loading, useDifferentialUpdates]);
 
   // OPTIMIZATION: Use callback to prevent recreation
   const handleFocus = useCallback(() => {

@@ -203,6 +203,76 @@ setTimeout(function(){
         }
       };
       
+      // Update knocks differentially for better performance
+      window.updateKnocksDifferential=function(changes){
+        console.log('Applying differential update:',changes.added.length,'added,',changes.updated.length,'updated,',changes.removed.length,'removed');
+        
+        // Remove deleted knocks
+        changes.removed.forEach(function(knockId){
+          var marker=knockMarkerMap.get(knockId);
+          if(marker){
+            markerClusterGroup.removeLayer(marker);
+            knockMarkerMap.delete(knockId);
+          }
+        });
+        
+        // Helper function to create/update a marker
+        var createOrUpdateMarker=function(knock){
+          // Remove existing marker if any
+          var existingMarker=knockMarkerMap.get(knock.id);
+          if(existingMarker){
+            markerClusterGroup.removeLayer(existingMarker);
+            knockMarkerMap.delete(knock.id);
+          }
+          
+          // Create new marker
+          var color=colors[knock.outcome]||'#6b7280';
+          var emoji=emojis[knock.outcome]||'📍';
+          
+          var icon=L.divIcon({
+            html:'<div style="background-color:'+color+';width:24px;height:24px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:14px;">'+emoji+'</div>',
+            iconSize:[24,24],
+            iconAnchor:[12,12],
+            className:'custom-div-icon'
+          });
+          
+          // Build popup content
+          var popupContent='<div style="font-size:14px;"><h4 style="margin:0 0 8px 0;color:#1e40af;">'+emoji+' '+knock.outcome.replace(/_/g,' ').toUpperCase()+'</h4>';
+          popupContent+='<p style="margin:4px 0;"><strong>Address:</strong> '+(knock.address||'No address')+'</p>';
+          popupContent+='<p style="margin:4px 0;"><strong>Time:</strong> '+new Date(knock.timestamp).toLocaleString()+'</p>';
+          
+          if(knock.history&&knock.history.length>0){
+            popupContent+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;"><strong>History:</strong>';
+            knock.history.forEach(function(h){
+              var histEmoji=emojis[h.outcome]||'📍';
+              popupContent+='<br><span style="color:#6b7280;font-size:12px;">'+histEmoji+' '+h.outcome.replace(/_/g,' ')+' - '+new Date(h.timestamp).toLocaleDateString()+'</span>';
+            });
+            popupContent+='</div>';
+          }
+          
+          if(knock.notes){
+            popupContent+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;"><strong>Notes:</strong><br>'+knock.notes.replace(/\\n/g,'<br>')+'</div>';
+          }
+          
+          popupContent+='<div style="margin-top:10px;">';
+          popupContent+='<button onclick="window.editKnock(\\''+knock.id+'\\')" style="background-color:#1e40af;color:white;padding:8px 16px;border:none;border-radius:6px;font-size:14px;cursor:pointer;margin-right:8px;">Edit</button>';
+          popupContent+='<button onclick="window.clearKnock(\\''+knock.id+'\\')" style="background-color:#ef4444;color:white;padding:8px 16px;border:none;border-radius:6px;font-size:14px;cursor:pointer;">Clear</button>';
+          popupContent+='</div></div>';
+          
+          var marker=L.marker([knock.latitude,knock.longitude],{icon:icon}).bindPopup(popupContent);
+          markerClusterGroup.addLayer(marker);
+          knockMarkerMap.set(knock.id,marker);
+        };
+        
+        // Add new knocks
+        changes.added.forEach(createOrUpdateMarker);
+        
+        // Update existing knocks
+        changes.updated.forEach(createOrUpdateMarker);
+        
+        console.log('Differential update applied successfully');
+      };
+      
       // Update single knock for real-time updates
       window.updateSingleKnock=function(knock){
         console.log('Updating single knock:',knock.id,knock.outcome);
@@ -494,6 +564,9 @@ setTimeout(function(){
           }else if(data.type==='updateSingleKnock'){
             console.log('Received updateSingleKnock message');
             updateSingleKnock(data.knock);
+          }else if(data.type==='updateKnocksDifferential'){
+            console.log('Received updateKnocksDifferential message');
+            updateKnocksDifferential(data);
           }
         }catch(e){
           console.error('Message error:',e);
@@ -534,15 +607,7 @@ setTimeout(function(){
   // Track if we have pending contours to send
   const [pendingContours, setPendingContours] = useState<any>(null);
 
-  useEffect(() => {
-    console.log('WebMapOptimizedSafe knocks useEffect - isLoading:', isLoading, 'knocks count:', knocks.length);
-    if (!isLoading && webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({
-        type: 'updateKnocks',
-        knocks: knocks
-      }));
-    }
-  }, [knocks, isLoading]);
+  // Removed duplicate knock update - now handled by parent component with differential updates
 
   useEffect(() => {
     if (!isLoading && webViewRef.current && userLocation) {
