@@ -73,15 +73,34 @@ export default function SettingsScreen({ navigation }: any) {
   const clearData = () => {
     Alert.alert(
       'Clear All Data',
-      'Are you sure you want to delete all data? This cannot be undone.',
+      'This will delete all local AND cloud data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: 'Delete Local Only',
           onPress: async () => {
             await StorageService.clearAll();
-            Alert.alert('Success', 'All data has been cleared');
+            Alert.alert('Success', 'Local data has been cleared');
+          },
+        },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: async () => {
+            // Clear local data first
+            await StorageService.clearAll();
+            
+            // Then clear cloud data
+            if (cloudConnected) {
+              const result = await SupabaseService.clearAllCloudKnocks();
+              if (result.error) {
+                Alert.alert('Error', `Failed to clear cloud data: ${result.error}`);
+              } else {
+                Alert.alert('Success', `Cleared ${result.deleted} knocks from cloud and all local data`);
+              }
+            } else {
+              Alert.alert('Success', 'Local data cleared (not connected to cloud)');
+            }
           },
         },
       ]
@@ -89,34 +108,73 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const syncData = async () => {
-    if (!cloudConnected) {
-      // Try to connect first
-      const connected = await SupabaseService.initialize();
-      if (!connected) {
-        // If still not connected, try anonymous auth
-        const signedIn = await SupabaseService.signInAnonymously();
-        if (!signedIn) {
-          Alert.alert(
-            'Cloud Not Connected',
-            'Please check your internet connection and Supabase configuration.'
-          );
-          return;
+    try {
+      // Check connection first
+      if (!cloudConnected) {
+        setSyncing(true);
+        console.log('Not connected to cloud, attempting to connect...');
+        
+        // Try to connect first
+        const connected = await SupabaseService.initialize();
+        if (!connected) {
+          // If still not connected, try anonymous auth
+          const signedIn = await SupabaseService.signInAnonymously();
+          if (!signedIn) {
+            setSyncing(false);
+            Alert.alert(
+              'Cloud Not Connected',
+              'Please check your internet connection and Supabase configuration.'
+            );
+            return;
+          }
         }
+        setCloudConnected(true);
       }
+
+      setSyncing(true);
+      
+      // Get local knock count before sync
+      const localKnocks = await StorageService.getKnocks();
+      const unsyncedKnocks = await StorageService.getUnsyncedKnocks();
+      
+      console.log(`Starting sync: ${localKnocks.length} total knocks, ${unsyncedKnocks.length} unsynced`);
+      
+      // Perform sync
+      const result = await SupabaseService.syncKnocks();
+      
+      // Get cloud knock count after sync
+      const cloudKnocks = await SupabaseService.getCloudKnocks();
+      
+      // Refresh storage usage
+      const usage = await SupabaseService.getStorageUsage();
+      setStorageUsage(usage);
+      
+      setSyncing(false);
+
+      // Detailed sync report
+      const syncReport = [
+        `📱 Local knocks: ${localKnocks.length}`,
+        `☁️  Cloud knocks: ${cloudKnocks.length}`,
+        `✅ Synced: ${result.synced}`,
+        result.failed > 0 ? `❌ Failed: ${result.failed}` : null,
+        `💾 Cloud storage: ${usage ? `${(usage.percentage_used).toFixed(2)}% used` : 'Unknown'}`
+      ].filter(Boolean).join('\n');
+
+      Alert.alert('Sync Complete', syncReport);
+      
+      // Log any discrepancies
+      if (localKnocks.length !== cloudKnocks.length) {
+        console.warn(`Knock count mismatch - Local: ${localKnocks.length}, Cloud: ${cloudKnocks.length}`);
+      }
+      
+    } catch (error: any) {
+      setSyncing(false);
+      console.error('Sync error:', error);
+      Alert.alert(
+        'Sync Failed',
+        `An error occurred during sync: ${error?.message || String(error)}`
+      );
     }
-
-    setSyncing(true);
-    const result = await SupabaseService.syncKnocks();
-    setSyncing(false);
-
-    // Refresh storage usage
-    const usage = await SupabaseService.getStorageUsage();
-    setStorageUsage(usage);
-
-    Alert.alert(
-      'Sync Complete',
-      `✅ ${result.synced} knocks synced to cloud\n${result.failed > 0 ? `❌ ${result.failed} failed to sync` : ''}`
-    );
   };
 
   return (

@@ -40,8 +40,10 @@ export class StorageService {
       }
       
       knocks[existingIndex] = { 
-        ...knock, 
-        id: existingKnock.id,
+        ...existingKnock,  // Preserve all existing fields first
+        ...knock,          // Then override with new data
+        id: existingKnock.id,  // Ensure ID is preserved
+        timestamp: existingKnock.timestamp,  // Preserve original timestamp
         history: history
       };
     } else {

@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LocationService } from '../services/locationService';
-import { StorageService } from '../services/storageService';
+import { StorageService } from '../services/storageServiceWrapper';
 import { SupabaseService } from '../services/supabaseService';
 import { EmailService } from '../services/emailService';
 import { Knock, KnockOutcome, ContactFormData } from '../types';
 import ContactForm from '../components/ContactForm';
+import { KnockDebugger } from '../utils/knockDebugger';
 
 const PIPELINE_OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: string; requiresForm: boolean }[] = [
   { value: 'lead', label: '✅ Lead', color: '#10b981', emoji: '✅', requiresForm: true },
@@ -57,6 +58,11 @@ export default function KnockScreen({ route, navigation }: any) {
   useEffect(() => {
     // Check if we're editing an existing knock
     if (route?.params?.knockId) {
+      KnockDebugger.log('🎯 KnockScreen: Editing existing knock', {
+        knockId: route.params.knockId,
+        outcome: route.params.outcome,
+        address: route.params.address
+      });
       setEditingKnockId(route.params.knockId);
       setSelectedOutcome(route.params.outcome);
       setNotes(route.params.notes || '');
@@ -67,6 +73,10 @@ export default function KnockScreen({ route, navigation }: any) {
       });
     } else if (route?.params?.latitude && route?.params?.longitude) {
       // Creating new knock from map click
+      KnockDebugger.log('🎯 KnockScreen: Creating new knock from map click', {
+        latitude: route.params.latitude,
+        longitude: route.params.longitude
+      });
       setCurrentLocation({
         lat: route.params.latitude,
         lng: route.params.longitude
@@ -75,6 +85,7 @@ export default function KnockScreen({ route, navigation }: any) {
       getAddressFromCoords(route.params.latitude, route.params.longitude);
     } else {
       // Normal knock recording
+      KnockDebugger.log('🎯 KnockScreen: Normal knock recording (current location)');
       getCurrentLocation();
     }
   }, [route?.params]);
@@ -207,12 +218,16 @@ export default function KnockScreen({ route, navigation }: any) {
   };
 
   const saveKnock = async (overrideNotes?: string): Promise<string | null> => {
+    KnockDebugger.log('💾 Starting knock save process');
+    
     if (!selectedOutcome) {
+      KnockDebugger.error('No outcome selected', null);
       Alert.alert('Error', 'Please select an outcome');
       return null;
     }
 
     if (!currentLocation) {
+      KnockDebugger.error('No current location', null);
       Alert.alert('Error', 'Unable to get current location');
       return null;
     }
@@ -225,13 +240,37 @@ export default function KnockScreen({ route, navigation }: any) {
       address,
       outcome: selectedOutcome,
       notes: overrideNotes || notes,
-      timestamp: new Date(),
+      timestamp: new Date(), // This will be preserved by StorageService for edits
       repId: 'current-user', // TODO: Get from auth
       syncStatus: 'pending',
     };
 
+    KnockDebugger.log('📦 Knock object created', knock);
+
     try {
+      KnockDebugger.log('🔄 Calling StorageService.saveKnock');
+      
+      // DEBUG: Log before save
+      console.log('🔵 DEBUG - Before saveKnock:', {
+        isEdit: !!editingKnockId,
+        knockId: knock.id,
+        oldOutcome: route.params?.outcome,
+        newOutcome: knock.outcome,
+        address: knock.address,
+      });
+      
       await StorageService.saveKnock(knock);
+      
+      // DEBUG: Verify save
+      console.log('🟢 DEBUG - After saveKnock, verifying...');
+      const allKnocks = await StorageService.getKnocks();
+      const savedKnock = allKnocks.find(k => k.id === knock.id);
+      console.log('🟡 DEBUG - Saved knock from storage:', {
+        found: !!savedKnock,
+        outcome: savedKnock?.outcome,
+        notes: savedKnock?.notes,
+        timestamp: savedKnock?.timestamp,
+      });
       
       // Update daily stats
       const today = new Date();
@@ -268,11 +307,25 @@ export default function KnockScreen({ route, navigation }: any) {
       setNotes('');
       setEditingKnockId(null);
       
+      // DEBUG: Log navigation
+      console.log('🟣 DEBUG - About to navigate back to Map');
+      console.log('🟣 DEBUG - Navigation params:', {
+        editingKnockId,
+        knockId,
+        outcome: knock.outcome,
+      });
+      
       // Navigate to map view after save
       navigation.navigate('Map');
       
+      KnockDebugger.log('✅ Knock saved successfully!', { knockId: knockId });
+      KnockDebugger.log('📊 Debug session complete. Export logs:', {
+        logs: KnockDebugger.exportLogs()
+      });
+      
       return knockId;
     } catch (error) {
+      KnockDebugger.error('Failed to save knock', error);
       Alert.alert('Error', 'Failed to save knock');
       return null;
     }

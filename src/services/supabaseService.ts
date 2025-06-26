@@ -80,7 +80,9 @@ export class SupabaseService {
         address: knock.address,
         outcome: knock.outcome,
         notes: knock.notes,
-        created_at: knock.timestamp.toString(),
+        created_at: knock.timestamp instanceof Date 
+          ? knock.timestamp.toISOString() 
+          : new Date(knock.timestamp).toISOString(),
         local_id: knock.id,
       }));
 
@@ -113,6 +115,37 @@ export class SupabaseService {
     } catch (error) {
       console.error('Sync failed:', error);
       return { synced: 0, failed: 0 };
+    }
+  }
+
+  // Force sync all knocks (not just unsynced)
+  static async forceSyncAllKnocks(): Promise<{ synced: number; failed: number; total: number }> {
+    if (!this.userId) return { synced: 0, failed: 0, total: 0 };
+
+    try {
+      console.log('Force syncing all knocks...');
+      
+      // Get ALL local knocks
+      const allKnocks = await StorageService.getKnocks();
+      console.log(`Found ${allKnocks.length} total local knocks to sync`);
+      
+      if (allKnocks.length === 0) {
+        return { synced: 0, failed: 0, total: 0 };
+      }
+      
+      // Sync them all
+      const result = await this.syncKnocks(allKnocks);
+      
+      // Mark all as synced if successful
+      if (result.synced > 0) {
+        const syncedIds = allKnocks.map(k => k.id);
+        await StorageService.markKnocksSynced(syncedIds);
+      }
+      
+      return { ...result, total: allKnocks.length };
+    } catch (error) {
+      console.error('Force sync failed:', error);
+      return { synced: 0, failed: 0, total: 0 };
     }
   }
 
@@ -244,5 +277,65 @@ export class SupabaseService {
     return () => {
       subscription.unsubscribe();
     };
+  }
+
+  // Clear all cloud knocks for current user
+  static async clearAllCloudKnocks(): Promise<{ deleted: number; error?: string }> {
+    if (!this.userId) return { deleted: 0, error: 'No user ID' };
+
+    try {
+      console.log('Clearing all cloud knocks for user:', this.userId);
+      
+      // First get count of knocks to delete
+      const { count, error: countError } = await supabase
+        .from('knocks')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', this.userId);
+
+      if (countError) {
+        console.error('Error counting knocks:', countError);
+        return { deleted: 0, error: countError.message };
+      }
+
+      // Delete all knocks for this user
+      const { error: deleteError } = await supabase
+        .from('knocks')
+        .delete()
+        .eq('user_id', this.userId);
+
+      if (deleteError) {
+        console.error('Error deleting knocks:', deleteError);
+        return { deleted: 0, error: deleteError.message };
+      }
+
+      console.log(`Successfully deleted ${count} knocks from cloud`);
+      return { deleted: count || 0 };
+    } catch (error) {
+      console.error('Clear cloud knocks failed:', error);
+      return { deleted: 0, error: String(error) };
+    }
+  }
+
+  // Delete specific cloud knocks
+  static async deleteCloudKnocks(knockIds: string[]): Promise<{ deleted: number; error?: string }> {
+    if (!this.userId || knockIds.length === 0) return { deleted: 0 };
+
+    try {
+      const { error } = await supabase
+        .from('knocks')
+        .delete()
+        .eq('user_id', this.userId)
+        .in('local_id', knockIds);
+
+      if (error) {
+        console.error('Error deleting specific knocks:', error);
+        return { deleted: 0, error: error.message };
+      }
+
+      return { deleted: knockIds.length };
+    } catch (error) {
+      console.error('Delete specific knocks failed:', error);
+      return { deleted: 0, error: String(error) };
+    }
   }
 }

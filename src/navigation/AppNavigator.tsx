@@ -5,7 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 // Import screens (we'll create these next)
-import RealMapScreen from '../screens/RealMapScreen';
+import RealMapScreen from '../screens/RealMapScreenWrapper';
 import KnockScreen from '../screens/KnockScreen';
 import StatsScreen from '../screens/StatsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
