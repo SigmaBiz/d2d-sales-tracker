@@ -737,4 +737,48 @@ Successfully implemented three major optimizations:
 
 All three optimizations tested and working. Ready for viewport culling (final optimization).
 
+### Session 7 (June 26, 2025) - Viewport Culling Attempt 1
+- **First Attempt at Viewport Culling**:
+  - Created `WebMapOptimizedViewport.tsx` with viewport culling logic
+  - Implemented bounds tracking and visible marker rendering
+  - Added 20% viewport buffer for smooth panning
+  
+- **Issues Encountered**:
+  - ❌ No markers appeared on initial load
+  - ❌ currentBounds was null when updateKnocks called
+  - ❌ WebView message handling not working properly
+  - ❌ User location centering felt "clunky"
+  
+- **Root Causes Identified**:
+  - Race condition: Map bounds not ready when knocks arrive
+  - Message handler not properly connected
+  - No fallback for initial render
+  - Too aggressive culling without safety checks
+
+### Session 8 (June 26, 2025) - Planning Viewport Culling v2
+- **Consulted with AI agents** for best practices
+- **Created comprehensive plan** with safety-first approach:
+  1. Two-phase initialization (guaranteed render first)
+  2. Kill switch in optimization config
+  3. Extensive logging for debugging
+  4. Fallback to proven render on any error
+  5. Only activate culling for 500+ knocks
+  
+- **Key Insights from Consultation**:
+  - Never sacrifice working functionality for performance
+  - Viewport culling should wrap existing code, not replace it
+  - Need bulletproof message handling
+  - Must validate bounds before attempting culling
+  
+- **Save Point Created**:
+  - Documented current working state in `VIEWPORT_CULLING_IMPLEMENTATION.md`
+  - Added kill switch to `optimization.ts`
+  - Ready to implement safer viewport culling
+
+### Current Optimization Status:
+1. ✅ **Minification** - 30% size reduction (WORKING)
+2. ✅ **Real-time updates** - Instant feedback (WORKING)
+3. ✅ **Differential updates** - 99.9% less data (WORKING)
+4. 🚧 **Viewport culling** - In development (v2 planned)
+
 ---

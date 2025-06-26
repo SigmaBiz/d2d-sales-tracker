@@ -139,6 +139,12 @@ setTimeout(function(){
       var verifiedMarkers=[];
       var knockMarkerMap=new Map();
       
+      // Viewport culling variables
+      var currentBounds=null;
+      var allKnocksData=[];
+      var viewportCullingEnabled=true; // Feature flag
+      var renderDebounceTimer=null;
+      
       // Update knocks function
       window.updateKnocks=function(knocksData){
         console.log('Updating '+knocksData.length+' knocks with clustering');
