@@ -566,3 +566,103 @@ This session focused on fixing critical bugs that prevented proper data manageme
 ---
 
 This log documents the complete OpenStreetMap optimization effort. The foundation is solid for future Google Maps integration.
+
+### Session 5 (June 26, 2025) - Performance Planning
+- **Invisible Knocks Resolution Confirmed**:
+  - Verified that the invisible knocks issue was caused by corrupted data
+  - Fixed by cloud sync/clear functionality implemented in Session 4
+  - Marked Phase 1 and Phase 2 as complete
+
+- **Performance Optimization Planning**:
+  - Created comprehensive TODO list ranked by impact/time ratio
+  - Weighted impact 70% vs time 30% for prioritization
+  - Identified 11 remaining tasks with detailed explanations
+  - Selected 4 high-impact optimizations for immediate implementation
+
+- **Selected Optimizations** (in order):
+  1. Minimize WebView HTML/CSS (1-2 hours)
+  2. Real-time WebView updates (2-3 hours)
+  3. Differential updates (1 day)
+  4. Viewport culling (1-2 days)
+
+- **Architecture Analysis**:
+  - Created detailed performance optimization analysis
+  - Emphasized structure preservation - no functional changes
+  - All optimizations must produce identical outputs
+  - Focus purely on performance improvements
+  - Documented current structures and optimization approaches
+
+### Files Created This Session:
+- `CUMULATIVE_TODO_LIST.md` - Prioritized task list with rankings
+- `PERFORMANCE_OPTIMIZATION_ANALYSIS.md` - Detailed optimization plans
+
+### Key Decisions:
+- Performance improvements only - no structural changes
+- Preserve all existing functionality exactly
+- Each optimization must be independently toggleable
+- Focus on user-perceivable performance gains
+
+---
+
+## Final Handoff Protocol
+
+### Current State:
+- **Branch**: `feature/openstreetmap-optimization`
+- **Context**: Fresh session ready (previous was 100%)
+- **Core Issues**: All resolved
+  - ✅ Cloud sync/delete functionality
+  - ✅ Knock update timestamps
+  - ✅ WebView marker updates
+  - ✅ Invisible knocks (data corruption)
+- **Ready for**: Performance optimizations
+
+### Next Steps (Prioritized):
+1. **Minimize WebView HTML/CSS** (Quick Win)
+   - Minify HTML/CSS/JS in WebMapOptimized
+   - Target: 30-50% size reduction
+   - Preserve exact visual output
+
+2. **Real-time WebView Updates** (UX Enhancement)
+   - Add `updateSingleKnock` method
+   - Send updates without navigation
+   - Instant visual feedback
+
+3. **Differential Updates** (Performance)
+   - Track previous state
+   - Send only changes
+   - Reduce data transfer
+
+4. **Viewport Culling** (Scalability)
+   - Render only visible markers
+   - Handle 1000+ knocks smoothly
+   - Add 20% viewport buffer
+
+### Implementation Notes:
+- Each optimization has detailed plan in `PERFORMANCE_OPTIMIZATION_ANALYSIS.md`
+- Preserve all functionality - performance only
+- Test visual output remains identical
+- Add feature flags for each optimization
+
+### Testing Checklist for Optimizations:
+- [ ] Visual output identical (before/after screenshots)
+- [ ] All features work exactly the same
+- [ ] Performance metrics show improvement
+- [ ] Can toggle optimization on/off
+- [ ] No data structure changes
+
+### Environment Ready:
+- Expo dev server likely needs restart
+- All debugging code in place
+- Optimization toggle system active
+- Test with cleared data for best results
+
+### Critical Reminders:
+- **DO NOT** change visual appearance
+- **DO NOT** modify data structures
+- **DO NOT** alter feature behavior
+- **ONLY** improve performance
+- **PRESERVE** all existing functionality
+
+---
+
+The codebase is now stable with all critical bugs fixed. Ready for performance optimization phase.
