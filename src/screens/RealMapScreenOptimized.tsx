@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-// OPTIMIZATION: Use optimized WebMap
-import WebMap from '../components/WebMapOptimized';
+// OPTIMIZATION: Use safer minified WebMap (20-30% smaller)
+import WebMap from '../components/WebMapOptimizedSafe';
 import { LocationService } from '../services/locationService';
 import { StorageService } from '../services/storageServiceWrapper';
 import { SupabaseService } from '../services/supabaseService';
@@ -18,6 +18,7 @@ import DebugPanel from '../components/DebugPanel';
 import { Knock, NotificationLogEntry } from '../types';
 import { testContourGeneration } from '../utils/testContourGeneration';
 import { KnockDebugger } from '../utils/knockDebugger';
+import MapUpdateService from '../services/mapUpdateService';
 
 // OPTIMIZATION: Debounce helper
 const debounce = (func: Function, wait: number) => {
@@ -114,8 +115,18 @@ export default function RealMapScreenOptimized({ navigation }: any) {
       if (interval) clearInterval(interval);
       if (contourGenerationTimeout.current) clearTimeout(contourGenerationTimeout.current);
       HailAlertService.stopMonitoring();
+      // Clear map update service reference
+      MapUpdateService.clear();
     };
   }, []);
+
+  // Set MapUpdateService reference when WebView is ready
+  useEffect(() => {
+    if (webMapRef.current) {
+      MapUpdateService.setWebViewRef(webMapRef.current);
+      console.log('RealMapScreenOptimized: MapUpdateService initialized');
+    }
+  }, [loading]); // Re-run when loading changes
 
   // OPTIMIZATION: Use callback to prevent recreation
   const handleFocus = useCallback(() => {

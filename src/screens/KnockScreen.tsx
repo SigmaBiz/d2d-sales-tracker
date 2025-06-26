@@ -17,6 +17,7 @@ import { EmailService } from '../services/emailService';
 import { Knock, KnockOutcome, ContactFormData } from '../types';
 import ContactForm from '../components/ContactForm';
 import { KnockDebugger } from '../utils/knockDebugger';
+import MapUpdateService from '../services/mapUpdateService';
 
 const PIPELINE_OUTCOMES: { value: KnockOutcome; label: string; color: string; emoji: string; requiresForm: boolean }[] = [
   { value: 'lead', label: '✅ Lead', color: '#10b981', emoji: '✅', requiresForm: true },
@@ -271,6 +272,15 @@ export default function KnockScreen({ route, navigation }: any) {
         notes: savedKnock?.notes,
         timestamp: savedKnock?.timestamp,
       });
+      
+      // Send real-time update to map if available
+      if (savedKnock && MapUpdateService.isReady()) {
+        console.log('🔵 DEBUG - Sending real-time update to map');
+        const updated = MapUpdateService.updateSingleKnock(savedKnock);
+        console.log('🔵 DEBUG - Real-time update sent:', updated);
+      } else {
+        console.log('🔴 DEBUG - MapUpdateService not ready, will refresh on navigation');
+      }
       
       // Update daily stats
       const today = new Date();
