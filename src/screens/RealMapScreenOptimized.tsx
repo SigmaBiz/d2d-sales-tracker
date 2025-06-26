@@ -49,6 +49,7 @@ export default function RealMapScreenOptimized({ navigation }: any) {
   const [showNotificationLog, setShowNotificationLog] = useState(false);
   const [showCleared, setShowCleared] = useState(false);
   const [clearedCount, setClearedCount] = useState(0);
+  const [mapReady, setMapReady] = useState(false);
   const webMapRef = useRef<any>(null);
   const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
   
@@ -135,39 +136,42 @@ export default function RealMapScreenOptimized({ navigation }: any) {
 
   // OPTIMIZATION: Send differential updates when knocks change
   useEffect(() => {
-    if (!loading && webMapRef.current && knocks.length > 0) {
-      if (useDifferentialUpdates && previousKnocksRef.current.length > 0) {
-        // Calculate changes
-        const changes = calculateKnockChanges(previousKnocksRef.current, knocks);
-        
-        if (changes.hasChanges) {
-          console.log('Sending differential update:', {
-            added: changes.added.length,
-            updated: changes.updated.length,
-            removed: changes.removed.length
-          });
+    if (!loading && webMapRef.current && mapReady) {
+      // Always send update if we have knocks OR if previous had knocks (for clearing)
+      if (knocks.length > 0 || previousKnocksRef.current.length > 0) {
+        if (useDifferentialUpdates && previousKnocksRef.current.length > 0) {
+          // Calculate changes
+          const changes = calculateKnockChanges(previousKnocksRef.current, knocks);
           
-          // Send differential update
+          if (changes.hasChanges) {
+            console.log('Sending differential update:', {
+              added: changes.added.length,
+              updated: changes.updated.length,
+              removed: changes.removed.length
+            });
+            
+            // Send differential update
+            webMapRef.current.postMessage(JSON.stringify({
+              type: 'updateKnocksDifferential',
+              added: changes.added,
+              updated: changes.updated,
+              removed: changes.removed
+            }));
+          }
+        } else {
+          // Send full update (first load or differential disabled)
+          console.log('Sending full knock update:', knocks.length);
           webMapRef.current.postMessage(JSON.stringify({
-            type: 'updateKnocksDifferential',
-            added: changes.added,
-            updated: changes.updated,
-            removed: changes.removed
+            type: 'updateKnocks',
+            knocks: knocks
           }));
         }
-      } else {
-        // Send full update (first load or differential disabled)
-        console.log('Sending full knock update:', knocks.length);
-        webMapRef.current.postMessage(JSON.stringify({
-          type: 'updateKnocks',
-          knocks: knocks
-        }));
+        
+        // Update reference for next comparison
+        previousKnocksRef.current = [...knocks];
       }
-      
-      // Update reference for next comparison
-      previousKnocksRef.current = [...knocks];
     }
-  }, [knocks, loading, useDifferentialUpdates]);
+  }, [knocks, loading, useDifferentialUpdates, mapReady]);
 
   // OPTIMIZATION: Use callback to prevent recreation
   const handleFocus = useCallback(() => {
@@ -457,6 +461,10 @@ export default function RealMapScreenOptimized({ navigation }: any) {
         userLocation={userLocation}
         onKnockClick={handleMapClick}
         onKnockClear={handleKnockClear}
+        onMapReady={() => {
+          console.log('Map is ready, enabling knock updates');
+          setMapReady(true);
+        }}
         hailContours={hailContours}
         activeStorms={enabledStormIds}
         verifiedReports={verifiedReports}

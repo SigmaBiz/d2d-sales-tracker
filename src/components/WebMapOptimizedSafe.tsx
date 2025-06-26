@@ -9,12 +9,13 @@ interface WebMapProps {
   userLocation: { lat: number; lng: number } | null;
   onKnockClick?: (knock: Knock) => void;
   onKnockClear?: (knockId: string) => void;
+  onMapReady?: () => void;
   hailContours?: any;
   activeStorms?: string[];
   verifiedReports?: any[];
 }
 
-const WebMapOptimizedSafe = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, onKnockClear, hailContours = null, activeStorms = [], verifiedReports = [] }, ref) => {
+const WebMapOptimizedSafe = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, onKnockClick, onKnockClear, onMapReady, hailContours = null, activeStorms = [], verifiedReports = [] }, ref) => {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -497,8 +498,7 @@ setTimeout(function(){
         }
       });
       
-      // Initial data
-      ${knocks.length>0?`updateKnocks(${JSON.stringify(knocks)});`:''}
+      // Initial data - only user location, knocks handled by parent component
       ${userLocation?`updateUserLocation(${userLocation.lat},${userLocation.lng});`:''}
       
       // Message listener
@@ -683,6 +683,9 @@ setTimeout(function(){
       } else if (data.type === 'mapReady') {
         console.log('WebMapOptimizedSafe received mapReady message');
         setIsLoading(false);
+        if (onMapReady) {
+          onMapReady();
+        }
       } else if (data.type === 'mapError') {
         console.error('WebMapOptimizedSafe error:', data.error);
         setIsLoading(false);
