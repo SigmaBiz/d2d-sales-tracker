@@ -1,5 +1,11 @@
 # D2D Sales Tracker - Development Log
 
+## Constitution of Development
+
+The D2D Sales Tracker is built on core principles that guide every development decision:
+
+**Core Mission**: We want an app that helps us track d2d data kinda like a crm but for door to door outcomes, notes, history which is dynamic, easy to use and which gives user insights from the d2d data such as sales analytics. The hail tiered system is supposed to optimize conversion for the canvassing app to expedite the scouting process and help the user arrive to the correct location where hail has occurred and which provides live notifications for events as they happen, historical data, and verified landed hail reports. The app is intended to keep d2d users organized, optimized, alert, and effective.
+
 ## 🚨 CRITICAL: CONTEXT COMPACTING SAFETY PROTOCOL - TWO-TIER SYSTEM 🚨
 
 ### TIER 1: Lightweight Checkpoints (Every 5% Context Consumed)
@@ -1091,6 +1097,78 @@ Task 3: "Trace user flow leading to [bug description]"
    - Navigation integration in Settings
 
 ### Technical Architecture:
+
+## Native Architecture Performance Discussion (2025-01-04)
+
+### Context
+After completing Phase 3 optimizations (background processing), we explored the concept of achieving "order of magnitude" performance improvements to make the app operate seamlessly, effortlessly, and flawlessly.
+
+### Current Performance (v1.0-js-optimized)
+- **Architecture**: React Native → WebView → Leaflet
+- **Cold start**: 3-5 seconds  
+- **Map load**: 1-2 seconds
+- **Contour generation**: ~1.1s (now in background)
+- **Max practical knocks**: ~1000 before sluggish
+
+### Proposed Native Architecture (v2.0-native-planned)
+
+#### Phase 8: Native Core Rewrite
+- **Native Map Rendering**: Direct Metal/OpenGL rendering instead of WebView
+- **Native Data Layer**: Direct SQLite with memory-mapped files
+- **Native Business Logic**: Core operations in Swift/Kotlin
+- **Expected**: 10-50x faster operations
+
+#### Phase 9: Shared Native Components  
+- **C++ Core Library**: Shared between iOS and Android
+- **WebAssembly Fallback**: For web compatibility
+- **Spatial indexing**: GPU-accelerated clustering
+
+#### Phase 10: Predictive Performance
+- **Predictive Caching**: Pre-render based on user patterns
+- **Edge Computing**: Process hail data at CDN
+- **Intelligent Preloading**: AI-driven data preloading
+
+#### Phase 11: Architectural Revolution
+- **Event Sourcing**: Store events, compute views on demand
+- **CQRS Implementation**: Separate read/write models
+- **Reactive Streams**: Replace callbacks with streams
+
+### Expected Performance Gains
+- **Cold start**: <500ms (10x improvement)
+- **Map render**: Instant (100x improvement)  
+- **100k knocks**: Smooth operation (100x capacity)
+- **Memory usage**: 10x reduction
+- **Battery life**: Significantly improved
+
+### Implementation Timeline Discussion
+- Initial estimate: 10-12 months (unrealistic)
+- Revised estimate: 3-4 weeks (more realistic given our 2-week development pace)
+- Aggressive goal: 2 days for core improvements (native storage + basic map)
+- Reality: Code can be written in hours, but building/testing takes time
+
+### Testing Constraints
+- **Expo Go limitation**: Does NOT support native modules
+- **Solution**: EAS Development Builds
+  - One-time setup: ~30-45 minutes
+  - Hot reload for JavaScript changes (instant)
+  - Rebuilds only for native changes (~10 min)
+  - 95% of Expo Go convenience with native module support
+
+### Key Preservation Strategy
+Following our fortified protocol strictly:
+- **Kill switches** for every native module
+- **Exact same interfaces** (no API changes)
+- **Preserve all 15 knock outcomes** exactly
+- **No UI/UX changes** whatsoever
+- **Fallback to JavaScript** always available
+
+### Development Approach
+1. Write native modules with feature flags
+2. Test in EAS development builds
+3. Gradual rollout with monitoring
+4. Instant rollback capability
+
+The key insight: We're not changing WHAT the app does, only HOW it does it - making it orders of magnitude faster while preserving exact functionality.
 ```
 TIER 1: NCEP MRMS (2min) → Immediate Alerts → Canvassing
          ↓
