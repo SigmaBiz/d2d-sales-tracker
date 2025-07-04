@@ -1,8 +1,13 @@
 import Foundation
 import SQLite3
+import React
 
 @objc(D2DNativeStorage)
-class D2DNativeStorage: NSObject {
+class D2DNativeStorage: NSObject, RCTBridgeModule {
+  
+  static func moduleName() -> String! {
+    return "D2DNativeStorage"
+  }
   private var db: OpaquePointer?
   private var enabled: Bool = true
   private let dbPath: String
