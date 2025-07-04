@@ -26,6 +26,7 @@ export const OPTIMIZATIONS = {
   
   // Phase 3 Optimization: Background Processing
   USE_BACKGROUND_CONTOURS: true,  // 🚀 Generate hail contours in background
+  USE_RAF_FOR_UI_UPDATES: true,   // 🚀 Use requestAnimationFrame for smooth UI updates
 };
 
 // Performance monitoring

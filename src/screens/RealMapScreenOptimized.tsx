@@ -579,7 +579,15 @@ export default function RealMapScreenOptimized({ navigation }: any) {
           onStormToggle={handleStormToggle}
           onStormDelete={handleStormDelete}
           onStormFocus={handleStormFocus}
-          onClose={() => setShowStormPanel(false)}
+          onClose={() => {
+          if (OPTIMIZATIONS.USE_RAF_FOR_UI_UPDATES) {
+            requestAnimationFrame(() => {
+              setShowStormPanel(false);
+            });
+          } else {
+            setShowStormPanel(false);
+          }
+        }}
           dataSource={
             activeStorms.length > 0 && activeStorms[0].source
               ? activeStorms[0].source
@@ -591,7 +599,15 @@ export default function RealMapScreenOptimized({ navigation }: any) {
       {/* Notification Log Panel */}
       <NotificationLogPanel
         visible={showNotificationLog}
-        onClose={() => setShowNotificationLog(false)}
+        onClose={() => {
+          if (OPTIMIZATIONS.USE_RAF_FOR_UI_UPDATES) {
+            requestAnimationFrame(() => {
+              setShowNotificationLog(false);
+            });
+          } else {
+            setShowNotificationLog(false);
+          }
+        }}
         onCreateOverlay={() => {
           loadHailData();
           setShowNotificationLog(false);
@@ -624,7 +640,15 @@ export default function RealMapScreenOptimized({ navigation }: any) {
         {/* Notification Log Button */}
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={() => setShowNotificationLog(!showNotificationLog)}
+          onPress={() => {
+            if (OPTIMIZATIONS.USE_RAF_FOR_UI_UPDATES) {
+              requestAnimationFrame(() => {
+                setShowNotificationLog(!showNotificationLog);
+              });
+            } else {
+              setShowNotificationLog(!showNotificationLog);
+            }
+          }}
         >
           <Ionicons name="notifications" size={24} color="#FF6B6B" />
         </TouchableOpacity>
@@ -648,7 +672,15 @@ export default function RealMapScreenOptimized({ navigation }: any) {
         {/* Active Storms Button with badge */}
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={() => setShowStormPanel(!showStormPanel)}
+          onPress={() => {
+            if (OPTIMIZATIONS.USE_RAF_FOR_UI_UPDATES) {
+              requestAnimationFrame(() => {
+                setShowStormPanel(!showStormPanel);
+              });
+            } else {
+              setShowStormPanel(!showStormPanel);
+            }
+          }}
         >
           {isGeneratingContours ? (
             <ActivityIndicator size="small" color="#1e40af" />
@@ -685,12 +717,20 @@ export default function RealMapScreenOptimized({ navigation }: any) {
         <TouchableOpacity 
           style={styles.actionButton} 
           onPress={() => {
-            const newType = mapType === 'street' ? 'satellite' : 'street';
-            setMapType(newType);
-            if (webMapRef.current) {
-              webMapRef.current.postMessage(JSON.stringify({
-                type: 'toggleMapType'
-              }));
+            const updateMapType = () => {
+              const newType = mapType === 'street' ? 'satellite' : 'street';
+              setMapType(newType);
+              if (webMapRef.current) {
+                webMapRef.current.postMessage(JSON.stringify({
+                  type: 'toggleMapType'
+                }));
+              }
+            };
+            
+            if (OPTIMIZATIONS.USE_RAF_FOR_UI_UPDATES) {
+              requestAnimationFrame(updateMapType);
+            } else {
+              updateMapType();
             }
           }}
         >
@@ -702,14 +742,22 @@ export default function RealMapScreenOptimized({ navigation }: any) {
           style={styles.actionButton} 
           onPress={loadKnocks}
           onLongPress={async () => {
-            setShowCleared(!showCleared);
-            Alert.alert(
-              showCleared ? 'Hiding Cleared Knocks' : 'Showing All Knocks',
-              showCleared 
-                ? 'Map will now hide cleared knocks' 
-                : `Map will show all knocks including ${clearedCount} cleared ones`,
-              [{ text: 'OK', onPress: () => loadKnocks() }]
-            );
+            const toggleCleared = () => {
+              setShowCleared(!showCleared);
+              Alert.alert(
+                showCleared ? 'Hiding Cleared Knocks' : 'Showing All Knocks',
+                showCleared 
+                  ? 'Map will now hide cleared knocks' 
+                  : `Map will show all knocks including ${clearedCount} cleared ones`,
+                [{ text: 'OK', onPress: () => loadKnocks() }]
+              );
+            };
+            
+            if (OPTIMIZATIONS.USE_RAF_FOR_UI_UPDATES) {
+              requestAnimationFrame(toggleCleared);
+            } else {
+              toggleCleared();
+            }
           }}
         >
           <Ionicons 
