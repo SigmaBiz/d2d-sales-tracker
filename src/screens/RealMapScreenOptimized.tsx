@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator, InteractionManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 // OPTIMIZATION: Use safer minified WebMap (20-30% smaller)
@@ -388,44 +388,95 @@ export default function RealMapScreenOptimized({ navigation }: any) {
 
     setIsGeneratingContours(true);
     
-    console.log(`Generating contours from ${allReports.length} hail reports`);
-    
-    let contourData = null;
-    
-    if (useSmoothContours) {
-      try {
-        console.log('Attempting MRMS contour generation...');
-        contourData = await MRMSContourService.generateContoursFromReports(allReports);
-        console.log('MRMS contours generated successfully:', contourData);
-      } catch (mrmsError) {
-        console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
+    // PHASE 3 OPTIMIZATION: Move heavy computation to background
+    if (OPTIMIZATIONS.USE_BACKGROUND_CONTOURS) {
+      console.log(`[PHASE3] Deferring contour generation for ${allReports.length} reports to background`);
+      
+      InteractionManager.runAfterInteractions(async () => {
+        console.log('[PHASE3] Starting background contour generation');
+        const startTime = Date.now();
         
+        let contourData = null;
+        
+        if (useSmoothContours) {
+          try {
+            console.log('Attempting MRMS contour generation...');
+            contourData = await MRMSContourService.generateContoursFromReports(allReports);
+            console.log('MRMS contours generated successfully:', contourData);
+          } catch (mrmsError) {
+            console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
+            
+            try {
+              contourData = SimpleContourService.generateSimpleContours(allReports);
+              console.log('Simple contours generated as fallback:', contourData);
+            } catch (simpleError) {
+              console.error('Both contour methods failed:', simpleError);
+            }
+          }
+        } else {
+          try {
+            contourData = SimpleContourService.generateSimpleContours(allReports);
+            console.log('Simple contours generated:', contourData);
+          } catch (simpleError) {
+            console.error('Simple contour generation failed:', simpleError);
+          }
+        }
+        
+        const endTime = Date.now();
+        console.log(`[PHASE3] Contour generation completed in ${endTime - startTime}ms`);
+        
+        console.log('Setting hail contours in state:', contourData);
+        if (contourData && contourData.features) {
+          console.log('Contour features being set:', contourData.features.map((f: any) => ({
+            description: f.properties.description,
+            color: f.properties.color,
+            level: f.properties.level
+          })));
+        }
+        setHailContours(contourData);
+        setIsGeneratingContours(false);
+      });
+    } else {
+      // Original synchronous implementation
+      console.log(`Generating contours from ${allReports.length} hail reports`);
+      
+      let contourData = null;
+      
+      if (useSmoothContours) {
+        try {
+          console.log('Attempting MRMS contour generation...');
+          contourData = await MRMSContourService.generateContoursFromReports(allReports);
+          console.log('MRMS contours generated successfully:', contourData);
+        } catch (mrmsError) {
+          console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
+          
+          try {
+            contourData = SimpleContourService.generateSimpleContours(allReports);
+            console.log('Simple contours generated as fallback:', contourData);
+          } catch (simpleError) {
+            console.error('Both contour methods failed:', simpleError);
+          }
+        }
+      } else {
         try {
           contourData = SimpleContourService.generateSimpleContours(allReports);
-          console.log('Simple contours generated as fallback:', contourData);
+          console.log('Simple contours generated:', contourData);
         } catch (simpleError) {
-          console.error('Both contour methods failed:', simpleError);
+          console.error('Simple contour generation failed:', simpleError);
         }
       }
-    } else {
-      try {
-        contourData = SimpleContourService.generateSimpleContours(allReports);
-        console.log('Simple contours generated:', contourData);
-      } catch (simpleError) {
-        console.error('Simple contour generation failed:', simpleError);
+      
+      console.log('Setting hail contours in state:', contourData);
+      if (contourData && contourData.features) {
+        console.log('Contour features being set:', contourData.features.map((f: any) => ({
+          description: f.properties.description,
+          color: f.properties.color,
+          level: f.properties.level
+        })));
       }
+      setHailContours(contourData);
+      setIsGeneratingContours(false);
     }
-    
-    console.log('Setting hail contours in state:', contourData);
-    if (contourData && contourData.features) {
-      console.log('Contour features being set:', contourData.features.map((f: any) => ({
-        description: f.properties.description,
-        color: f.properties.color,
-        level: f.properties.level
-      })));
-    }
-    setHailContours(contourData);
-    setIsGeneratingContours(false);
   }, [useSmoothContours]);
 
   const loadHailData = useCallback(async () => {

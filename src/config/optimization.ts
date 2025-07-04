@@ -23,6 +23,9 @@ export const OPTIMIZATIONS = {
   
   // Phase 2 Optimization: Progressive Data Loading
   USE_PROGRESSIVE_LOADING: true,  // 🚀 Load knocks in stages for instant UI
+  
+  // Phase 3 Optimization: Background Processing
+  USE_BACKGROUND_CONTOURS: true,  // 🚀 Generate hail contours in background
 };
 
 // Performance monitoring

@@ -84,6 +84,50 @@
 
 ---
 
+## 📜 CONSTITUTION OF DEVELOPMENT 📜
+
+### Core Mission
+We are building an app that helps track door-to-door (D2D) data - functioning as a specialized CRM for door-to-door sales outcomes, notes, and dynamic history. The app must be easy to use while providing powerful insights from D2D data through sales analytics.
+
+### Fundamental Principles
+
+#### 1. **D2D Data Tracking Excellence**
+- Track all door-to-door outcomes with precision and context
+- Maintain comprehensive notes and dynamic history for each location
+- One tag per location system with full interaction history
+- Function as a specialized CRM tailored for D2D sales teams
+
+#### 2. **User Insights & Analytics**
+- Provide actionable sales analytics from collected data
+- Surface patterns and trends to improve conversion rates
+- Help users understand their performance and optimize routes
+- Transform raw knock data into strategic intelligence
+
+#### 3. **Hail Intelligence Integration**
+- **Optimize Conversion**: The 3-tier hail system expedites the scouting process
+- **Live Notifications**: Alert users to hail events as they happen
+- **Historical Data**: Access past storm data for territory planning
+- **Verified Reports**: Ground-truth validation for accuracy
+- **Right Place, Right Time**: Help users arrive at correct hail-affected locations
+
+#### 4. **Core User Benefits**
+The app is intended to keep D2D users:
+- **ORGANIZED**: Comprehensive tracking of all interactions and outcomes
+- **OPTIMIZED**: Data-driven insights for better conversion rates
+- **ALERT**: Real-time notifications for opportunities
+- **EFFECTIVE**: Right tools at the right time for maximum success
+
+### Development Philosophy
+- **Preserve Functionality**: Never break working features while optimizing
+- **User-First Design**: Every feature must enhance the D2D workflow
+- **Performance Matters**: Fast, responsive, and reliable in the field
+- **Data Integrity**: Every knock represents potential revenue - zero data loss tolerance
+
+### This Constitution Guides All Development
+Every feature, optimization, and decision must align with these core principles. We are not just building an app - we are building a tool that directly impacts sales success and livelihoods.
+
+---
+
 ## Project Overview
 A React Native mobile app for door-to-door sales teams to track knocks, analyze performance, and optimize sales routes. Built with Expo for cross-platform compatibility.
 
