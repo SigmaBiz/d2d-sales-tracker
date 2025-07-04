@@ -359,6 +359,16 @@ export default function SettingsScreen({ navigation }: any) {
             3-Tier Hail Intelligence
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => navigation.navigate('NativeTest')}
+        >
+          <Ionicons name="speedometer" size={24} color="#1e40af" />
+          <Text style={styles.actionButtonText}>
+            Native Module Testing
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>

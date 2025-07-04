@@ -1,17 +1,22 @@
-import { USE_OPTIMIZED_COMPONENTS } from '../config/optimization';
+import { USE_OPTIMIZED_COMPONENTS, OPTIMIZATIONS } from '../config/optimization';
 import { StorageService as StorageServiceOriginal } from './storageService';
 import { StorageServiceOptimized } from './storageServiceOptimized';
+import { StorageServiceNative } from './storageServiceNative';
 
 /**
- * Wrapper to switch between original and optimized StorageService
- * This allows the 15-foot location matching to be toggled with the optimization flag
+ * Wrapper to switch between original, optimized, and native StorageService
+ * Priority: Native (if enabled) > Optimized > Original
  */
-export const StorageService = USE_OPTIMIZED_COMPONENTS 
-  ? StorageServiceOptimized 
-  : StorageServiceOriginal;
+export const StorageService = OPTIMIZATIONS.USE_NATIVE_STORAGE 
+  ? StorageServiceNative
+  : USE_OPTIMIZED_COMPONENTS 
+    ? StorageServiceOptimized 
+    : StorageServiceOriginal;
 
 // Log which version is being used
-if (USE_OPTIMIZED_COMPONENTS) {
+if (OPTIMIZATIONS.USE_NATIVE_STORAGE) {
+  console.log('[Performance] Using NATIVE StorageService (SQLite with fallback)');
+} else if (USE_OPTIMIZED_COMPONENTS) {
   console.log('[Performance] Using OPTIMIZED StorageService (15ft location matching)');
 } else {
   console.log('[Performance] Using ORIGINAL StorageService (36ft location matching)');

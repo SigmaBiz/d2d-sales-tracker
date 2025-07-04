@@ -12,6 +12,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import StormSearchScreen from '../screens/StormSearchScreen';
 import DataFlowDashboard from '../screens/DataFlowDashboard';
 import HailIntelligenceDashboard from '../screens/HailIntelligenceDashboard';
+import NativeTestScreen from '../screens/NativeTestScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -97,6 +98,20 @@ function MainStack() {
         component={HailIntelligenceDashboard}
         options={{ 
           title: 'Hail Intelligence',
+          headerStyle: {
+            backgroundColor: '#1e40af',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen 
+        name="NativeTest" 
+        component={NativeTestScreen}
+        options={{ 
+          title: 'Native Module Testing',
           headerStyle: {
             backgroundColor: '#1e40af',
           },
