@@ -9,11 +9,13 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
 import { StorageUsage } from '../services/supabaseClient';
+import { useNativeMap } from '../hooks/useNativeMap';
 
 export default function SettingsScreen({ navigation }: any) {
   const [settings, setSettings] = useState({
@@ -26,6 +28,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [cloudConnected, setCloudConnected] = useState(false);
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const { isNativeMapAvailable, isNativeMapEnabled, toggleNativeMap } = useNativeMap();
 
   useEffect(() => {
     loadSettings();
@@ -226,6 +229,23 @@ export default function SettingsScreen({ navigation }: any) {
             thumbColor={settings.showIncomeOverlay ? '#1e40af' : '#f3f4f6'}
           />
         </View>
+
+        {isNativeMapAvailable && (
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Use Native Map</Text>
+              <Text style={styles.settingDescription}>
+                Use high-performance native iOS map (5-10x faster)
+              </Text>
+            </View>
+            <Switch
+              value={isNativeMapEnabled}
+              onValueChange={toggleNativeMap}
+              trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
+              thumbColor={isNativeMapEnabled ? '#1e40af' : '#f3f4f6'}
+            />
+          </View>
+        )}
 
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>

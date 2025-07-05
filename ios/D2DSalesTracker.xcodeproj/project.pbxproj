@@ -10,6 +10,11 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3D4E9D352E185B7E00BC8944 /* D2DNativeStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D4E9D342E185B7E00BC8944 /* D2DNativeStorage.swift */; };
 		3D4E9D362E185B7E00BC8944 /* D2DNativeStorage.m in Sources */ = {isa = PBXBuildFile; fileRef = 3D4E9D332E185B7E00BC8944 /* D2DNativeStorage.m */; };
+		3D9315D42E18A931005F4E27 /* D2DNativeMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9315D32E18A930005F4E27 /* D2DNativeMapView.swift */; };
+		3D9315D52E18A931005F4E27 /* D2DNativeMap.m in Sources */ = {isa = PBXBuildFile; fileRef = 3D9315D02E18A930005F4E27 /* D2DNativeMap.m */; };
+		3D9315D62E18A931005F4E27 /* D2DNativeMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9315D12E18A930005F4E27 /* D2DNativeMap.swift */; };
+		3D9315D72E18A931005F4E27 /* D2DMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9315CF2E18A930005F4E27 /* D2DMapView.swift */; };
+		3D9315D82E18A931005F4E27 /* D2DNativeMapView.m in Sources */ = {isa = PBXBuildFile; fileRef = 3D9315D22E18A930005F4E27 /* D2DNativeMapView.m */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5B969C99BC522D18C369F384 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BEDCCD2B10A4F184266352FA /* PrivacyInfo.xcprivacy */; };
 		76299B0879D4CC8954811707 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3211684DC3968A99B5504C2D /* ExpoModulesProvider.swift */; };
@@ -27,9 +32,14 @@
 		38550745934A801E0832CFF7 /* Pods-D2DSalesTracker.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-D2DSalesTracker.debug.xcconfig"; path = "Target Support Files/Pods-D2DSalesTracker/Pods-D2DSalesTracker.debug.xcconfig"; sourceTree = "<group>"; };
 		3D4E9D332E185B7E00BC8944 /* D2DNativeStorage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = D2DNativeStorage.m; path = D2DSalesTracker/D2DNativeStorage.m; sourceTree = "<group>"; };
 		3D4E9D342E185B7E00BC8944 /* D2DNativeStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = D2DNativeStorage.swift; path = D2DSalesTracker/D2DNativeStorage.swift; sourceTree = "<group>"; };
+		3D9315CF2E18A930005F4E27 /* D2DMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = D2DMapView.swift; path = D2DSalesTracker/D2DMapView.swift; sourceTree = "<group>"; };
+		3D9315D02E18A930005F4E27 /* D2DNativeMap.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = D2DNativeMap.m; path = D2DSalesTracker/D2DNativeMap.m; sourceTree = "<group>"; };
+		3D9315D12E18A930005F4E27 /* D2DNativeMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = D2DNativeMap.swift; path = D2DSalesTracker/D2DNativeMap.swift; sourceTree = "<group>"; };
+		3D9315D22E18A930005F4E27 /* D2DNativeMapView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = D2DNativeMapView.m; path = D2DSalesTracker/D2DNativeMapView.m; sourceTree = "<group>"; };
+		3D9315D32E18A930005F4E27 /* D2DNativeMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = D2DNativeMapView.swift; path = D2DSalesTracker/D2DNativeMapView.swift; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = D2DSalesTracker/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		BEDCCD2B10A4F184266352FA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = D2DSalesTracker/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BEDCCD2B10A4F184266352FA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = D2DSalesTracker/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C40D10EF977520883F0A9DC1 /* libPods-D2DSalesTracker.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-D2DSalesTracker.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = D2DSalesTracker/AppDelegate.swift; sourceTree = "<group>"; };
@@ -89,6 +99,11 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				3D9315CF2E18A930005F4E27 /* D2DMapView.swift */,
+				3D9315D02E18A930005F4E27 /* D2DNativeMap.m */,
+				3D9315D12E18A930005F4E27 /* D2DNativeMap.swift */,
+				3D9315D22E18A930005F4E27 /* D2DNativeMapView.m */,
+				3D9315D32E18A930005F4E27 /* D2DNativeMapView.swift */,
 				3D4E9D332E185B7E00BC8944 /* D2DNativeStorage.m */,
 				3D4E9D342E185B7E00BC8944 /* D2DNativeStorage.swift */,
 				13B07FAE1A68108700A75B9A /* D2DSalesTracker */,
@@ -126,7 +141,6 @@
 				38550745934A801E0832CFF7 /* Pods-D2DSalesTracker.debug.xcconfig */,
 				0B833401A36A715D6C3C23B3 /* Pods-D2DSalesTracker.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -347,6 +361,11 @@
 				3D4E9D362E185B7E00BC8944 /* D2DNativeStorage.m in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				76299B0879D4CC8954811707 /* ExpoModulesProvider.swift in Sources */,
+				3D9315D42E18A931005F4E27 /* D2DNativeMapView.swift in Sources */,
+				3D9315D52E18A931005F4E27 /* D2DNativeMap.m in Sources */,
+				3D9315D62E18A931005F4E27 /* D2DNativeMap.swift in Sources */,
+				3D9315D72E18A931005F4E27 /* D2DMapView.swift in Sources */,
+				3D9315D82E18A931005F4E27 /* D2DNativeMapView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -477,10 +496,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -538,10 +554,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;

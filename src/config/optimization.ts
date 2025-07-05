@@ -29,7 +29,7 @@ export const OPTIMIZATIONS = {
   USE_RAF_FOR_UI_UPDATES: true,   // 🚀 Use requestAnimationFrame for smooth UI updates
   
   // Phase 8 Optimization: Native Architecture (KILL SWITCHES)
-  USE_NATIVE_STORAGE: false,      // 🔧 Native SQLite storage (iOS/Android)
+  USE_NATIVE_STORAGE: true,       // 🔧 Native SQLite storage (iOS/Android) - FIXED data handling
   USE_NATIVE_MAP: false,          // 🔧 Native map rendering (Metal/OpenGL)
   USE_NATIVE_KNOCK_LOGIC: false,  // 🔧 Native knock matching algorithms
   USE_NATIVE_HAIL: false,         // 🔧 Native hail contour generation

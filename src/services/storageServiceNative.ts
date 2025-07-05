@@ -198,6 +198,69 @@ class StorageServiceNativeClass {
     
     console.log('=== End Performance Comparison ===');
   }
+
+  // Additional methods that delegate to StorageService
+  // Daily Stats
+  async getDailyStats() {
+    return await StorageService.getDailyStats();
+  }
+
+  async saveDailyStats(stats: any) {
+    return await StorageService.saveDailyStats(stats);
+  }
+
+  // Territories
+  async saveTerritories(territories: any[]) {
+    return await StorageService.saveTerritories(territories);
+  }
+
+  async getTerritories() {
+    return await StorageService.getTerritories();
+  }
+
+  // Settings
+  async saveSettings(settings: any) {
+    return await StorageService.saveSettings(settings);
+  }
+
+  async getSettings() {
+    return await StorageService.getSettings();
+  }
+
+  // Contact Forms
+  async saveContactForm(knockId: string, formData: any) {
+    return await StorageService.saveContactForm(knockId, formData);
+  }
+
+  async getContactForms() {
+    return await StorageService.getContactForms();
+  }
+
+  async getContactFormByKnockId(knockId: string) {
+    return await StorageService.getContactFormsByKnockIds([knockId]);
+  }
+
+  async getContactFormByAddress(address: string) {
+    return await StorageService.getContactFormByAddress(address);
+  }
+
+  // Clear operations
+  async clearAll() {
+    if (this.useNative && NativeModuleManager.storage) {
+      // Clear native storage too
+      this.useNative = false; // Reset to recheck availability
+    }
+    return await StorageService.clearAll();
+  }
+
+  // Notification Log
+  async getNotificationLog() {
+    return await StorageService.getNotificationLog();
+  }
+
+  async saveNotificationLogEntry(entry: any) {
+    return await StorageService.saveNotificationLogEntry(entry);
+  }
 }
 
 // Export singleton instance

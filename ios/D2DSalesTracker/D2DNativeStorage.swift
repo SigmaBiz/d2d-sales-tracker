@@ -312,31 +312,58 @@ class D2DNativeStorage: NSObject, RCTBridgeModule {
     var knock: [String: Any] = [:]
     
     // Extract all fields preserving exact structure
+    // ALWAYS include all fields, even if empty
     knock["id"] = String(cString: sqlite3_column_text(statement, 0))
     knock["latitude"] = sqlite3_column_double(statement, 1)
     knock["longitude"] = sqlite3_column_double(statement, 2)
     
+    // Address fields - always include, even if empty
     if let address = sqlite3_column_text(statement, 3) {
       knock["address"] = String(cString: address)
+    } else {
+      knock["address"] = ""
     }
+    
     if let city = sqlite3_column_text(statement, 4) {
       knock["city"] = String(cString: city)
+    } else {
+      knock["city"] = ""
     }
+    
     if let state = sqlite3_column_text(statement, 5) {
       knock["state"] = String(cString: state)
+    } else {
+      knock["state"] = ""
     }
     
-    knock["outcome"] = String(cString: sqlite3_column_text(statement, 6))
+    // Outcome - required field
+    if let outcome = sqlite3_column_text(statement, 6) {
+      knock["outcome"] = String(cString: outcome)
+    } else {
+      knock["outcome"] = ""
+    }
     
+    // Notes - always include, even if empty
     if let notes = sqlite3_column_text(statement, 7) {
       knock["notes"] = String(cString: notes)
+    } else {
+      knock["notes"] = ""
     }
     
-    knock["timestamp"] = String(cString: sqlite3_column_text(statement, 8))
+    // Timestamp - required field
+    if let timestamp = sqlite3_column_text(statement, 8) {
+      knock["timestamp"] = String(cString: timestamp)
+    } else {
+      knock["timestamp"] = ""
+    }
+    
     knock["cleared"] = sqlite3_column_int(statement, 9) == 1
     
+    // Sync status - default to pending if not set
     if let syncStatus = sqlite3_column_text(statement, 10) {
       knock["syncStatus"] = String(cString: syncStatus)
+    } else {
+      knock["syncStatus"] = "pending"
     }
     
     // Parse history JSON
@@ -345,7 +372,11 @@ class D2DNativeStorage: NSObject, RCTBridgeModule {
       if let historyData = historyString.data(using: .utf8),
          let history = try? JSONSerialization.jsonObject(with: historyData) {
         knock["history"] = history
+      } else {
+        knock["history"] = []
       }
+    } else {
+      knock["history"] = []
     }
     
     return knock

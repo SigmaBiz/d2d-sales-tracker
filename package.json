@@ -1,12 +1,14 @@
 {
   "name": "d2d-sales-tracker",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "rebuild-ios": "./scripts/rebuild-ios.sh",
+    "add-ios-files": "node ./scripts/add-ios-files.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",

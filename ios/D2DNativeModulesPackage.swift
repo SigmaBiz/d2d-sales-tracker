@@ -7,8 +7,9 @@ class D2DNativeModulesPackage: NSObject {
   @objc
   static func moduleClasses() -> [AnyClass] {
     return [
-      D2DNativeStorage.self
-      // D2DNativeMap.self will be added later
+      D2DNativeStorage.self,
+      D2DNativeMap.self,
+      D2DNativeMapViewManager.self
     ]
   }
   
