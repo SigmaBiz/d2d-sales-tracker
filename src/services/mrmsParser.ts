@@ -340,10 +340,10 @@ export class MRMSParser {
    * Fetch historical MESH data for a specific date
    */
   static async fetchHistoricalMESH(date: Date): Promise<HailReport[]> {
-    // Format date for MRMS archive
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    // Format date for MRMS archive (use UTC to avoid timezone bugs)
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
     
     // Try Iowa State Mesonet archive first
     const archiveUrl = `https://mesonet.agron.iastate.edu/archive/data/${year}/${month}/${day}/mrms/mesh/`;
