@@ -1,0 +1,21 @@
+{
+  "name": "d2d-hail-tracker-api",
+  "version": "1.0.0",
+  "description": "Serverless API for MRMS hail data processing",
+  "main": "index.js",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.654.0",
+    "@aws-sdk/s3-request-presigner": "^3.654.0",
+    "axios": "^1.7.7",
+    "csv-parse": "^5.5.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "@vercel/node": "^3.2.17",
+    "typescript": "^5.6.3"
+  }
+}
