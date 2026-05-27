@@ -19,6 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export interface SupabaseKnock {
   id?: string;
   user_id?: string;
+  team_id?: string;
   address?: string;
   latitude: number;
   longitude: number;

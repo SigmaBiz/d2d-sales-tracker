@@ -14,10 +14,21 @@ import { supabase, SupabaseKnock, SupabaseKnockHistory, SupabaseContact } from '
 import { Knock, KnockContact, KnockOutcome } from '../types';
 
 const OFFLINE_QUEUE_KEY = '@knock_offline_queue';
+const TEAM_ID_KEY = '@team_id';
+const TEAM_SETUP_DONE_KEY = '@team_setup_done';
 const MAX_HISTORY_PER_KNOCK = 10;
+
+export interface TeamInfo {
+  id: string;
+  name: string;
+  invite_code: string;
+  role: 'owner' | 'member';
+  member_count?: number;
+}
 
 export class SupabaseService {
   private static userId: string | null = null;
+  private static teamId: string | null = null;
 
   // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +37,7 @@ export class SupabaseService {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         this.userId = session.user.id;
+        this.teamId = await AsyncStorage.getItem(TEAM_ID_KEY);
         return true;
       }
       return false; // No session — user must sign in via AuthScreen
@@ -35,12 +47,133 @@ export class SupabaseService {
     }
   }
 
+  static async isTeamSetupDone(): Promise<boolean> {
+    const val = await AsyncStorage.getItem(TEAM_SETUP_DONE_KEY);
+    return val === 'true';
+  }
+
+  static async markTeamSetupDone(): Promise<void> {
+    await AsyncStorage.setItem(TEAM_SETUP_DONE_KEY, 'true');
+  }
+
+  // ── Team ────────────────────────────────────────────────────────────────────
+
+  static async createTeam(name: string): Promise<{ success: boolean; invite_code?: string; error?: string }> {
+    if (!this.userId) return { success: false, error: 'Not authenticated' };
+
+    // Generate a 6-char invite code (no confusing chars)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let invite_code = '';
+    for (let i = 0; i < 6; i++) {
+      invite_code += chars[Math.floor(Math.random() * chars.length)];
+    }
+
+    const { data: team, error: teamErr } = await supabase
+      .from('teams')
+      .insert({ owner_id: this.userId, name, invite_code })
+      .select()
+      .single();
+
+    if (teamErr) return { success: false, error: teamErr.message };
+
+    await supabase.from('team_members').insert({
+      team_id: team.id,
+      user_id: this.userId,
+      role: 'owner',
+    });
+
+    this.teamId = team.id;
+    await AsyncStorage.setItem(TEAM_ID_KEY, team.id);
+    await this.markTeamSetupDone();
+
+    return { success: true, invite_code };
+  }
+
+  static async joinTeam(inviteCode: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.userId) return { success: false, error: 'Not authenticated' };
+
+    const { data: team, error: lookupErr } = await supabase
+      .from('teams')
+      .select('id, name')
+      .eq('invite_code', inviteCode.toUpperCase().trim())
+      .maybeSingle();
+
+    if (lookupErr || !team) return { success: false, error: 'Invalid invite code' };
+
+    const { error: joinErr } = await supabase.from('team_members').insert({
+      team_id: team.id,
+      user_id: this.userId,
+      role: 'member',
+    });
+
+    if (joinErr) {
+      if (joinErr.code === '23505') return { success: false, error: 'Already a member of this team' };
+      return { success: false, error: joinErr.message };
+    }
+
+    this.teamId = team.id;
+    await AsyncStorage.setItem(TEAM_ID_KEY, team.id);
+    await this.markTeamSetupDone();
+
+    return { success: true };
+  }
+
+  static async getMyTeam(): Promise<TeamInfo | null> {
+    if (!this.userId) return null;
+
+    const { data } = await supabase
+      .from('team_members')
+      .select('role, teams(id, name, invite_code)')
+      .eq('user_id', this.userId)
+      .maybeSingle();
+
+    if (!data || !data.teams) return null;
+
+    const team = data.teams as any;
+
+    // Get member count (only available to owner)
+    let member_count: number | undefined;
+    if (data.role === 'owner') {
+      const { count } = await supabase
+        .from('team_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('team_id', team.id);
+      member_count = count ?? undefined;
+    }
+
+    return {
+      id: team.id,
+      name: team.name,
+      invite_code: team.invite_code,
+      role: data.role as 'owner' | 'member',
+      member_count,
+    };
+  }
+
+  static async leaveTeam(): Promise<void> {
+    if (!this.userId || !this.teamId) return;
+
+    await supabase
+      .from('team_members')
+      .delete()
+      .eq('team_id', this.teamId)
+      .eq('user_id', this.userId);
+
+    this.teamId = null;
+    await AsyncStorage.removeItem(TEAM_ID_KEY);
+  }
+
+  static getTeamId(): string | null {
+    return this.teamId;
+  }
+
   static async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { success: false, error: error.message };
       if (data.user) {
         this.userId = data.user.id;
+        this.teamId = await AsyncStorage.getItem(TEAM_ID_KEY);
         return { success: true };
       }
       return { success: false, error: 'Sign in failed' };
@@ -55,6 +188,7 @@ export class SupabaseService {
       if (error) return { success: false, error: error.message };
       if (data.user) {
         this.userId = data.user.id;
+        this.teamId = null; // New user has no team yet
         return { success: true };
       }
       return { success: false, error: 'Sign up failed' };
@@ -83,6 +217,7 @@ export class SupabaseService {
 
     const row: SupabaseKnock = {
       user_id: this.userId ?? undefined,
+      team_id: this.teamId ?? undefined,
       address: knock.address,
       latitude: knock.latitude,
       longitude: knock.longitude,
@@ -160,7 +295,6 @@ export class SupabaseService {
     const { data, error } = await supabase
       .from('knocks')
       .select('*')
-      .eq('user_id', this.userId)
       .order('knocked_at', { ascending: false })
       .limit(2000);
 
@@ -180,7 +314,6 @@ export class SupabaseService {
     const { data, error } = await supabase
       .from('knocks')
       .select('*')
-      .eq('user_id', this.userId)
       .gte('latitude', south)
       .lte('latitude', north)
       .gte('longitude', west)

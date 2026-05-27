@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StorageService } from '../services/storageService';
-import { SupabaseService } from '../services/supabaseService';
+import { SupabaseService, TeamInfo } from '../services/supabaseService';
 import { StorageUsage } from '../services/supabaseClient';
 
 export default function SettingsScreen({ navigation }: any) {
@@ -26,10 +26,16 @@ export default function SettingsScreen({ navigation }: any) {
   const [cloudConnected, setCloudConnected] = useState(false);
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [team, setTeam] = useState<TeamInfo | null>(null);
+  const [loadingTeam, setLoadingTeam] = useState(true);
 
   useEffect(() => {
     loadSettings();
     checkCloudConnection();
+    SupabaseService.getMyTeam().then(t => {
+      setTeam(t);
+      setLoadingTeam(false);
+    });
     
     // Refresh when screen is focused
     const interval = setInterval(() => {
@@ -304,6 +310,48 @@ export default function SettingsScreen({ navigation }: any) {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Team</Text>
+        {loadingTeam ? (
+          <ActivityIndicator style={{ margin: 16 }} color="#1e40af" />
+        ) : team ? (
+          <View style={{ paddingHorizontal: 16 }}>
+            <Text style={styles.teamName}>{team.name}</Text>
+            <Text style={styles.teamRole}>{team.role === 'owner' ? 'Owner' : 'Member'}</Text>
+            {team.role === 'owner' && (
+              <>
+                <Text style={styles.teamLabel}>Invite Code</Text>
+                <View style={styles.inviteCodeBox}>
+                  <Text style={styles.inviteCode}>{team.invite_code}</Text>
+                </View>
+                {team.member_count !== undefined && (
+                  <Text style={styles.teamMeta}>{team.member_count} member{team.member_count !== 1 ? 's' : ''}</Text>
+                )}
+              </>
+            )}
+            {team.role === 'member' && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.dangerButton, { marginTop: 12, marginHorizontal: 0 }]}
+                onPress={() => {
+                  Alert.alert('Leave Team', 'You will no longer see team pins or be able to add knocks to this team.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Leave', style: 'destructive', onPress: async () => {
+                      await SupabaseService.leaveTeam();
+                      setTeam(null);
+                    }},
+                  ]);
+                }}
+              >
+                <Ionicons name="exit-outline" size={24} color="#dc2626" />
+                <Text style={[styles.actionButtonText, styles.dangerText]}>Leave Team</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <Text style={styles.teamNone}>Solo mode — no team. Reinstall the app to set up a team.</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <Text style={styles.aboutText}>D2D Sales Tracker v1.0.0</Text>
         <Text style={styles.aboutText}>© 2024 Your Company</Text>
@@ -434,5 +482,51 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 8,
     textAlign: 'center',
+  },
+  teamName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  teamRole: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  teamLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inviteCodeBox: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#86efac',
+    marginBottom: 8,
+  },
+  inviteCode: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#166534',
+    letterSpacing: 6,
+    textAlign: 'center',
+  },
+  teamMeta: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  teamNone: {
+    fontSize: 14,
+    color: '#9ca3af',
+    paddingHorizontal: 16,
+    fontStyle: 'italic',
   },
 });

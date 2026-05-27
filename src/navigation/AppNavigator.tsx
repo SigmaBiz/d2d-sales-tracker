@@ -13,6 +13,7 @@ import StormSearchScreen from '../screens/StormSearchScreen';
 import DataFlowDashboard from '../screens/DataFlowDashboard';
 import HailIntelligenceDashboard from '../screens/HailIntelligenceDashboard';
 import AuthScreen from '../screens/AuthScreen';
+import TeamSetupScreen from '../screens/TeamSetupScreen';
 import { SupabaseService } from '../services/supabaseService';
 
 const Tab = createBottomTabNavigator();
@@ -113,11 +114,16 @@ function MainStack() {
 }
 
 export default function AppNavigator() {
-  const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
+  const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'team_setup' | 'unauthenticated'>('loading');
 
   useEffect(() => {
-    SupabaseService.initialize().then(authenticated => {
-      setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
+    SupabaseService.initialize().then(async authenticated => {
+      if (!authenticated) {
+        setAuthState('unauthenticated');
+        return;
+      }
+      const teamSetupDone = await SupabaseService.isTeamSetupDone();
+      setAuthState(teamSetupDone ? 'authenticated' : 'team_setup');
     });
   }, []);
 
@@ -130,7 +136,16 @@ export default function AppNavigator() {
   }
 
   if (authState === 'unauthenticated') {
-    return <AuthScreen onAuthenticated={() => setAuthState('authenticated')} />;
+    return (
+      <AuthScreen onAuthenticated={async () => {
+        const teamSetupDone = await SupabaseService.isTeamSetupDone();
+        setAuthState(teamSetupDone ? 'authenticated' : 'team_setup');
+      }} />
+    );
+  }
+
+  if (authState === 'team_setup') {
+    return <TeamSetupScreen onComplete={() => setAuthState('authenticated')} />;
   }
 
   return (
