@@ -79,23 +79,40 @@ export class HailAlertService {
    * Called on every init so tokens stay current (they can rotate).
    */
   static async registerPushToken(): Promise<void> {
+    // DEBUG: confirm function was reached
+    await supabase.from('push_tokens').upsert(
+      { token: 'DEBUG_STARTED', active: false, updated_at: new Date().toISOString() },
+      { onConflict: 'token' }
+    );
+
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({
         projectId: 'ffdec8ec-db31-4b46-ad99-d4434a5e5115',
       });
       const token = tokenData.data;
 
+      // DEBUG: confirm token obtained and capture its value
       await supabase.from('push_tokens').upsert(
+        { token: `DEBUG_TOKEN: ${token}`, active: false, updated_at: new Date().toISOString() },
+        { onConflict: 'token' }
+      );
+
+      const { error: upsertError } = await supabase.from('push_tokens').upsert(
         { token, active: true, updated_at: new Date().toISOString() },
         { onConflict: 'token' }
       );
 
-      console.log('[HailAlert] Push token registered:', token);
+      if (upsertError) {
+        await supabase.from('push_tokens').upsert(
+          { token: `DEBUG_UPSERT_ERR: ${upsertError.message}`, active: false, updated_at: new Date().toISOString() },
+          { onConflict: 'token' }
+        );
+      } else {
+        console.log('[HailAlert] Push token registered:', token);
+      }
     } catch (err) {
-      // Non-fatal — app still works, just won't receive server-side alerts
       const errMsg = err instanceof Error ? err.message : String(err);
       console.warn('[HailAlert] Push token registration failed:', errMsg);
-      // Write error to Supabase so we can debug remotely
       try {
         await supabase.from('push_tokens').upsert(
           { token: `DEBUG_ERROR: ${errMsg}`, active: false, updated_at: new Date().toISOString() },
