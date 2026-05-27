@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (error) {
     console.error('[TestPush] Error fetching tokens:', error);
-    return res.status(500).json({ error: 'Failed to fetch push tokens' });
+    return res.status(500).json({ error: 'Failed to fetch push tokens', detail: error.message, code: error.code });
   }
 
   const tokens: string[] = (tokenRows || []).map((r: { token: string }) => r.token);
