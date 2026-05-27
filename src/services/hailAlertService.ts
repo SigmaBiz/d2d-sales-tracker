@@ -93,7 +93,15 @@ export class HailAlertService {
       console.log('[HailAlert] Push token registered:', token);
     } catch (err) {
       // Non-fatal — app still works, just won't receive server-side alerts
-      console.warn('[HailAlert] Push token registration failed:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn('[HailAlert] Push token registration failed:', errMsg);
+      // Write error to Supabase so we can debug remotely
+      try {
+        await supabase.from('push_tokens').upsert(
+          { token: `DEBUG_ERROR: ${errMsg}`, active: false, updated_at: new Date().toISOString() },
+          { onConflict: 'token' }
+        );
+      } catch (_) {}
     }
   }
   
