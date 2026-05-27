@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-parameters": "^7.29.7",
     "@types/react": "~19.1.10",
     "@types/react-native": "^0.72.8",
     "typescript": "~5.9.2"
