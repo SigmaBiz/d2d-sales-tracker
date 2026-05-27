@@ -46,6 +46,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow D2D Sales Tracker to use your location to track door knocks and territory coverage."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1e40af"
+        }
       ]
     ],
     "extra": {
