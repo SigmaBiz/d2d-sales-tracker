@@ -24,8 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? '(missing)';
-  const supabaseKeyLength = process.env.SUPABASE_SERVICE_ROLE_KEY?.length ?? 0;
   const supabase = getSupabaseClient();
 
   const { data: tokenRows, error } = await supabase
@@ -35,13 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (error) {
     console.error('[TestPush] Error fetching tokens:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch push tokens',
-      detail: error.message,
-      code: error.code,
-      supabase_url: supabaseUrl,
-      supabase_key_length: supabaseKeyLength,
-    });
+    return res.status(500).json({ error: 'Failed to fetch push tokens' });
   }
 
   const tokens: string[] = (tokenRows || []).map((r: { token: string }) => r.token);
