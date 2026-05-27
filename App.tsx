@@ -18,7 +18,12 @@ export default function App() {
   useEffect(() => {
     // Initialize services
     SupabaseService.initialize();
-    
+
+    // Register push token so server-side alerts can reach this device
+    HailAlertService.initialize().catch(err =>
+      console.warn('[App] Push notification init failed (non-fatal):', err)
+    );
+
     // Initialize 3-Tier Hail Intelligence System
     IntegratedHailIntelligence.initialize({
       enableRealTime: true,
@@ -30,7 +35,7 @@ export default function App() {
     }).catch(error => {
       console.error('[App] Failed to initialize Hail Intelligence:', error);
     });
-    
+
     // Handle notifications when app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('Notification received:', notification);
@@ -38,12 +43,19 @@ export default function App() {
 
     // Handle notification taps
     responseListener.current = Notifications.addNotificationResponseReceivedListener(async response => {
+      const data = response.notification.request.content.data as any;
+
+      // Swath ready — store date so map screen can auto-select it
+      if (data?.type === 'swath_ready' && data?.date) {
+        console.log('[App] Swath ready tapped for date:', data.date);
+        (global as any).pendingSwathDate = data.date;
+        return;
+      }
+
       const result = await HailAlertService.handleNotificationResponse(response);
-      
+
       if (result && result.action === 'OPEN_NOTIFICATION_LOG') {
-        // Store the intent to open notification log
         console.log('Hail alert tapped, will open notification log on map...');
-        // Store the navigation intent globally so map screen can check it
         (global as any).openNotificationLog = true;
       }
     });

@@ -1,39 +1,79 @@
-export type KnockOutcome = 
-  // Primary outcomes
-  | 'not_home'        // 👻 Nobody answered
-  | 'convo'           // 💬 Had conversation
-  | 'inspected'       // 🪜 Roof inspected
-  | 'no_soliciting'   // 🚫 No soliciting sign
-  | 'lead'            // ✅ Interested prospect
-  | 'sale'            // 📝 Contract signed
-  | 'callback'        // 🔄 Follow up needed
-  // Property status
-  | 'new_roof'        // 👼 Recently replaced roof
-  | 'competitor'      // 🏗️ Another company working
-  | 'renter'          // 🧟 Tenant, not owner
-  | 'poor_condition'  // 🏚️ House in bad shape
-  // Action taken
-  | 'proposal_left'   // 📋 Left estimate/proposal
-  | 'stay_away'       // 👹 Dangerous or problematic
-  | 'revisit'         // 👀 Worth coming back
-  // Legacy (for backward compatibility)
-  | 'not_interested';
+export type KnockOutcome =
+  | 'no_home'          // 👻 Nobody answered
+  | 'not_interested'   // 🙅 Clear rejection
+  | 'no_soliciting'    // 🚫 Sign on door
+  | 'renter'           // 🧟 Tenant, not owner
+  | 'conversation'     // 💬 Engaged, some interest
+  | 'inspected'        // 🪜 Roof assessed
+  | 'signed'           // 🔏 Contract signed
+  | 'follow_up'        // 🔄 Warm, needs another touch
+  | 'lead'             // ✅ Hot, qualified prospect
+  | 'scout';           // 📍 Address noted for future canvassing
+
+export const KNOCK_OUTCOME_EMOJI: Record<KnockOutcome, string> = {
+  no_home:        '👻',
+  not_interested: '🙅',
+  no_soliciting:  '🚫',
+  renter:         '🧟',
+  conversation:   '💬',
+  inspected:      '🪜',
+  signed:         '🔏',
+  follow_up:      '🔄',
+  lead:           '✅',
+  scout:          '📍',
+};
+
+export const KNOCK_OUTCOME_LABEL: Record<KnockOutcome, string> = {
+  no_home:        'No Home',
+  not_interested: 'Not Interested',
+  no_soliciting:  'No Soliciting',
+  renter:         'Renter',
+  conversation:   'Conversation',
+  inspected:      'Inspected',
+  signed:         'Signed',
+  follow_up:      'Follow Up',
+  lead:           'Lead',
+  scout:          'Scout',
+};
 
 export interface Knock {
   id: string;
+  user_id?: string;
   latitude: number;
   longitude: number;
   address?: string;
-  outcome: KnockOutcome;
+  label: KnockOutcome;
   notes?: string;
-  timestamp: Date;
-  repId: string;
+  photo_url?: string;
+  storm_date?: string; // YYYY-MM-DD of storm that prompted this canvass
+  knocked_at: Date;
   syncStatus: 'pending' | 'synced';
+  year_built?: number; // property year built (from Redfin/manual entry)
+  sqft?: number;       // property square footage (from Redfin/manual entry)
   history?: Array<{
-    outcome: KnockOutcome;
-    timestamp: Date;
+    previous_label: KnockOutcome;
+    new_label: KnockOutcome;
+    changed_at: Date;
     notes?: string;
   }>;
+}
+
+export interface KnockContact {
+  id: string;
+  knock_id: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  insurance_carrier?: string;
+  is_owner: boolean;
+}
+
+export interface Appointment {
+  id: string;
+  knock_id: string;
+  scheduled_at: Date;
+  notes?: string;
+  status: 'pending' | 'completed' | 'cancelled';
 }
 
 export interface Territory {

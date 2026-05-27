@@ -1,0 +1,13 @@
+# Mobile build artifacts — not needed for Vercel API deployment
+ios/
+android/
+
+# Local GRIB2 data files — processed locally, results go to R2
+mrms-proxy-server/
+
+# Expo/React Native node_modules — Vercel only needs api/
+node_modules/
+
+# Local dev files
+.env
+.env.local

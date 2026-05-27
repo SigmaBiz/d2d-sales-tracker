@@ -30,11 +30,6 @@ export interface ValidationMetrics {
 }
 
 export class StormEventsService {
-  // NOAA Storm Events Database endpoints - Using public FTP data
-  private static readonly BASE_URL = 'https://www.ncei.noaa.gov/pub/data/swdi/stormevents';
-  private static readonly SEARCH_API = 'https://www.ncdc.noaa.gov/stormevents/csv';
-  
-  // No API token needed for public data
   
   // Sync frequency: Weekly
   private static readonly SYNC_INTERVAL = 7 * 24 * 60 * 60 * 1000;  // 1 week
@@ -115,98 +110,57 @@ export class StormEventsService {
    * Fetch Storm Events from NOAA database
    */
   static async fetchStormEvents(startDate: Date, endDate: Date): Promise<StormEventReport[]> {
-    try {
-      console.log('[TIER 3] Fetching Storm Events from', startDate.toISOString(), 'to', endDate.toISOString());
-      
-      // Try to fetch from NOAA Storm Events Database
-      // The NOAA Storm Events Database provides CSV downloads
-      const year = startDate.getFullYear();
-      
-      // Storm Events are available at:
-      // https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/
-      // Format: StormEvents_details-ftp_v1.0_dYYYY_cYYYYMMDD.csv.gz
-      
-      // For now, use our proxy server to fetch and process the data
-      const proxyUrl = process.env.EXPO_PUBLIC_MRMS_PROXY_URL || 'https://d2d-sales-tracker.vercel.app';
-      const url = `${proxyUrl}/api/storm-events?` +
-        `startDate=${startDate.toISOString().split('T')[0]}&` +
-        `endDate=${endDate.toISOString().split('T')[0]}&` +
-        `state=OK&` +
-        `eventType=Hail`;
-      
-      console.log('[TIER 3] Fetching from proxy:', url);
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.log('[TIER 3] Proxy error:', response.status);
-        throw new Error(`Proxy returned ${response.status}`);
-      }
+    const vercelUrl = process.env.EXPO_PUBLIC_VERCEL_URL || 'https://d2d-sales-tracker-tau.vercel.app';
+    const results: StormEventReport[] = [];
 
-      const text = await response.text();
-      console.log('[TIER 3] Raw response:', text.substring(0, 200));
-      
-      const data = JSON.parse(text);
-      
-      if (data.events && Array.isArray(data.events)) {
-        console.log('[TIER 3] Got', data.events.length, 'storm events from proxy');
-        return data.events.map((event: any) => this.parseStormEvent(event));
-      }
-      
-      console.log('[TIER 3] No events in response');
-      return [];
-    } catch (error) {
-      console.error('[TIER 3] Error fetching Storm Events:', error);
-      
-      // Return empty array instead of mock data
-      return [];
-    }
-  }
+    // SPC reports are per-day — iterate over each day in the range
+    const current = new Date(startDate);
+    current.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
 
-  /**
-   * Parse individual storm event from proxy response
-   */
-  private static parseStormEvent(event: any): StormEventReport {
-    // Handle coordinates - they might be strings with directional indicators
-    const parseLat = (lat: any): number => {
-      if (typeof lat === 'number') return lat;
-      if (typeof lat === 'string') {
-        const cleaned = lat.replace(/[^0-9.-]/g, '');
-        return parseFloat(cleaned) || 0;
-      }
-      return 0;
-    };
-    
-    const parseLon = (lon: any): number => {
-      if (typeof lon === 'number') return lon;
-      if (typeof lon === 'string') {
-        let cleaned = lon.replace(/[^0-9.-]/g, '');
-        // West longitudes are negative
-        if (lon.includes('W') && !cleaned.startsWith('-')) {
-          cleaned = '-' + cleaned;
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
+      const url = `${vercelUrl}/api/spc/reports?date=${dateStr}&statewide=1`;
+
+      try {
+        console.log('[TIER 3] Fetching SPC reports for', dateStr);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          console.log('[TIER 3] SPC reports error:', response.status, 'for', dateStr);
+        } else {
+          const data = await response.json();
+          const reports: any[] = data.reports || [];
+          console.log('[TIER 3] Got', reports.length, 'SPC reports for', dateStr);
+
+          for (const r of reports) {
+            results.push({
+              eventId: r.id,
+              state: 'OK',
+              eventType: 'Hail',
+              beginDate: new Date(r.timestamp),
+              beginLocation: { lat: r.latitude, lon: r.longitude },
+              magnitude: r.size,
+              source: r.comments ? `SPC - ${r.comments.slice(0, 50)}` : 'SPC Storm Reports',
+              injuries: 0,
+              deaths: 0,
+              propertyDamage: '$0',
+              narrativeComments: r.comments || ''
+            });
+          }
         }
-        return parseFloat(cleaned) || 0;
+      } catch (err) {
+        console.error('[TIER 3] Error fetching SPC reports for', dateStr, ':', err);
       }
-      return 0;
-    };
-    
-    return {
-      eventId: event.event_id || event.eventId || `SE_${Date.now()}`,
-      state: event.state || 'OK',
-      eventType: 'Hail',
-      beginDate: new Date(event.begin_date_time || event.beginDate),
-      beginLocation: {
-        lat: parseLat(event.begin_lat || event.latitude),
-        lon: parseLon(event.begin_lon || event.longitude)
-      },
-      magnitude: parseFloat(event.magnitude) || 0,
-      source: event.source || 'Unknown',
-      injuries: parseInt(event.injuries_direct) || 0,
-      deaths: parseInt(event.deaths_direct) || 0,
-      propertyDamage: event.damage_property || '$0',
-      narrativeComments: event.event_narrative || event.comments || ''
-    };
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    console.log('[TIER 3] Total SPC reports fetched:', results.length);
+    return results;
   }
+
 
   /**
    * Geocode location descriptions to coordinates
@@ -254,39 +208,6 @@ export class StormEventsService {
     }
   }
 
-  /**
-   * Get mock storm events for testing
-   */
-  private static getMockStormEvents(startDate: Date, endDate: Date): StormEventReport[] {
-    return [
-      {
-        eventId: 'MOCK_001',
-        state: 'OK',
-        eventType: 'Hail',
-        beginDate: new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime())),
-        beginLocation: { lat: 35.4676, lon: -97.5164 },
-        magnitude: 1.75,
-        source: 'TRAINED SPOTTER',
-        injuries: 0,
-        deaths: 0,
-        propertyDamage: '$50,000',
-        narrativeComments: 'Golf ball size hail reported in Oklahoma City metro area'
-      },
-      {
-        eventId: 'MOCK_002',
-        state: 'OK',
-        eventType: 'Hail',
-        beginDate: new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime())),
-        beginLocation: { lat: 35.2226, lon: -97.4395 },
-        magnitude: 1.0,
-        source: 'PUBLIC',
-        injuries: 0,
-        deaths: 0,
-        propertyDamage: '$10,000',
-        narrativeComments: 'Quarter size hail in Norman'
-      }
-    ];
-  }
 
   /**
    * Get stored predictions for validation period

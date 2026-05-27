@@ -379,12 +379,12 @@ export default function StormSearchScreen({ navigation }: any) {
         <TouchableOpacity
           style={styles.significantDateButton}
           onPress={async () => {
-            const nov3 = new Date(2024, 10, 3); // Month is 0-indexed, so 10 = November
-            setSelectedDate(nov3);
+            const mar10 = new Date(2026, 2, 10); // Month is 0-indexed, so 2 = March
+            setSelectedDate(mar10);
             setSearchType('date');
             setLoading(true);
             try {
-              const results = await WeatherHistoryService.searchStorms({ date: nov3 });
+              const results = await WeatherHistoryService.searchStorms({ date: mar10 });
               setSearchResults(results);
               if (results.length === 0) {
                 Alert.alert('No Storms Found', 'No data available for this date.');
@@ -396,18 +396,18 @@ export default function StormSearchScreen({ navigation }: any) {
             }
           }}
         >
-          <Text style={styles.significantDateText}>11/03/2024 - Early November Supercell</Text>
+          <Text style={styles.significantDateText}>03/10/2026 - Yukon/Mustang/OKC Hail</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.significantDateButton}
           onPress={async () => {
-            const may17 = new Date(2025, 4, 17); // Month is 0-indexed, so 4 = May
-            setSelectedDate(may17);
+            const may8 = new Date(2026, 4, 8); // Month is 0-indexed, so 4 = May
+            setSelectedDate(may8);
             setSearchType('date');
             setLoading(true);
             try {
-              const results = await WeatherHistoryService.searchStorms({ date: may17 });
+              const results = await WeatherHistoryService.searchStorms({ date: may8 });
               setSearchResults(results);
               if (results.length === 0) {
                 Alert.alert('No Storms Found', 'No data available for this date.');
@@ -419,7 +419,7 @@ export default function StormSearchScreen({ navigation }: any) {
             }
           }}
         >
-          <Text style={styles.significantDateText}>05/17/2025 - Major Moore/Norman Event</Text>
+          <Text style={styles.significantDateText}>05/08/2026 - OKC Metro Wide Hail</Text>
         </TouchableOpacity>
       </View>
 

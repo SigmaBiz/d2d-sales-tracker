@@ -6,7 +6,6 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HailReport } from './mrmsService';
-import * as FileSystem from 'expo-file-system';
 import { getHistoricalServerUrl } from '../config/api.config';
 
 export interface IEMArchiveData {
@@ -17,239 +16,38 @@ export interface IEMArchiveData {
 }
 
 export class IEMArchiveService {
-  // IEM Archive endpoints
-  private static readonly BASE_URL = 'https://mrms.agron.iastate.edu';
-  private static readonly ARCHIVE_URL = 'https://mtarchive.geol.iastate.edu';
-  
-  // Date range: October 2019 - Present
-  private static readonly MIN_DATE = new Date('2019-10-01');
 
   /**
    * Fetch historical storm data from IEM Archive
    * @param date - Date to fetch (24-48 hours in the past for validated data)
    */
   static async fetchHistoricalStorm(date: Date): Promise<HailReport[]> {
-    try {
-      // Validate date range
-      const twelveMonthsAgo = new Date();
-      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-      
-      if (date < twelveMonthsAgo || date > new Date()) {
-        console.log('[TIER 2] Date out of range (last 12 months only):', date.toISOString());
+    const dateStr = date.toISOString().split('T')[0];
+    console.log(`[TIER 2] Fetching MESH data for ${dateStr}`);
+
+    const url = getHistoricalServerUrl(`/api/mesh/${dateStr}`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        // Cache cold — no MESH data processed for this date yet.
+        // Run: npm run preprocess <date>
+        console.log(`[TIER 2] No MESH data for ${dateStr} — run: npm run preprocess ${dateStr}`);
         return [];
       }
-
-      console.log(`[TIER 2] Fetching historical data for ${date.toISOString()}`);
-
-      // Use dynamic server for any date in last 12 months
-      // Use the local endpoint to handle timezone conversion properly
-      // This ensures evening storms show on the correct local date
-      const dateStr = date.toISOString().split('T')[0];
-      const url = getHistoricalServerUrl(`/api/mesh/local/${dateStr}`);
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-      
-      const data = await response.json();
-      // Convert timestamp strings to Date objects
-      const reports = data.reports || [];
-      return reports.map((report: any) => ({
-        ...report,
-        timestamp: new Date(report.timestamp)
-      }));
-    } catch (error) {
-      console.error('[TIER 2] Error fetching historical data:', error);
-      // Fallback to alternative method
-      return await this.fetchAlternativeIEM(date);
+      throw new Error(`[TIER 2] Server returned ${response.status} for ${dateStr}`);
     }
+
+    const data = await response.json();
+    return (data.reports || []).map((r: any) => ({
+      ...r,
+      timestamp: new Date(r.timestamp),
+    }));
   }
 
   /**
    * Fetch archive data (needs proxy in production due to CORS)
    */
-  private static async fetchArchiveData(url: string, date: Date): Promise<any> {
-    try {
-      // Direct fetch will fail due to CORS, throw error to trigger alternative
-      throw new Error('Direct fetch not available - use proxy');
-    } catch (error) {
-      console.error('[TIER 2] Archive fetch error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Alternative IEM endpoint for JSON data
-   */
-  private static async fetchAlternativeIEM(date: Date): Promise<HailReport[]> {
-    try {
-      // Use the new IEM Archive Service for real historical MESH data
-      console.log('[TIER 2] Using IEM Archive Service for historical data:', date.toISOString());
-      const { IEMArchiveService } = await import('./iemArchiveService');
-      const meshReports = await IEMArchiveService.fetchHistoricalMESH(date);
-      
-      if (meshReports && meshReports.length > 0) {
-        console.log('[TIER 2] Got', meshReports.length, 'MESH reports from IEM Archive');
-        return meshReports;
-      }
-      
-      // Fallback to mock proxy if IEM has no data
-      console.log('[TIER 2] No IEM data, trying mock proxy as fallback');
-      const { MRMSProxyService } = await import('./mrmsProxyService');
-      const proxyReports = await MRMSProxyService.fetchHistoricalMRMS(date);
-      
-      if (proxyReports && proxyReports.length > 0) {
-        console.log('[TIER 2] Got', proxyReports.length, 'reports from mock proxy');
-        return proxyReports;
-      }
-      
-      // If no data from either source
-      console.log('[TIER 2] No data available for date:', date.toISOString());
-      return [];
-    } catch (error) {
-      console.error('[TIER 2] Alternative IEM fetch error:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Process IEM data into hail reports
-   */
-  private static processIEMData(data: any, date: Date): HailReport[] {
-    const reports: HailReport[] = [];
-
-    // Process based on data format
-    if (data.features) {
-      // GeoJSON format
-      data.features.forEach((feature: any, index: number) => {
-        const props = feature.properties || {};
-        const coords = feature.geometry?.coordinates?.[0] || [];
-        
-        if (props.mesh && coords.length > 0) {
-          // Calculate centroid
-          const centroid = this.calculateCentroid(coords);
-          
-          reports.push({
-            id: `iem_${date.getTime()}_${index}`,
-            latitude: centroid.lat,
-            longitude: centroid.lon,
-            size: props.mesh / 25.4,  // Convert mm to inches
-            timestamp: new Date(props.valid || date),
-            source: 'IEM Archive',
-            meshValue: props.mesh,
-            polygon: coords,
-            confidence: 75
-          });
-        }
-      });
-    } else if (Array.isArray(data)) {
-      // Array format
-      data.forEach((item: any, index: number) => {
-        if (item.mesh_mm && item.lat && item.lon) {
-          reports.push({
-            id: `iem_${date.getTime()}_${index}`,
-            latitude: item.lat,
-            longitude: item.lon,
-            size: item.mesh_mm / 25.4,
-            timestamp: date,
-            source: 'IEM Archive',
-            meshValue: item.mesh_mm,
-            confidence: 75
-          });
-        }
-      });
-    }
-
-    return reports;
-  }
-
-  /**
-   * Process GeoJSON format from IEM
-   */
-  private static processGeoJSON(geojson: any, date: Date): HailReport[] {
-    const reports: HailReport[] = [];
-
-    if (geojson.features) {
-      geojson.features.forEach((feature: any, index: number) => {
-        const props = feature.properties || {};
-        const geom = feature.geometry;
-
-        if (props.mesh && geom && geom.type === 'Polygon') {
-          const centroid = this.calculateCentroid(geom.coordinates[0]);
-          
-          reports.push({
-            id: `iem_geo_${date.getTime()}_${index}`,
-            latitude: centroid.lat,
-            longitude: centroid.lon,
-            size: props.mesh / 25.4,
-            timestamp: new Date(props.valid || date),
-            confidence: 75,  // Base historical confidence
-            source: 'IEM Archive (Validated)',
-            meshValue: props.mesh,
-            polygon: geom.coordinates[0]
-          });
-        }
-      });
-    }
-
-    return reports;
-  }
-
-  /**
-   * Calculate centroid of polygon
-   */
-  private static calculateCentroid(coords: number[][]): { lat: number; lon: number } {
-    let sumLat = 0, sumLon = 0;
-    coords.forEach(coord => {
-      sumLon += coord[0];
-      sumLat += coord[1];
-    });
-    return {
-      lat: sumLat / coords.length,
-      lon: sumLon / coords.length
-    };
-  }
-
-  /**
-   * Apply historical confidence scoring (70-85%)
-   */
-  private static applyHistoricalConfidence(reports: HailReport[]): HailReport[] {
-    return reports.map(report => {
-      let confidence = 70;  // Base historical confidence
-
-      // Add confidence based on size
-      if (report.size >= 2.0) confidence += 10;   // 2+ inch hail
-      else if (report.size >= 1.5) confidence += 7;  // 1.5+ inch
-      else if (report.size >= 1.0) confidence += 5;  // 1+ inch
-
-      // Add confidence if polygon data available
-      if (report.polygon) confidence += 5;
-
-      // Cap at 85% for historical data
-      confidence = Math.min(confidence, 85);
-
-      return {
-        ...report,
-        confidence,
-        validated: true
-      };
-    });
-  }
-
-  /**
-   * Cache processed overlay data
-   */
-  private static async cacheProcessedData(date: Date, reports: HailReport[]): Promise<void> {
-    const cacheKey = `@iem_cache_${date.toISOString().split('T')[0]}`;
-    await AsyncStorage.setItem(cacheKey, JSON.stringify({
-      date,
-      reports,
-      cached: new Date(),
-      validated: true
-    }));
-  }
-
   /**
    * Fetch last 12 months of storm data for OKC Metro
    */

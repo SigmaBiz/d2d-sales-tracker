@@ -45,7 +45,7 @@ export class WeatherHistoryService {
     // Check cache first
     const cacheKey = JSON.stringify(params);
     const cached = await this.getCachedSearch(cacheKey);
-    if (cached) return cached;
+    if (cached && cached.length > 0) return cached;
 
     let results: HistoricalStormEvent[] = [];
 

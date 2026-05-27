@@ -1,37 +1,24 @@
 /**
  * API Configuration
- * Centralized configuration for all API endpoints
+ * All tiers now served from the Vercel deployment.
+ * Set EXPO_PUBLIC_VERCEL_URL in .env to override (e.g. for preview deployments).
  */
 
-interface ApiConfig {
-  realTimeServer: string;
-  historicalServer: string;
-  proxyServer: string;
-}
+const VERCEL_URL =
+  process.env.EXPO_PUBLIC_VERCEL_URL || 'https://d2d-sales-tracker-tau.vercel.app';
 
-const DEV_CONFIG: ApiConfig = {
-  realTimeServer: 'https://d2d-realtime-server.onrender.com',
-  historicalServer: 'https://d2d-dynamic-server.onrender.com',
-  proxyServer: 'https://d2d-dynamic-server.onrender.com' // Using production servers for dev
+export const API_CONFIG = {
+  vercelApi: VERCEL_URL,
 };
 
-const PROD_CONFIG: ApiConfig = {
-  realTimeServer: process.env.EXPO_PUBLIC_REALTIME_SERVER || 'https://d2d-realtime-server.onrender.com',
-  historicalServer: process.env.EXPO_PUBLIC_HISTORICAL_SERVER || 'https://d2d-dynamic-server.onrender.com',
-  proxyServer: process.env.EXPO_PUBLIC_PROXY_SERVER || 'https://d2d-dynamic-server.onrender.com'
-};
-
-export const API_CONFIG = __DEV__ ? DEV_CONFIG : PROD_CONFIG;
-
-// Helper function to get the appropriate server URL
 export function getRealtimeServerUrl(endpoint: string): string {
-  return `${API_CONFIG.realTimeServer}${endpoint}`;
+  return `${VERCEL_URL}${endpoint}`;
 }
 
 export function getHistoricalServerUrl(endpoint: string): string {
-  return `${API_CONFIG.historicalServer}${endpoint}`;
+  return `${VERCEL_URL}${endpoint}`;
 }
 
 export function getProxyServerUrl(endpoint: string): string {
-  return `${API_CONFIG.proxyServer}${endpoint}`;
+  return `${VERCEL_URL}${endpoint}`;
 }

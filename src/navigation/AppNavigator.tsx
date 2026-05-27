@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
-// Import screens (we'll create these next)
 import RealMapScreen from '../screens/RealMapScreen';
 import KnockScreen from '../screens/KnockScreen';
 import StatsScreen from '../screens/StatsScreen';
@@ -12,6 +12,8 @@ import SettingsScreen from '../screens/SettingsScreen';
 import StormSearchScreen from '../screens/StormSearchScreen';
 import DataFlowDashboard from '../screens/DataFlowDashboard';
 import HailIntelligenceDashboard from '../screens/HailIntelligenceDashboard';
+import AuthScreen from '../screens/AuthScreen';
+import { SupabaseService } from '../services/supabaseService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -111,6 +113,26 @@ function MainStack() {
 }
 
 export default function AppNavigator() {
+  const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
+
+  useEffect(() => {
+    SupabaseService.initialize().then(authenticated => {
+      setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
+    });
+  }, []);
+
+  if (authState === 'loading') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e40af' }}>
+        <ActivityIndicator size="large" color="white" />
+      </View>
+    );
+  }
+
+  if (authState === 'unauthenticated') {
+    return <AuthScreen onAuthenticated={() => setAuthState('authenticated')} />;
+  }
+
   return (
     <NavigationContainer>
       <MainStack />

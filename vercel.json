@@ -1,16 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.ts",
-      "use": "@vercel/node"
-    }
-  ],
   "functions": {
-    "api/mesh/[date].ts": {
-      "memory": 1024,
-      "maxDuration": 60
-    },
     "api/spc/check-date.ts": {
       "memory": 512,
       "maxDuration": 30
@@ -21,6 +11,7 @@
     }
   },
   "env": {
-    "NODE_VERSION": "20"
+    "NODE_VERSION": "22"
   }
+
 }

@@ -5,11 +5,12 @@
   "main": "index.js",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.654.0",
     "@aws-sdk/s3-request-presigner": "^3.654.0",
+    "@supabase/supabase-js": "^2.50.0",
     "axios": "^1.7.7",
     "csv-parse": "^5.5.6"
   },

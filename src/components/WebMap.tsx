@@ -244,7 +244,7 @@ const WebMap = React.forwardRef<WebView, WebMapProps>(({ knocks, userLocation, o
                   popupContent += '<p style="margin: 4px 0;"><strong>Time:</strong> ' + new Date(report.timestamp).toLocaleString() + '</p>';
                   popupContent += '<p style="margin: 4px 0;"><strong>Location:</strong> ' + (report.city || 'Unknown') + '</p>';
                   popupContent += '<p style="margin: 4px 0;"><strong>Source:</strong> ' + (report.source || 'NOAA Storm Events') + '</p>';
-                  popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; color: #10b981; font-style: italic;">This is a verified ground truth report from the NOAA Storm Events Database</div>';
+                  popupContent += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; color: #10b981; font-style: italic;">Ground truth spotter report — SPC Storm Reports (human observed)</div>';
                   popupContent += '</div>';
                   
                   var marker = L.marker([report.latitude, report.longitude], {icon: icon})

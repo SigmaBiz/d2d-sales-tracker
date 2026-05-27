@@ -1,181 +1,123 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert, ActivityIndicator } from 'react-native';
+import {
+  View, StyleSheet, TouchableOpacity, Text, Modal,
+  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  Linking, Share,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useIsFocused } from '@react-navigation/native';
-// SOLUTION SWITCHER: Comment/uncomment to try different solutions
-import WebMap from '../components/WebMap'; // Original version
-// import WebMap from '../components/WebMapFixed'; // Fixed version with proper message queuing
-// import WebMap from '../components/WebMapSimple'; // Solution 2: Simple dots (no emojis)
-// import TestWebView from '../components/TestWebView'; // Test WebView
+
+import NativeMap, { NativeMapRef } from '../components/NativeMap';
 import { LocationService } from '../services/locationService';
-import { StorageService } from '../services/storageService';
 import { SupabaseService } from '../services/supabaseService';
-import { MRMSService, StormEvent, HailReport } from '../services/mrmsService';
+import { MRMSService, HailReport } from '../services/mrmsService';
 import { HailAlertService } from '../services/hailAlertService';
-import { SimpleContourService } from '../services/simpleContourService';
-import { MRMSContourService } from '../services/mrmsContourService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
 import NotificationLogPanel from '../components/NotificationLogPanel';
-import { Knock, NotificationLogEntry } from '../types';
-import { testContourGeneration } from '../utils/testContourGeneration';
+import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL } from '../types';
 
-// DEVELOPMENT FLAGS - REMEMBER TO RESTORE BEFORE PRODUCTION
-const DEV_DISABLE_GPS_UPDATES = __DEV__; // Automatically false in production builds
+const LABEL_ORDER: KnockOutcome[] = [
+  'no_home', 'not_interested', 'no_soliciting', 'renter',
+  'conversation', 'inspected', 'follow_up', 'lead', 'signed', 'scout',
+];
 
 export default function RealMapScreen({ navigation }: any) {
-  const isFocused = useIsFocused();
+  const mapRef = useRef<NativeMapRef>(null);
+  const suppressNextMapPress = useRef(false);
+
+  // Map state
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeStorms, setActiveStorms] = useState<StormEvent[]>([]);
-  const [hailData, setHailData] = useState<HailReport[]>([]);
-  const [hailContours, setHailContours] = useState<any>(null);
-  const [useSmoothContours, setUseSmoothContours] = useState(true); // Default to smooth MRMS contours
-  const [showStormPanel, setShowStormPanel] = useState(false);
-  const [mapType, setMapType] = useState<'street' | 'satellite'>('street');
-  const [isGeneratingContours, setIsGeneratingContours] = useState(false);
+  const [hailReports, setHailReports] = useState<HailReport[]>([]);
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
+  const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
+
+
+  // Storm panel
+  const [activeStorms, setActiveStorms] = useState<any[]>([]);
+  const [showStormPanel, setShowStormPanel] = useState(false);
   const [showNotificationLog, setShowNotificationLog] = useState(false);
-  const webMapRef = useRef<any>(null);
-  const contourGenerationTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Label picker state
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pendingKnock, setPendingKnock] = useState<Knock | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<KnockOutcome | null>(null);
+  const [pickerNotes, setPickerNotes] = useState('');
+  const [savingKnock, setSavingKnock] = useState(false);
+
+  // Detail sheet state
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailKnock, setDetailKnock] = useState<Knock | null>(null);
+  const [detailHistory, setDetailHistory] = useState<Knock['history']>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Contact state
+  const [detailContacts, setDetailContacts] = useState<KnockContact[]>([]);
+  const [contactFormVisible, setContactFormVisible] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactInsurance, setContactInsurance] = useState('');
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Property data state
+  const [propertyFormVisible, setPropertyFormVisible] = useState(false);
+  const [propertyYearBuilt, setPropertyYearBuilt] = useState('');
+  const [propertySqft, setPropertySqft] = useState('');
+  const [savingProperty, setSavingProperty] = useState(false);
+
+  // Unified creation sheet — address resolved async on map tap
+  const [pendingAddress, setPendingAddress] = useState<string | undefined>(undefined);
+  const [geocodingAddress, setGeocodingAddress] = useState(false);
+  const [pickerTab, setPickerTab] = useState<'knock' | 'contact'>('knock');
+
+  // ── Init ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    initializeMap();
-    loadKnocks();
-    loadHailData();
-    initializeHailAlerts();
-    
-    // Test contour generation
-    console.log('Running contour generation test...');
-    testContourGeneration();
-    
-    // Set up location watching (disabled in development)
-    let interval: NodeJS.Timeout | null = null;
-    if (!DEV_DISABLE_GPS_UPDATES) {
-      interval = setInterval(updateLocation, 5000); // Update every 5 seconds
-    } else {
-      console.log('[DEV] GPS updates disabled for development');
-      // Get location once for initial position
-      updateLocation();
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-      if (contourGenerationTimeout.current) clearTimeout(contourGenerationTimeout.current);
-      HailAlertService.stopMonitoring();
-    };
+    initializeApp();
+    return () => { HailAlertService.stopMonitoring(); };
   }, []);
 
-  // Reload knocks and hail data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadKnocks();
-      loadHailData(); // Also reload hail data to show newly added storms
-      
-      // Check if we should open notification log
+      loadHailData();
       if ((global as any).openNotificationLog) {
         setShowNotificationLog(true);
-        (global as any).openNotificationLog = false; // Clear the flag
+        (global as any).openNotificationLog = false;
       }
     });
-
     return unsubscribe;
   }, [navigation]);
 
-  // Monitor hailContours state changes
-  useEffect(() => {
-    console.log('RealMapScreen - hailContours state updated:', hailContours);
-  }, [hailContours]);
-
-  const initializeMap = async () => {
+  const initializeApp = async () => {
+    await SupabaseService.initialize();
     const hasPermission = await LocationService.requestPermissions();
-    if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Location permission is required to use the map.');
-      return;
+    if (hasPermission) {
+      await updateLocation();
+    } else {
+      setUserLocation({ lat: 35.4676, lng: -97.5164 });
     }
-
-    updateLocation();
+    await Promise.all([loadKnocks(), loadHailData(), initializeHailAlerts()]);
   };
 
   const updateLocation = async () => {
-    const location = await LocationService.getCurrentLocation();
-    if (location) {
-      setUserLocation({
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
-      });
-    } else {
-      // Default to Oklahoma City if no location permission
-      setUserLocation({
-        lat: 35.4676,
-        lng: -97.5164,
-      });
+    const loc = await LocationService.getCurrentLocation();
+    if (loc) {
+      setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
     }
   };
+
+  // ── Data loading ──────────────────────────────────────────────────────────
 
   const loadKnocks = async () => {
-    setLoading(true);
     try {
-      // First get local knocks
-      const localKnocks = await StorageService.getKnocks();
-      console.log('Loaded knocks:', localKnocks.length);
-      setKnocks(localKnocks);
-      
-      // Then try to get cloud knocks if connected
-      const cloudKnocks = await SupabaseService.getCloudKnocks();
-      if (cloudKnocks.length > 0) {
-        // Merge cloud and local knocks, removing duplicates
-        const knockMap = new Map();
-        [...localKnocks, ...cloudKnocks].forEach(knock => {
-          knockMap.set(knock.id, knock);
-        });
-        setKnocks(Array.from(knockMap.values()));
-      }
-    } catch (error) {
-      console.error('Error loading knocks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  const centerOnUser = () => {
-    updateLocation();
-    if (webMapRef.current && userLocation) {
-      webMapRef.current.postMessage(JSON.stringify({
-        type: 'centerOnUser'
-      }));
-    }
-  };
-
-  const handleMapClick = (knockData: Knock) => {
-    if (knockData.id) {
-      // Editing existing knock
-      navigation.navigate('Knock', {
-        knockId: knockData.id,
-        latitude: knockData.latitude,
-        longitude: knockData.longitude,
-        address: knockData.address,
-        outcome: knockData.outcome,
-        notes: knockData.notes,
-        history: knockData.history,
-      });
-    } else {
-      // Creating new knock
-      navigation.navigate('Knock', {
-        latitude: knockData.latitude,
-        longitude: knockData.longitude,
-      });
-    }
-  };
-
-  const initializeHailAlerts = async () => {
-    try {
-      await HailAlertService.initialize();
-      await HailAlertService.startMonitoring(5); // Check every 5 minutes
-    } catch (error) {
-      console.error('Error initializing hail alerts:', error);
+      const data = await SupabaseService.getKnocks();
+      setKnocks(data);
+      // Sync any offline queue in background
+      SupabaseService.syncOfflineQueue();
+    } catch (err) {
+      console.error('[Map] loadKnocks error:', err);
     }
   };
 
@@ -183,183 +125,296 @@ export default function RealMapScreen({ navigation }: any) {
     try {
       const storms = await MRMSService.getActiveStorms();
       setActiveStorms(storms);
-      
-      // Combine all enabled storm reports
-      const allReports: HailReport[] = [];
+      const all: HailReport[] = [];
       const verified: HailReport[] = [];
       storms.forEach(storm => {
         if (storm.enabled) {
-          allReports.push(...storm.reports);
-          // Extract verified reports
-          const verifiedInStorm = storm.reports.filter(r => r.groundTruth);
-          verified.push(...verifiedInStorm);
+          all.push(...storm.reports);
+          verified.push(...storm.reports.filter((r: HailReport) => r.groundTruth));
         }
       });
-      setHailData(allReports);
+      setHailReports(all);
       setVerifiedReports(verified);
-      console.log(`Found ${verified.length} verified reports to display as markers`);
-      
-      // Clear any existing timeout
-      if (contourGenerationTimeout.current) {
-        clearTimeout(contourGenerationTimeout.current);
-      }
-      
-      // Debounce contour generation to avoid lag
-      contourGenerationTimeout.current = setTimeout(async () => {
-        // Generate contours from reports
-        if (allReports.length > 0) {
-          setIsGeneratingContours(true);
-          
-          // Generate contours directly from the collected reports
-          console.log(`Generating contours from ${allReports.length} hail reports`);
-          
-          let contourData = null;
-          
-          // Use user preference or fall back gracefully
-          if (useSmoothContours) {
-            // Try MRMS contours first for smoother visualization
-            try {
-              console.log('Attempting MRMS contour generation...');
-              contourData = await MRMSContourService.generateContoursFromReports(allReports);
-              console.log('MRMS contours generated successfully:', contourData);
-            } catch (mrmsError) {
-              console.warn('MRMS contour generation failed, falling back to simple contours:', mrmsError);
-              
-              // Fallback to simple contours
-              try {
-                contourData = SimpleContourService.generateSimpleContours(allReports);
-                console.log('Simple contours generated as fallback:', contourData);
-              } catch (simpleError) {
-                console.error('Both contour methods failed:', simpleError);
-              }
-            }
-          } else {
-            // User prefers simple contours
-            try {
-              contourData = SimpleContourService.generateSimpleContours(allReports);
-              console.log('Simple contours generated:', contourData);
-            } catch (simpleError) {
-              console.error('Simple contour generation failed:', simpleError);
-            }
-          }
-          
-          console.log('Setting hail contours in state:', contourData);
-          if (contourData && contourData.features) {
-            console.log('Contour features being set:', contourData.features.map((f: any) => ({
-              description: f.properties.description,
-              color: f.properties.color,
-              level: f.properties.level
-            })));
-          }
-          setHailContours(contourData);
-          setIsGeneratingContours(false);
-        } else {
-          console.log('No hail reports available for contour generation - clearing contours');
-          setHailContours(null);
-          // Force clear by sending empty feature collection
-          const emptyContours = {
-            type: 'FeatureCollection',
-            features: []
-          };
-          setHailContours(emptyContours);
-          setIsGeneratingContours(false);
-        }
-      }, 300); // 300ms debounce delay
-    } catch (error) {
-      console.error('Error loading hail data:', error);
-      setIsGeneratingContours(false);
+    } catch (err) {
+      console.error('[Map] loadHailData error:', err);
     }
   };
 
+  const initializeHailAlerts = async () => {
+    try {
+      await HailAlertService.initialize();
+      await HailAlertService.startMonitoring(5);
+    } catch (err) {
+      console.error('[Map] HailAlert init error:', err);
+    }
+  };
+
+  // ── Map interactions ──────────────────────────────────────────────────────
+
+  const handleMapPress = (lat: number, lng: number) => {
+    if (suppressNextMapPress.current) {
+      suppressNextMapPress.current = false;
+      return;
+    }
+    setPendingCoords({ lat, lng });
+    setPendingKnock(null);
+    setPickerNotes('');
+    setSelectedLabel(null);
+    setContactName(''); setContactPhone(''); setContactInsurance('');
+    setPropertyYearBuilt(''); setPropertySqft('');
+    setPendingAddress(undefined);
+    setPickerTab('knock');
+    setPickerVisible(true);
+    // Geocode immediately so address is ready by the time the user picks a label
+    setGeocodingAddress(true);
+    LocationService.reverseGeocode(lat, lng)
+      .then(addr => setPendingAddress(addr))
+      .catch(() => {})
+      .finally(() => setGeocodingAddress(false));
+  };
+
+  const handleKnockPress = async (knock: Knock) => {
+    suppressNextMapPress.current = true;
+    // Open detail sheet — lazy-load history + contacts in parallel
+    setDetailKnock(knock);
+    setDetailHistory([]);
+    setDetailContacts([]);
+    setContactFormVisible(false);
+    setDetailVisible(true);
+    setDetailLoading(true);
+    const [history, contacts] = await Promise.all([
+      SupabaseService.getKnockHistory(knock.id),
+      SupabaseService.getContactsForKnock(knock.id),
+    ]);
+    setDetailHistory(history ?? []);
+    setDetailContacts(contacts);
+    // Pre-fill contact form
+    const c = contacts[0];
+    setContactName(c?.name ?? '');
+    setContactPhone(c?.phone ?? '');
+    setContactInsurance(c?.insurance_carrier ?? '');
+    // Pre-fill property form
+    setPropertyYearBuilt(knock.year_built ? String(knock.year_built) : '');
+    setPropertySqft(knock.sqft ? String(knock.sqft) : '');
+    setPropertyFormVisible(false);
+    setDetailLoading(false);
+  };
+
+  const handleSaveContact = async () => {
+    if (!detailKnock) return;
+    setSavingContact(true);
+    try {
+      await SupabaseService.upsertContact(detailKnock.id, {
+        name: contactName || undefined,
+        phone: contactPhone || undefined,
+        insurance_carrier: contactInsurance || undefined,
+      });
+      // Refresh contacts display
+      const contacts = await SupabaseService.getContactsForKnock(detailKnock.id);
+      setDetailContacts(contacts);
+      setContactFormVisible(false);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save contact info.');
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const handleAddressPress = (address: string) => {
+    const encoded = encodeURIComponent(address);
+    Alert.alert(address, undefined, [
+      { text: 'Share / Copy', onPress: () => Share.share({ message: address }) },
+      { text: 'Open on Redfin', onPress: () => Linking.openURL(`https://www.redfin.com/search#query=${encoded}`) },
+      { text: 'Open on Zillow', onPress: () => Linking.openURL(`https://www.zillow.com/homes/${encoded}_rb/`) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleSaveProperty = async () => {
+    if (!detailKnock) return;
+    setSavingProperty(true);
+    try {
+      const year = propertyYearBuilt ? parseInt(propertyYearBuilt, 10) : undefined;
+      const sq = propertySqft ? parseInt(propertySqft, 10) : undefined;
+      await SupabaseService.updateKnockProperty(detailKnock.id, {
+        year_built: year,
+        sqft: sq,
+      });
+      // Reflect in local knocks list
+      setKnocks(prev => prev.map(k =>
+        k.id === detailKnock.id ? { ...k, year_built: year, sqft: sq } : k
+      ));
+      setPropertyFormVisible(false);
+    } catch {
+      Alert.alert('Error', 'Failed to save property details.');
+    } finally {
+      setSavingProperty(false);
+    }
+  };
+
+  const handleDeleteKnock = () => {
+    if (!detailKnock) return;
+    Alert.alert(
+      'Delete Knock',
+      'This will permanently delete this knock and all its history. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            try {
+              await SupabaseService.deleteKnock(detailKnock.id);
+              setKnocks(prev => prev.filter(k => k.id !== detailKnock.id));
+              setDetailVisible(false);
+            } catch {
+              Alert.alert('Error', 'Failed to delete knock.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRelabel = () => {
+    if (!detailKnock) return;
+    setDetailVisible(false);
+    setTimeout(() => {
+      setPendingKnock(detailKnock);
+      setPendingCoords({ lat: detailKnock.latitude, lng: detailKnock.longitude });
+      setPickerNotes(detailKnock.notes ?? '');
+      setSelectedLabel(detailKnock.label);
+      // Pre-fill address — no need to re-geocode
+      setPendingAddress(detailKnock.address);
+      setGeocodingAddress(false);
+      setPickerTab('knock');
+      // Pre-fill contact fields from loaded contacts
+      const c = detailContacts[0];
+      setContactName(c?.name ?? '');
+      setContactPhone(c?.phone ?? '');
+      setContactInsurance(c?.insurance_carrier ?? '');
+      // Pre-fill property fields
+      setPropertyYearBuilt(detailKnock.year_built ? String(detailKnock.year_built) : '');
+      setPropertySqft(detailKnock.sqft ? String(detailKnock.sqft) : '');
+      setPickerVisible(true);
+    }, 300);
+  };
+
+  // ── Label picker ──────────────────────────────────────────────────────────
+
+  const handleLabelTap = (label: KnockOutcome) => {
+    setSelectedLabel(label); // just highlights — does not save
+  };
+
+  const handleSaveKnock = async () => {
+    if (!pendingCoords || !selectedLabel) return;
+    setSavingKnock(true);
+
+    try {
+      if (pendingKnock) {
+        // Re-label existing knock
+        await SupabaseService.updateKnockLabel(
+          pendingKnock.id, pendingKnock.label, selectedLabel, pickerNotes || undefined
+        );
+        if (contactName || contactPhone || contactInsurance) {
+          await SupabaseService.upsertContact(pendingKnock.id, {
+            name: contactName || undefined,
+            phone: contactPhone || undefined,
+            insurance_carrier: contactInsurance || undefined,
+          });
+        }
+        if (propertyYearBuilt || propertySqft) {
+          await SupabaseService.updateKnockProperty(pendingKnock.id, {
+            year_built: propertyYearBuilt ? parseInt(propertyYearBuilt, 10) : undefined,
+            sqft: propertySqft ? parseInt(propertySqft, 10) : undefined,
+          });
+        }
+      } else {
+        // New knock — address already resolved from handleMapPress
+        const savedKnock = await SupabaseService.saveKnock({
+          latitude: pendingCoords.lat,
+          longitude: pendingCoords.lng,
+          address: pendingAddress,
+          label: selectedLabel,
+          notes: pickerNotes || undefined,
+          knocked_at: new Date(),
+          user_id: SupabaseService.getUserId() ?? undefined,
+        });
+        if (contactName || contactPhone || contactInsurance) {
+          await SupabaseService.upsertContact(savedKnock.id, {
+            name: contactName || undefined,
+            phone: contactPhone || undefined,
+            insurance_carrier: contactInsurance || undefined,
+          });
+        }
+        if (propertyYearBuilt || propertySqft) {
+          await SupabaseService.updateKnockProperty(savedKnock.id, {
+            year_built: propertyYearBuilt ? parseInt(propertyYearBuilt, 10) : undefined,
+            sqft: propertySqft ? parseInt(propertySqft, 10) : undefined,
+          });
+        }
+      }
+
+      setPickerVisible(false);
+      setSelectedLabel(null);
+      setPickerNotes('');
+      setContactName(''); setContactPhone(''); setContactInsurance('');
+      setPropertyYearBuilt(''); setPropertySqft('');
+      await loadKnocks();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save knock. Check your connection.');
+      console.error('[Map] saveKnock error:', err);
+    } finally {
+      setSavingKnock(false);
+    }
+  };
+
+  // ── Storm handlers ────────────────────────────────────────────────────────
+
   const handleStormToggle = async (stormId: string, enabled: boolean) => {
-    // Actually toggle the storm state first
     await MRMSService.toggleStorm(stormId, enabled);
-    // Then reload the data to update the map
     await loadHailData();
   };
 
   const handleStormDelete = async (stormId: string) => {
-    // Actually delete the storm first
     await MRMSService.deleteStorm(stormId);
-    // Then reload the data to update the map
     await loadHailData();
   };
 
   const handleStormFocus = async (stormId: string) => {
     await loadHailData();
-    
-    // Get the focused storm to find its bounds
     const storms = await MRMSService.getActiveStorms();
-    const focusedStorm = storms.find(s => s.id === stormId && s.enabled);
-    
-    if (focusedStorm && focusedStorm.bounds && webMapRef.current) {
-      console.log('Focusing on storm bounds:', focusedStorm.bounds);
-      
-      // Send focus command to webview with specific bounds
-      webMapRef.current.postMessage(JSON.stringify({
-        type: 'focusOnBounds',
-        bounds: {
-          north: focusedStorm.bounds.north,
-          south: focusedStorm.bounds.south,
-          east: focusedStorm.bounds.east,
-          west: focusedStorm.bounds.west
-        }
-      }));
+    const storm = storms.find((s: any) => s.id === stormId && s.enabled);
+    if (storm?.bounds) {
+      mapRef.current?.fitToBounds(
+        storm.bounds.north, storm.bounds.south,
+        storm.bounds.east, storm.bounds.west
+      );
     }
   };
 
-  const handleAddressSelect = (address: string, lat: number, lng: number) => {
-    console.log('Address selected:', address, lat, lng);
-    
-    // Center map on the selected address
-    if (webMapRef.current) {
-      webMapRef.current.postMessage(JSON.stringify({
-        type: 'centerOnLocation',
-        lat: lat,
-        lng: lng,
-        zoom: 16 // Zoom in closer for address view
-      }));
-    }
+  const handleAddressSelect = (_address: string, lat: number, lng: number) => {
+    mapRef.current?.centerOnLocation(lat, lng, 0.005);
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const signedCount = knocks.filter(k => k.label === 'signed').length;
+  const leadCount = knocks.filter(k => k.label === 'lead').length;
 
   return (
     <View style={styles.container}>
-      <WebMap 
-        ref={webMapRef}
+      <NativeMap
+        ref={mapRef}
         knocks={knocks}
-        userLocation={userLocation}
-        onKnockClick={handleMapClick}
-        hailContours={hailContours}
-        activeStorms={activeStorms.filter(s => s.enabled).map(s => s.id)}
+        hailReports={hailReports}
         verifiedReports={verifiedReports}
+        userLocation={userLocation}
+        mapType={mapType}
+        onMapPress={handleMapPress}
+        onKnockPress={handleKnockPress}
       />
-      
-      {/* Storm Panel - Only show when toggled */}
-      {showStormPanel && (
-        <HailOverlay
-          onStormToggle={handleStormToggle}
-          onStormDelete={handleStormDelete}
-          onStormFocus={handleStormFocus}
-          onClose={() => setShowStormPanel(false)}
-          dataSource={
-            activeStorms.length > 0 && activeStorms[0].source
-              ? activeStorms[0].source
-              : undefined
-          }
-        />
-      )}
 
-      {/* Notification Log Panel */}
-      <NotificationLogPanel
-        visible={showNotificationLog}
-        onClose={() => setShowNotificationLog(false)}
-        onCreateOverlay={() => {
-          // Refresh hail data to show the new overlay
-          loadHailData();
-          setShowNotificationLog(false);
-        }}
-      />
-      
+      {/* Stats bar */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{knocks.length}</Text>
@@ -367,200 +422,648 @@ export default function RealMapScreen({ navigation }: any) {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {knocks.filter(k => k.outcome === 'sale').length}
-          </Text>
-          <Text style={styles.statLabel}>Sales</Text>
+          <Text style={styles.statValue}>{signedCount}</Text>
+          <Text style={styles.statLabel}>Signed</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {knocks.filter(k => k.outcome === 'lead').length}
-          </Text>
+          <Text style={styles.statValue}>{leadCount}</Text>
           <Text style={styles.statLabel}>Leads</Text>
         </View>
       </View>
 
-      {/* Address Search Bar */}
+      {/* Address search */}
       <AddressSearchBar onAddressSelect={handleAddressSelect} />
 
-      {/* Right Button Stack - Storm related */}
+      {/* Right buttons */}
       <View style={styles.rightButtonStack}>
-        {/* Notification Log Button */}
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => setShowNotificationLog(!showNotificationLog)}
-        >
+        <TouchableOpacity style={styles.actionButton} onPress={() => setShowNotificationLog(!showNotificationLog)}>
           <Ionicons name="notifications" size={24} color="#FF6B6B" />
         </TouchableOpacity>
-
-        {/* Focus on Hail Button */}
-        {hailContours && (
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => {
-              if (webMapRef.current) {
-                webMapRef.current.postMessage(JSON.stringify({
-                  type: 'focusOnHail'
-                }));
-              }
-            }}
-          >
+        {hailReports.length > 0 && (
+          <TouchableOpacity style={styles.actionButton} onPress={() => mapRef.current?.focusOnHail(hailReports.filter(r => !r.groundTruth))}>
             <Ionicons name="thunderstorm" size={24} color="#ef4444" />
           </TouchableOpacity>
         )}
-        
-        {/* Active Storms Button with badge */}
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => setShowStormPanel(!showStormPanel)}
-        >
-          {isGeneratingContours ? (
-            <ActivityIndicator size="small" color="#1e40af" />
-          ) : (
-            <>
-              <Ionicons name="cloud" size={24} color="#1e40af" />
-              {activeStorms.filter(s => s.enabled).length > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {activeStorms.filter(s => s.enabled).length}
-                  </Text>
-                </View>
-              )}
-            </>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setShowStormPanel(!showStormPanel)}>
+          <Ionicons name="cloud" size={24} color="#1e40af" />
+          {activeStorms.filter((s: any) => s.enabled).length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{activeStorms.filter((s: any) => s.enabled).length}</Text>
+            </View>
           )}
         </TouchableOpacity>
-        
-        {/* Storm Search Button */}
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => {
-            // Use requestAnimationFrame to defer navigation for smoother transition
-            requestAnimationFrame(() => {
-              navigation.navigate('StormSearch');
-            });
-          }}
-        >
+        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('StormSearch')}>
           <Ionicons name="search" size={24} color="#1e40af" />
         </TouchableOpacity>
       </View>
-      
-      {/* Left Button Stack - Map controls */}
+
+      {/* Left buttons */}
       <View style={styles.leftButtonStack}>
-        {/* Map Type Toggle */}
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => {
-            const newType = mapType === 'street' ? 'satellite' : 'street';
-            setMapType(newType);
-            if (webMapRef.current) {
-              webMapRef.current.postMessage(JSON.stringify({
-                type: 'toggleMapType'
-              }));
-            }
-          }}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => setMapType(t => t === 'standard' ? 'hybrid' : 'standard')}
         >
-          <Text style={{ fontSize: 24 }}>{mapType === 'street' ? '🗺️' : '🛰️'}</Text>
+          <Text style={{ fontSize: 24 }}>{mapType === 'standard' ? '🗺️' : '🛰️'}</Text>
         </TouchableOpacity>
-        
-        {/* Refresh Button */}
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={loadKnocks}
-        >
+        <TouchableOpacity style={styles.actionButton} onPress={loadKnocks}>
           <Ionicons name="refresh" size={24} color="#1e40af" />
         </TouchableOpacity>
-        
-        {/* Center on User Button */}
-        <TouchableOpacity style={styles.actionButton} onPress={centerOnUser}>
+        <TouchableOpacity style={styles.actionButton} onPress={async () => {
+          await updateLocation();
+          if (userLocation) mapRef.current?.centerOnLocation(userLocation.lat, userLocation.lng, 0.01);
+        }}>
           <Ionicons name="locate" size={24} color="#1e40af" />
         </TouchableOpacity>
       </View>
 
-      
+      {/* Storm panel */}
+      {showStormPanel && (
+        <HailOverlay
+          onStormToggle={handleStormToggle}
+          onStormDelete={handleStormDelete}
+          onStormFocus={handleStormFocus}
+          onClose={() => setShowStormPanel(false)}
+          dataSource={activeStorms.length > 0 ? activeStorms[0].source : undefined}
+        />
+      )}
+
+      <NotificationLogPanel
+        visible={showNotificationLog}
+        onClose={() => setShowNotificationLog(false)}
+        onCreateOverlay={() => { loadHailData(); setShowNotificationLog(false); }}
+      />
+
+      {/* ── Knock Sheet (create + update) ───────────────────────────────── */}
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity style={styles.modalDismiss} onPress={() => setPickerVisible(false)} />
+
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHandle} />
+
+            {/* Address row — always visible above tabs */}
+            {geocodingAddress ? (
+              <Text style={styles.pickerAddressLoading}>Getting address…</Text>
+            ) : pendingAddress ? (
+              <TouchableOpacity onPress={() => handleAddressPress(pendingAddress)}>
+                <Text style={styles.pickerAddressLink}>📍  {pendingAddress}</Text>
+              </TouchableOpacity>
+            ) : pendingCoords ? (
+              <Text style={styles.pickerAddressLoading}>
+                📍  {pendingCoords.lat.toFixed(5)}, {pendingCoords.lng.toFixed(5)}
+              </Text>
+            ) : null}
+
+            {/* Segmented control */}
+            <View style={styles.pickerTabBar}>
+              <TouchableOpacity
+                style={[styles.pickerTabBtn, pickerTab === 'knock' && styles.pickerTabBtnActive]}
+                onPress={() => setPickerTab('knock')}
+              >
+                <Text style={[styles.pickerTabText, pickerTab === 'knock' && styles.pickerTabTextActive]}>
+                  🏠  Knock
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.pickerTabBtn, pickerTab === 'contact' && styles.pickerTabBtnActive]}
+                onPress={() => setPickerTab('contact')}
+              >
+                <Text style={[styles.pickerTabText, pickerTab === 'contact' && styles.pickerTabTextActive]}>
+                  👤  Contact
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Scrollable tab content */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.pickerTabContent}
+            >
+              {pickerTab === 'knock' ? (
+                <>
+                  {pendingKnock && (
+                    <Text style={styles.pickerCurrent}>
+                      Current: {KNOCK_OUTCOME_EMOJI[pendingKnock.label]} {KNOCK_OUTCOME_LABEL[pendingKnock.label]}
+                    </Text>
+                  )}
+
+                  <View style={styles.labelGrid}>
+                    {LABEL_ORDER.map(label => (
+                      <TouchableOpacity
+                        key={label}
+                        style={[
+                          styles.labelButton,
+                          selectedLabel === label && styles.labelButtonSelected,
+                        ]}
+                        onPress={() => handleLabelTap(label)}
+                        disabled={savingKnock}
+                      >
+                        <Text style={styles.labelEmoji}>{KNOCK_OUTCOME_EMOJI[label]}</Text>
+                        <Text style={[
+                          styles.labelText,
+                          selectedLabel === label && styles.labelTextSelected,
+                        ]}>
+                          {KNOCK_OUTCOME_LABEL[label]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TextInput
+                    style={[styles.notesInput, { marginBottom: 8 }]}
+                    placeholder="Add a note (optional)"
+                    placeholderTextColor="#9ca3af"
+                    value={pickerNotes}
+                    onChangeText={setPickerNotes}
+                    multiline
+                    numberOfLines={2}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.pickerSectionTitle}>HOMEOWNER INFO</Text>
+                  <TextInput
+                    style={styles.contactInput}
+                    placeholder="Name"
+                    placeholderTextColor="#9ca3af"
+                    value={contactName}
+                    onChangeText={setContactName}
+                    autoCapitalize="words"
+                  />
+                  <TextInput
+                    style={styles.contactInput}
+                    placeholder="Phone"
+                    placeholderTextColor="#9ca3af"
+                    value={contactPhone}
+                    onChangeText={setContactPhone}
+                    keyboardType="phone-pad"
+                  />
+                  <TextInput
+                    style={styles.contactInput}
+                    placeholder="Insurance Carrier"
+                    placeholderTextColor="#9ca3af"
+                    value={contactInsurance}
+                    onChangeText={setContactInsurance}
+                    autoCapitalize="words"
+                  />
+
+                  <Text style={[styles.pickerSectionTitle, { marginTop: 8 }]}>PROPERTY DETAILS</Text>
+                  <TextInput
+                    style={styles.contactInput}
+                    placeholder="Year Built (e.g. 1994)"
+                    placeholderTextColor="#9ca3af"
+                    value={propertyYearBuilt}
+                    onChangeText={setPropertyYearBuilt}
+                    keyboardType="number-pad"
+                  />
+                  <TextInput
+                    style={[styles.contactInput, { marginBottom: 8 }]}
+                    placeholder="Square Footage (e.g. 1840)"
+                    placeholderTextColor="#9ca3af"
+                    value={propertySqft}
+                    onChangeText={setPropertySqft}
+                    keyboardType="number-pad"
+                  />
+                </>
+              )}
+            </ScrollView>
+
+            {/* Save + Cancel — pinned outside scroll, always visible */}
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                (!selectedLabel || savingKnock) && styles.saveButtonDisabled,
+              ]}
+              onPress={handleSaveKnock}
+              disabled={!selectedLabel || savingKnock}
+            >
+              {savingKnock
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.saveButtonText}>Save Knock</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.closeButton, { marginBottom: 8 }]}
+              onPress={() => { setPickerVisible(false); setSelectedLabel(null); setPickerNotes(''); }}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Knock Detail Sheet ───────────────────────────────────────────── */}
+      <Modal
+        visible={detailVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={styles.modalDismiss} onPress={() => setDetailVisible(false)} />
+
+          <View style={styles.detailSheet}>
+            <View style={styles.pickerHandle} />
+
+            {detailKnock && (
+              <>
+                {/* Header: emoji + label + address */}
+                <View style={styles.detailLabelRow}>
+                  <Text style={styles.detailEmoji}>
+                    {KNOCK_OUTCOME_EMOJI[detailKnock.label]}
+                  </Text>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.detailLabelName}>
+                      {KNOCK_OUTCOME_LABEL[detailKnock.label]}
+                    </Text>
+                    {detailKnock.address ? (
+                    <TouchableOpacity onPress={() => handleAddressPress(detailKnock.address!)}>
+                      <Text style={styles.detailAddressLink} numberOfLines={1}>
+                        {detailKnock.address}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.detailAddress} numberOfLines={1}>
+                      {`${detailKnock.latitude.toFixed(5)}, ${detailKnock.longitude.toFixed(5)}`}
+                    </Text>
+                  )}
+                  </View>
+                </View>
+
+                {/* Meta: timestamp + storm date */}
+                <View style={styles.detailMetaRow}>
+                  <Text style={styles.detailMeta}>
+                    {formatDate(detailKnock.knocked_at)}
+                  </Text>
+                  {detailKnock.storm_date && (
+                    <Text style={styles.detailMetaBadge}>
+                      Storm: {detailKnock.storm_date}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Notes */}
+                {detailKnock.notes ? (
+                  <View style={styles.detailNotesBox}>
+                    <Text style={styles.detailNotesText}>{detailKnock.notes}</Text>
+                  </View>
+                ) : null}
+
+                {/* Homeowner Info */}
+                <View style={styles.contactSection}>
+                  <Text style={styles.historySectionTitle}>Homeowner Info</Text>
+
+                  {!contactFormVisible ? (
+                    // Display mode
+                    detailContacts.length > 0 && (detailContacts[0].name || detailContacts[0].phone || detailContacts[0].insurance_carrier) ? (
+                      <View style={styles.contactDisplay}>
+                        {detailContacts[0].name ? (
+                          <Text style={styles.contactDisplayRow}>👤  {detailContacts[0].name}</Text>
+                        ) : null}
+                        {detailContacts[0].phone ? (
+                          <Text style={styles.contactDisplayRow}>📞  {detailContacts[0].phone}</Text>
+                        ) : null}
+                        {detailContacts[0].insurance_carrier ? (
+                          <Text style={styles.contactDisplayRow}>🏢  {detailContacts[0].insurance_carrier}</Text>
+                        ) : null}
+                        <TouchableOpacity onPress={() => setContactFormVisible(true)}>
+                          <Text style={styles.contactEditLink}>Edit</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.addContactButton} onPress={() => setContactFormVisible(true)}>
+                        <Text style={styles.addContactButtonText}>+ Add Contact Info</Text>
+                      </TouchableOpacity>
+                    )
+                  ) : (
+                    // Edit mode
+                    <View>
+                      <TextInput
+                        style={styles.contactInput}
+                        placeholder="Homeowner Name"
+                        placeholderTextColor="#9ca3af"
+                        value={contactName}
+                        onChangeText={setContactName}
+                        autoCapitalize="words"
+                      />
+                      <TextInput
+                        style={styles.contactInput}
+                        placeholder="Phone Number"
+                        placeholderTextColor="#9ca3af"
+                        value={contactPhone}
+                        onChangeText={setContactPhone}
+                        keyboardType="phone-pad"
+                      />
+                      <TextInput
+                        style={styles.contactInput}
+                        placeholder="Insurance Carrier"
+                        placeholderTextColor="#9ca3af"
+                        value={contactInsurance}
+                        onChangeText={setContactInsurance}
+                        autoCapitalize="words"
+                      />
+                      <View style={styles.contactFormActions}>
+                        <TouchableOpacity
+                          style={styles.contactSaveButton}
+                          onPress={handleSaveContact}
+                          disabled={savingContact}
+                        >
+                          {savingContact
+                            ? <ActivityIndicator color="white" size="small" />
+                            : <Text style={styles.contactSaveButtonText}>Save</Text>
+                          }
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setContactFormVisible(false)}>
+                          <Text style={styles.contactCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* History */}
+                {detailLoading ? (
+                  <ActivityIndicator style={{ marginVertical: 16 }} color="#1e40af" />
+                ) : detailHistory && detailHistory.length > 0 ? (
+                  <View style={styles.historySection}>
+                    <Text style={styles.historySectionTitle}>Label History</Text>
+                    <ScrollView style={{ maxHeight: 160 }}>
+                      {detailHistory.map((entry, i) => (
+                        <View key={i} style={styles.detailHistoryRow}>
+                          <Text style={styles.detailHistoryChange}>
+                            {KNOCK_OUTCOME_EMOJI[entry.previous_label]} {KNOCK_OUTCOME_LABEL[entry.previous_label]}
+                            {'  →  '}
+                            {KNOCK_OUTCOME_EMOJI[entry.new_label]} {KNOCK_OUTCOME_LABEL[entry.new_label]}
+                          </Text>
+                          <Text style={styles.detailHistoryDate}>
+                            {formatDate(entry.changed_at)}
+                          </Text>
+                          {entry.notes ? (
+                            <Text style={styles.detailHistoryNotes}>{entry.notes}</Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
+                {/* Property Details */}
+                <View style={styles.contactSection}>
+                  <Text style={styles.historySectionTitle}>Property Details</Text>
+                  {!propertyFormVisible ? (
+                    detailKnock.year_built || detailKnock.sqft ? (
+                      <View style={styles.contactDisplay}>
+                        <Text style={styles.contactDisplayRow}>
+                          {[
+                            detailKnock.year_built ? `📅 Built: ${detailKnock.year_built}` : null,
+                            detailKnock.sqft ? `📐 ${detailKnock.sqft.toLocaleString()} sqft` : null,
+                          ].filter(Boolean).join('   ·   ')}
+                        </Text>
+                        <TouchableOpacity onPress={() => setPropertyFormVisible(true)}>
+                          <Text style={styles.contactEditLink}>Edit</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.addContactButton} onPress={() => setPropertyFormVisible(true)}>
+                        <Text style={styles.addContactButtonText}>+ Add Property Details</Text>
+                      </TouchableOpacity>
+                    )
+                  ) : (
+                    <View>
+                      <TextInput
+                        style={styles.contactInput}
+                        placeholder="Year Built (e.g. 1994)"
+                        placeholderTextColor="#9ca3af"
+                        value={propertyYearBuilt}
+                        onChangeText={setPropertyYearBuilt}
+                        keyboardType="number-pad"
+                      />
+                      <TextInput
+                        style={styles.contactInput}
+                        placeholder="Square Footage (e.g. 1840)"
+                        placeholderTextColor="#9ca3af"
+                        value={propertySqft}
+                        onChangeText={setPropertySqft}
+                        keyboardType="number-pad"
+                      />
+                      <View style={styles.contactFormActions}>
+                        <TouchableOpacity
+                          style={styles.contactSaveButton}
+                          onPress={handleSaveProperty}
+                          disabled={savingProperty}
+                        >
+                          {savingProperty
+                            ? <ActivityIndicator color="white" size="small" />
+                            : <Text style={styles.contactSaveButtonText}>Save</Text>
+                          }
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setPropertyFormVisible(false)}>
+                          <Text style={styles.contactCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Actions */}
+                <TouchableOpacity style={styles.relabelButton} onPress={handleRelabel}>
+                  <Text style={styles.relabelButtonText}>Re-label</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.followUpButton}
+                  onPress={() => Alert.alert('Coming Soon', 'Appointment scheduling will be available in a future update.')}
+                >
+                  <Text style={styles.followUpButtonText}>📅  Schedule Follow-up</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.closeButton} onPress={() => setDetailVisible(false)}>
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteKnockButton} onPress={handleDeleteKnock}>
+                  <Text style={styles.deleteKnockButtonText}>Delete Knock</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
+function formatDate(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   statsBar: {
-    position: 'absolute',
-    top: 10,
-    left: 16,
-    right: 16,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    position: 'absolute', top: 10, left: 16, right: 16,
+    backgroundColor: 'white', borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, shadowRadius: 3.84, elevation: 5,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1e40af',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#e5e7eb',
-  },
-  rightButtonStack: {
-    position: 'absolute',
-    right: 16,
-    bottom: 80, // Above the tab bar
-  },
-  leftButtonStack: {
-    position: 'absolute',
-    left: 16,
-    bottom: 80, // Above the tab bar
-  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 20, fontWeight: 'bold', color: '#1e40af' },
+  statLabel: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  statDivider: { width: 1, height: 30, backgroundColor: '#e5e7eb' },
+  rightButtonStack: { position: 'absolute', right: 16, bottom: 80 },
+  leftButtonStack: { position: 'absolute', left: 16, bottom: 80 },
   actionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Almost opaque white
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3.84,
-    elevation: 5,
-    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 30,
+    width: 60, height: 60, justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 3.84, elevation: 5, marginBottom: 10,
   },
   badge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
+    position: 'absolute', top: -5, right: -5,
+    backgroundColor: '#ef4444', borderRadius: 10,
+    minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: 'white',
   },
-  badgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
+  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+
+  // Modal
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end' },
+  modalDismiss: { flex: 1 },
+  pickerSheet: {
+    backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, maxHeight: '78%',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1, shadowRadius: 6, elevation: 10,
   },
+  pickerHandle: {
+    alignSelf: 'center', width: 40, height: 4,
+    backgroundColor: '#d1d5db', borderRadius: 2, marginBottom: 12,
+  },
+  pickerTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 },
+  pickerCurrent: { fontSize: 14, color: '#6b7280', marginBottom: 10 },
+  pickerAddress: { fontSize: 13, color: '#374151', marginBottom: 10 },
+  pickerAddressLoading: { fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginBottom: 10 },
+  pickerAddressLink: { fontSize: 13, color: '#1e40af', textDecorationLine: 'underline', marginBottom: 10 },
+  pickerTabBar: {
+    flexDirection: 'row', backgroundColor: '#f3f4f6',
+    borderRadius: 10, padding: 3, marginBottom: 14,
+  },
+  pickerTabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  pickerTabBtnActive: {
+    backgroundColor: 'white',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1, shadowRadius: 2, elevation: 2,
+  },
+  pickerTabText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  pickerTabTextActive: { color: '#111827' },
+  pickerTabContent: { flexGrow: 0 },
+  pickerSectionTitle: { fontSize: 11, fontWeight: '700', color: '#9ca3af', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  labelGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  labelButton: {
+    width: '30%', backgroundColor: '#f9fafb', borderRadius: 12,
+    paddingVertical: 12, alignItems: 'center',
+    borderWidth: 1, borderColor: '#e5e7eb',
+  },
+  labelEmoji: { fontSize: 26, marginBottom: 4 },
+  labelText: { fontSize: 11, color: '#374151', textAlign: 'center', fontWeight: '500' },
+  labelButtonSelected: {
+    backgroundColor: '#dbeafe', borderColor: '#1e40af', borderWidth: 2,
+  },
+  labelTextSelected: { color: '#1e40af', fontWeight: '700' },
+  notesInput: {
+    borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10,
+    padding: 12, fontSize: 14, color: '#111827',
+    minHeight: 60, textAlignVertical: 'top', marginBottom: 16,
+  },
+  saveButton: {
+    backgroundColor: '#1e40af', borderRadius: 12,
+    paddingVertical: 16, alignItems: 'center',
+  },
+  saveButtonDisabled: { backgroundColor: '#93c5fd' },
+  saveButtonText: { color: 'white', fontSize: 16, fontWeight: '700' },
+
+  // Detail sheet
+  detailSheet: {
+    backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 36,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1, shadowRadius: 6, elevation: 10,
+  },
+  detailLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  detailEmoji: { fontSize: 40 },
+  detailLabelName: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  detailAddress: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  detailAddressLink: { fontSize: 13, color: '#1e40af', marginTop: 2, textDecorationLine: 'underline' },
+  detailMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  detailMeta: { fontSize: 13, color: '#6b7280' },
+  detailMetaBadge: {
+    fontSize: 12, color: '#1e40af', backgroundColor: '#dbeafe',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, fontWeight: '600',
+  },
+  detailNotesBox: {
+    backgroundColor: '#f9fafb', borderRadius: 10, padding: 12, marginBottom: 12,
+  },
+  detailNotesText: { fontSize: 14, color: '#374151' },
+  historySection: { marginBottom: 16 },
+  historySectionTitle: { fontSize: 13, fontWeight: '700', color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  detailHistoryRow: {
+    borderLeftWidth: 2, borderLeftColor: '#dbeafe',
+    paddingLeft: 10, marginBottom: 10,
+  },
+  detailHistoryChange: { fontSize: 13, color: '#111827', fontWeight: '500' },
+  detailHistoryDate: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  detailHistoryNotes: { fontSize: 12, color: '#6b7280', marginTop: 2, fontStyle: 'italic' },
+  relabelButton: {
+    borderWidth: 2, borderColor: '#1e40af', borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center', marginBottom: 10,
+  },
+  relabelButtonText: { color: '#1e40af', fontSize: 16, fontWeight: '700' },
+  closeButton: { alignItems: 'center', paddingVertical: 8 },
+  closeButtonText: { color: '#9ca3af', fontSize: 15 },
+
+  // Contact section
+  contactSection: { marginBottom: 16 },
+  contactDisplay: {
+    backgroundColor: '#f9fafb', borderRadius: 10, padding: 12, marginTop: 6,
+  },
+  contactDisplayRow: { fontSize: 14, color: '#111827', marginBottom: 4 },
+  contactEditLink: { fontSize: 13, color: '#1e40af', fontWeight: '600', marginTop: 4 },
+  addContactButton: {
+    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, borderStyle: 'dashed',
+    paddingVertical: 10, alignItems: 'center', marginTop: 6,
+  },
+  addContactButtonText: { color: '#6b7280', fontSize: 14 },
+  contactInput: {
+    borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8,
+    padding: 10, fontSize: 14, color: '#111827',
+    backgroundColor: '#f9fafb', marginBottom: 8,
+  },
+  contactFormActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 4 },
+  contactSaveButton: {
+    backgroundColor: '#1e40af', borderRadius: 8,
+    paddingVertical: 10, paddingHorizontal: 20,
+  },
+  contactSaveButtonText: { color: 'white', fontSize: 14, fontWeight: '700' },
+  contactCancelText: { color: '#9ca3af', fontSize: 14 },
+
+  // Follow-up stub
+  followUpButton: {
+    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center', marginBottom: 10,
+  },
+  followUpButtonText: { color: '#6b7280', fontSize: 15 },
+  deleteKnockButton: { alignItems: 'center', paddingVertical: 8, marginTop: 4 },
+  deleteKnockButtonText: { color: '#ef4444', fontSize: 14 },
 });

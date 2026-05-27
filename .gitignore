@@ -63,4 +63,13 @@ coverage/
 .expo-shared/
 
 # EAS Build
-eas.json
+.vercel
+
+# Claude Code
+.claude/
+
+# Preprocessed data (large JSON files, not for git)
+mrms-proxy-server/preprocessed/
+
+# Context files (session state, not source code)
+.context/

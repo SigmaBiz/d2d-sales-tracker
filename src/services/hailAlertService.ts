@@ -10,6 +10,7 @@ import { MRMSService, HailReport, StormEvent } from './mrmsService';
 import { StorageService } from './storageService';
 import { ConfidenceScoring } from './confidenceScoring';
 import { getRealtimeServerUrl } from '../config/api.config';
+import { supabase } from './supabaseClient';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -58,7 +59,7 @@ export class HailAlertService {
     if (finalStatus !== 'granted') {
       throw new Error('Notification permissions not granted');
     }
-    
+
     // Register for push notifications
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('hail-alerts', {
@@ -67,6 +68,30 @@ export class HailAlertService {
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
       });
+    }
+
+    // Register Expo push token in Supabase so the server can reach this device
+    await HailAlertService.registerPushToken();
+  }
+
+  /**
+   * Get Expo push token and upsert into Supabase push_tokens table.
+   * Called on every init so tokens stay current (they can rotate).
+   */
+  static async registerPushToken(): Promise<void> {
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const token = tokenData.data;
+
+      await supabase.from('push_tokens').upsert(
+        { token, active: true, updated_at: new Date().toISOString() },
+        { onConflict: 'token' }
+      );
+
+      console.log('[HailAlert] Push token registered:', token);
+    } catch (err) {
+      // Non-fatal — app still works, just won't receive server-side alerts
+      console.warn('[HailAlert] Push token registration failed:', err);
     }
   }
   
