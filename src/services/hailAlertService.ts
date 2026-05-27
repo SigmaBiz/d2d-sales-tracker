@@ -80,7 +80,9 @@ export class HailAlertService {
    */
   static async registerPushToken(): Promise<void> {
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: 'ffdec8ec-db31-4b46-ad99-d4434a5e5115',
+      });
       const token = tokenData.data;
 
       await supabase.from('push_tokens').upsert(
