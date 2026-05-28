@@ -10,6 +10,7 @@ import NativeMap, { NativeMapRef } from '../components/NativeMap';
 import { LocationService } from '../services/locationService';
 import { SupabaseService } from '../services/supabaseService';
 import { MRMSService, HailReport } from '../services/mrmsService';
+import { IEMArchiveService } from '../services/tier2IEMService';
 import { HailAlertService } from '../services/hailAlertService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
@@ -86,9 +87,29 @@ export default function RealMapScreen({ navigation }: any) {
         setShowNotificationLog(true);
         (global as any).openNotificationLog = false;
       }
+      const pendingDate = (global as any).pendingSwathDate;
+      if (pendingDate) {
+        (global as any).pendingSwathDate = null;
+        autoLoadSwathDate(pendingDate);
+      }
     });
     return unsubscribe;
   }, [navigation]);
+
+  const autoLoadSwathDate = async (dateStr: string) => {
+    try {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      const reports = await IEMArchiveService.fetchHistoricalStorm(date);
+      if (reports.length === 0) return;
+      const storm = await MRMSService.groupIntoStormEvents(reports);
+      storm.name = `OKC Metro - ${String(month).padStart(2,'0')}/${String(day).padStart(2,'0')}/${year}`;
+      await MRMSService.saveStormEvent(storm);
+      await loadHailData();
+    } catch (err) {
+      console.warn('[Map] autoLoadSwathDate failed:', err);
+    }
+  };
 
   const initializeApp = async () => {
     await SupabaseService.initialize();
