@@ -47,20 +47,17 @@ export class HailAlertService {
    * Initialize alert service and request permissions
    */
   static async initialize(): Promise<void> {
-    // Request notification permissions
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      throw new Error('Notification permissions not granted');
+    // Request notification permissions — errors here are non-fatal
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      if (existingStatus !== 'granted') {
+        await Notifications.requestPermissionsAsync();
+      }
+    } catch (err) {
+      console.warn('[HailAlert] Permission check failed:', err);
     }
 
-    // Register for push notifications
+    // Register for push notifications (Android only)
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('hail-alerts', {
         name: 'Hail Alerts',
@@ -70,7 +67,7 @@ export class HailAlertService {
       });
     }
 
-    // Register Expo push token in Supabase so the server can reach this device
+    // Always attempt token registration — registerPushToken handles its own errors
     await HailAlertService.registerPushToken();
   }
 
