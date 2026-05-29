@@ -16,10 +16,18 @@ import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
 import NotificationLogPanel from '../components/NotificationLogPanel';
 import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL } from '../types';
+import { supabase } from '../services/supabaseClient';
 
 const LABEL_ORDER: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
   'conversation', 'inspected', 'follow_up', 'lead', 'signed', 'scout',
+];
+
+// Gate-filtered label sets. "No" (door didn't open) → outcomes you can tell
+// without engaging anyone. "Yes" (door opened) → outcomes that require talking.
+const NOT_OPENED_LABELS: KnockOutcome[] = ['no_home', 'no_soliciting', 'scout'];
+const OPENED_LABELS: KnockOutcome[] = [
+  'not_interested', 'renter', 'conversation', 'inspected', 'follow_up', 'lead', 'signed',
 ];
 
 export default function RealMapScreen({ navigation }: any) {
@@ -61,6 +69,10 @@ export default function RealMapScreen({ navigation }: any) {
   const [contactInsurance, setContactInsurance] = useState('');
   const [savingContact, setSavingContact] = useState(false);
 
+  // Ping Owner state
+  const [pingOwnerLoading, setPingOwnerLoading] = useState(false);
+  const [pingOwnerSent, setPingOwnerSent] = useState(false);
+
   // Property data state
   const [propertyFormVisible, setPropertyFormVisible] = useState(false);
   const [propertyYearBuilt, setPropertyYearBuilt] = useState('');
@@ -71,6 +83,15 @@ export default function RealMapScreen({ navigation }: any) {
   const [pendingAddress, setPendingAddress] = useState<string | undefined>(undefined);
   const [geocodingAddress, setGeocodingAddress] = useState(false);
   const [pickerTab, setPickerTab] = useState<'knock' | 'contact'>('knock');
+
+  // Knock session tracking (micro-cycle: open → close)
+  const activeSessionIdRef = useRef<string | null>(null);       // server session id, used by /close
+  const openInFlightRef = useRef<Promise<void> | null>(null);   // pending /open so /close can await its id
+  const doorLockRef = useRef(false);                            // LOCAL synchronous lock — gates the map (Z₂)
+
+  // "Opened?" gate — shown between map tap and label picker
+  const [hardOpenVisible, setHardOpenVisible] = useState(false);
+  const [gateOpened, setGateOpened] = useState<'yes' | 'no' | null>(null); // drives label filter + tab visibility
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +112,12 @@ export default function RealMapScreen({ navigation }: any) {
       if (pendingDate) {
         (global as any).pendingSwathDate = null;
         autoLoadSwathDate(pendingDate);
+      }
+
+      const pendingInspection = (global as any).pendingLiveInspectionLocation;
+      if (pendingInspection) {
+        (global as any).pendingLiveInspectionLocation = null;
+        mapRef.current?.centerOnLocation(pendingInspection.lat, pendingInspection.lng, 0.005);
       }
     });
     return unsubscribe;
@@ -170,6 +197,52 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
+  // ── Knock session helpers (micro-cycle) ───────────────────────────────────
+
+  // Records the server-side session (audit trail + future cycle-time analytics).
+  // The UI lock does NOT depend on this — see doorLockRef. `opened` is the
+  // Yes/No answer from the gate, stored explicitly for later analytics.
+  const openKnockSession = (lat: number, lng: number, opened: boolean) => {
+    activeSessionIdRef.current = null;
+    openInFlightRef.current = (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const res = await fetch('https://d2d-sales-tracker-tau.vercel.app/api/knocks/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, teamId: SupabaseService.getTeamId(), lat, lng, opened }),
+        });
+        if (res.ok) {
+          const { sessionId } = await res.json();
+          activeSessionIdRef.current = sessionId;
+        }
+      } catch (err) {
+        console.warn('[Session] Failed to open knock session:', err);
+      }
+    })();
+  };
+
+  const closeKnockSession = async (knockId?: string, outcomeLabel?: string) => {
+    // Wait for the in-flight /open so we have a session id to close.
+    if (openInFlightRef.current) {
+      try { await openInFlightRef.current; } catch {}
+      openInFlightRef.current = null;
+    }
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId) return;
+    activeSessionIdRef.current = null;
+    try {
+      await fetch('https://d2d-sales-tracker-tau.vercel.app/api/knocks/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, knockId, outcomeLabel }),
+      });
+    } catch (err) {
+      console.warn('[Session] Failed to close knock session:', err);
+    }
+  };
+
   // ── Map interactions ──────────────────────────────────────────────────────
 
   const handleMapPress = (lat: number, lng: number) => {
@@ -177,15 +250,20 @@ export default function RealMapScreen({ navigation }: any) {
       suppressNextMapPress.current = false;
       return;
     }
+    // A door is already open — the gate/picker modal is the lock; ignore stray taps.
+    if (doorLockRef.current) return;
+    doorLockRef.current = true; // engage lock SYNCHRONOUSLY, before any await or network call
     setPendingCoords({ lat, lng });
     setPendingKnock(null);
+    setGateOpened(null);
     setPickerNotes('');
     setSelectedLabel(null);
     setContactName(''); setContactPhone(''); setContactInsurance('');
     setPropertyYearBuilt(''); setPropertySqft('');
+    setPingOwnerSent(false);
     setPendingAddress(undefined);
     setPickerTab('knock');
-    setPickerVisible(true);
+    setHardOpenVisible(true);  // "Opened?" gate — session is created only on Yes/No
     // Geocode immediately so address is ready by the time the user picks a label
     setGeocodingAddress(true);
     LocationService.reverseGeocode(lat, lng)
@@ -195,6 +273,7 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const handleKnockPress = async (knock: Knock) => {
+    if (doorLockRef.current) return; // a door is open — finish labeling it first
     suppressNextMapPress.current = true;
     // Open detail sheet — lazy-load history + contacts in parallel
     setDetailKnock(knock);
@@ -219,6 +298,30 @@ export default function RealMapScreen({ navigation }: any) {
     setPropertySqft(knock.sqft ? String(knock.sqft) : '');
     setPropertyFormVisible(false);
     setDetailLoading(false);
+  };
+
+  const handlePingOwner = async (address: string, lat: number, lng: number) => {
+    setPingOwnerLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      const canvasserName = user?.email?.split('@')[0] ?? 'Canvasser';
+      const res = await fetch('https://d2d-sales-tracker-tau.vercel.app/api/alerts/ping-owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, canvasserName, address, lat, lng }),
+      });
+      if (res.ok) {
+        setPingOwnerSent(true);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert('Ping failed', (body as any).error || 'Could not reach owner');
+      }
+    } catch {
+      Alert.alert('Ping failed', 'Network error — try again');
+    } finally {
+      setPingOwnerLoading(false);
+    }
   };
 
   const handleSaveContact = async () => {
@@ -331,8 +434,11 @@ export default function RealMapScreen({ navigation }: any) {
     setSavingKnock(true);
 
     try {
+      let savedKnockId: string | undefined;
+
       if (pendingKnock) {
         // Re-label existing knock
+        savedKnockId = pendingKnock.id;
         await SupabaseService.updateKnockLabel(
           pendingKnock.id, pendingKnock.label, selectedLabel, pickerNotes || undefined
         );
@@ -360,6 +466,7 @@ export default function RealMapScreen({ navigation }: any) {
           knocked_at: new Date(),
           user_id: SupabaseService.getUserId() ?? undefined,
         });
+        savedKnockId = savedKnock.id;
         if (contactName || contactPhone || contactInsurance) {
           await SupabaseService.upsertContact(savedKnock.id, {
             name: contactName || undefined,
@@ -375,11 +482,19 @@ export default function RealMapScreen({ navigation }: any) {
         }
       }
 
+      // Close knock session (non-blocking) — only releases on a successful save,
+      // so a failed save keeps the door open and the picker up for retry.
+      closeKnockSession(savedKnockId, selectedLabel);
+
+      doorLockRef.current = false; // release the map lock
+      setGateOpened(null);
+      setHardOpenVisible(false);
       setPickerVisible(false);
       setSelectedLabel(null);
       setPickerNotes('');
       setContactName(''); setContactPhone(''); setContactInsurance('');
       setPropertyYearBuilt(''); setPropertySqft('');
+      setPingOwnerSent(false);
       await loadKnocks();
     } catch (err) {
       Alert.alert('Error', 'Failed to save knock. Check your connection.');
@@ -515,18 +630,79 @@ export default function RealMapScreen({ navigation }: any) {
         onCreateOverlay={() => { loadHailData(); setShowNotificationLog(false); }}
       />
 
+      {/* ── "Opened?" Gate ──────────────────────────────────────────────── */}
+      <Modal
+        visible={hardOpenVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { /* non-dismissable — must choose Yes / No / Wrong door */ }}
+      >
+        <View style={styles.modalBackdrop}>
+          {/* Inert backdrop — no dismiss; the gate must be answered */}
+          <View style={styles.modalDismiss} />
+          <View style={styles.hardOpenSheet}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.hardOpenAddress} numberOfLines={2}>
+              📍 {pendingAddress ?? (pendingCoords ? `${pendingCoords.lat.toFixed(4)}, ${pendingCoords.lng.toFixed(4)}` : '...')}
+            </Text>
+            <Text style={styles.hardOpenQuestion}>Opened?</Text>
+            <TouchableOpacity
+              style={styles.hardOpenYes}
+              onPress={() => {
+                setGateOpened('yes');
+                if (pendingCoords) openKnockSession(pendingCoords.lat, pendingCoords.lng, true);
+                setPickerTab('knock');
+                setHardOpenVisible(false);
+                setPickerVisible(true);
+              }}
+            >
+              <Text style={styles.hardOpenYesText}>Yes — door opened</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.hardOpenMaybe}
+              onPress={() => {
+                setGateOpened('no');
+                if (pendingCoords) openKnockSession(pendingCoords.lat, pendingCoords.lng, false);
+                setPickerTab('knock');
+                setHardOpenVisible(false);
+                setPickerVisible(true);
+              }}
+            >
+              <Text style={styles.hardOpenMaybeText}>No — didn't open</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.hardOpenNo}
+              onPress={() => {
+                // Wrong door / mis-tap — release the lock, no session created.
+                doorLockRef.current = false;
+                setGateOpened(null);
+                setPendingCoords(null);
+                setHardOpenVisible(false);
+              }}
+            >
+              <Text style={styles.hardOpenNoText}>Wrong door</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Knock Sheet (create + update) ───────────────────────────────── */}
       <Modal
         visible={pickerVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setPickerVisible(false)}
+        onRequestClose={() => { if (pendingKnock) setPickerVisible(false); }} // gated new doors are non-dismissable
       >
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <TouchableOpacity style={styles.modalDismiss} onPress={() => setPickerVisible(false)} />
+          {/* New (gated) doors: inert backdrop — must label to exit. Relabel: tap-away dismisses. */}
+          {pendingKnock ? (
+            <TouchableOpacity style={styles.modalDismiss} onPress={() => setPickerVisible(false)} />
+          ) : (
+            <View style={styles.modalDismiss} />
+          )}
 
           <View style={styles.pickerSheet}>
             <View style={styles.pickerHandle} />
@@ -544,25 +720,27 @@ export default function RealMapScreen({ navigation }: any) {
               </Text>
             ) : null}
 
-            {/* Segmented control */}
-            <View style={styles.pickerTabBar}>
-              <TouchableOpacity
-                style={[styles.pickerTabBtn, pickerTab === 'knock' && styles.pickerTabBtnActive]}
-                onPress={() => setPickerTab('knock')}
-              >
-                <Text style={[styles.pickerTabText, pickerTab === 'knock' && styles.pickerTabTextActive]}>
-                  🏠  Knock
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.pickerTabBtn, pickerTab === 'contact' && styles.pickerTabBtnActive]}
-                onPress={() => setPickerTab('contact')}
-              >
-                <Text style={[styles.pickerTabText, pickerTab === 'contact' && styles.pickerTabTextActive]}>
-                  👤  Contact
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {/* Segmented control — Contact tab hidden when the door didn't open (no one to capture) */}
+            {gateOpened !== 'no' && (
+              <View style={styles.pickerTabBar}>
+                <TouchableOpacity
+                  style={[styles.pickerTabBtn, pickerTab === 'knock' && styles.pickerTabBtnActive]}
+                  onPress={() => setPickerTab('knock')}
+                >
+                  <Text style={[styles.pickerTabText, pickerTab === 'knock' && styles.pickerTabTextActive]}>
+                    🏠  Knock
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.pickerTabBtn, pickerTab === 'contact' && styles.pickerTabBtnActive]}
+                  onPress={() => setPickerTab('contact')}
+                >
+                  <Text style={[styles.pickerTabText, pickerTab === 'contact' && styles.pickerTabTextActive]}>
+                    👤  Contact
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Scrollable tab content */}
             <ScrollView
@@ -579,7 +757,11 @@ export default function RealMapScreen({ navigation }: any) {
                   )}
 
                   <View style={styles.labelGrid}>
-                    {LABEL_ORDER.map(label => (
+                    {(pendingKnock
+                      ? LABEL_ORDER                              // relabel: all labels available
+                      : gateOpened === 'no' ? NOT_OPENED_LABELS  // didn't open
+                      : OPENED_LABELS                            // opened
+                    ).map(label => (
                       <TouchableOpacity
                         key={label}
                         style={[
@@ -629,6 +811,25 @@ export default function RealMapScreen({ navigation }: any) {
                     onChangeText={setContactPhone}
                     keyboardType="phone-pad"
                   />
+                  <TouchableOpacity
+                    style={[
+                      styles.pingOwnerButton,
+                      (!contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
+                    ]}
+                    onPress={() => {
+                      if (pendingCoords && pendingAddress) {
+                        handlePingOwner(pendingAddress, pendingCoords.lat, pendingCoords.lng);
+                      }
+                    }}
+                    disabled={!contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
+                  >
+                    {pingOwnerLoading
+                      ? <ActivityIndicator color="white" size="small" />
+                      : <Text style={styles.pingOwnerButtonText}>
+                          {pingOwnerSent ? '✓ Owner Pinged' : '🔔 Ping Owner — Live Inspection'}
+                        </Text>
+                    }
+                  </TouchableOpacity>
                   <TextInput
                     style={styles.contactInput}
                     placeholder="Insurance Carrier"
@@ -674,12 +875,20 @@ export default function RealMapScreen({ navigation }: any) {
               }
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.closeButton, { marginBottom: 8 }]}
-              onPress={() => { setPickerVisible(false); setSelectedLabel(null); setPickerNotes(''); }}
-            >
-              <Text style={styles.closeButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {/* Cancel only when relabeling. A gated new door must end in a label —
+                the misfire escape is the gate's "Wrong door" (pre-commit). */}
+            {pendingKnock && (
+              <TouchableOpacity
+                style={[styles.closeButton, { marginBottom: 8 }]}
+                onPress={() => {
+                  setPickerVisible(false);
+                  setSelectedLabel(null);
+                  setPickerNotes('');
+                }}
+              >
+                <Text style={styles.closeButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -786,6 +995,25 @@ export default function RealMapScreen({ navigation }: any) {
                         onChangeText={setContactPhone}
                         keyboardType="phone-pad"
                       />
+                      <TouchableOpacity
+                        style={[
+                          styles.pingOwnerButton,
+                          (!contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
+                        ]}
+                        onPress={() => {
+                          if (detailKnock?.address) {
+                            handlePingOwner(detailKnock.address, detailKnock.latitude, detailKnock.longitude);
+                          }
+                        }}
+                        disabled={!contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
+                      >
+                        {pingOwnerLoading
+                          ? <ActivityIndicator color="white" size="small" />
+                          : <Text style={styles.pingOwnerButtonText}>
+                              {pingOwnerSent ? '✓ Owner Pinged' : '🔔 Ping Owner — Live Inspection'}
+                            </Text>
+                        }
+                      </TouchableOpacity>
                       <TextInput
                         style={styles.contactInput}
                         placeholder="Insurance Carrier"
@@ -1087,4 +1315,37 @@ const styles = StyleSheet.create({
   followUpButtonText: { color: '#6b7280', fontSize: 15 },
   deleteKnockButton: { alignItems: 'center', paddingVertical: 8, marginTop: 4 },
   deleteKnockButtonText: { color: '#ef4444', fontSize: 14 },
+  // Hard open gate
+  hardOpenSheet: {
+    backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 24, paddingBottom: 40, paddingTop: 12, alignItems: 'center',
+  },
+  hardOpenAddress: {
+    fontSize: 13, color: '#6b7280', textAlign: 'center', marginBottom: 20, marginTop: 4,
+  },
+  hardOpenQuestion: {
+    fontSize: 22, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 28,
+  },
+  hardOpenYes: {
+    backgroundColor: '#1e40af', borderRadius: 14, paddingVertical: 16,
+    alignItems: 'center', width: '100%', marginBottom: 12,
+  },
+  hardOpenYesText: { color: 'white', fontSize: 17, fontWeight: '700' },
+  hardOpenMaybe: {
+    backgroundColor: '#eff6ff', borderWidth: 2, borderColor: '#1e40af', borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center', width: '100%', marginBottom: 12,
+  },
+  hardOpenMaybeText: { color: '#1e40af', fontSize: 17, fontWeight: '700' },
+  hardOpenNo: {
+    paddingVertical: 12, alignItems: 'center', width: '100%',
+  },
+  hardOpenNoText: { color: '#9ca3af', fontSize: 15 },
+
+  pingOwnerButton: {
+    backgroundColor: '#1e40af', borderRadius: 8,
+    paddingVertical: 10, alignItems: 'center',
+    marginBottom: 8,
+  },
+  pingOwnerButtonDisabled: { backgroundColor: '#93c5fd' },
+  pingOwnerButtonText: { color: 'white', fontSize: 14, fontWeight: '600' },
 });

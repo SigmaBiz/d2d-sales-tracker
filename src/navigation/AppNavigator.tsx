@@ -6,12 +6,12 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import RealMapScreen from '../screens/RealMapScreen';
-import KnockScreen from '../screens/KnockScreen';
 import StatsScreen from '../screens/StatsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import StormSearchScreen from '../screens/StormSearchScreen';
 import DataFlowDashboard from '../screens/DataFlowDashboard';
 import HailIntelligenceDashboard from '../screens/HailIntelligenceDashboard';
+import PingHistoryScreen from '../screens/PingHistoryScreen';
 import AuthScreen from '../screens/AuthScreen';
 import TeamSetupScreen from '../screens/TeamSetupScreen';
 import { SupabaseService } from '../services/supabaseService';
@@ -28,8 +28,6 @@ function TabNavigator() {
 
           if (route.name === 'Map') {
             iconName = focused ? 'map' : 'map-outline';
-          } else if (route.name === 'Knock') {
-            iconName = focused ? 'hand-left' : 'hand-left-outline';
           } else if (route.name === 'Stats') {
             iconName = focused ? 'stats-chart' : 'stats-chart-outline';
           } else if (route.name === 'Settings') {
@@ -52,8 +50,7 @@ function TabNavigator() {
       })}
     >
       <Tab.Screen name="Map" component={RealMapScreen} options={{ title: 'Territory Map' }} />
-      <Tab.Screen name="Knock" component={KnockScreen} options={{ title: 'Record Knock' }} />
-      <Tab.Screen name="Stats" component={StatsScreen} options={{ title: 'Analytics' }} />
+<Tab.Screen name="Stats" component={StatsScreen} options={{ title: 'Analytics' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
     </Tab.Navigator>
   );
@@ -95,18 +92,24 @@ function MainStack() {
           },
         }}
       />
-      <Stack.Screen 
-        name="HailIntelligence" 
+      <Stack.Screen
+        name="HailIntelligence"
         component={HailIntelligenceDashboard}
-        options={{ 
+        options={{
           title: 'Hail Intelligence',
-          headerStyle: {
-            backgroundColor: '#1e40af',
-          },
+          headerStyle: { backgroundColor: '#1e40af' },
           headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
+          headerTitleStyle: { fontWeight: 'bold' },
+        }}
+      />
+      <Stack.Screen
+        name="PingHistory"
+        component={PingHistoryScreen}
+        options={{
+          title: 'Ping History',
+          headerStyle: { backgroundColor: '#1e40af' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
     </Stack.Navigator>

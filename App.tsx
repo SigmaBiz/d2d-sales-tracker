@@ -52,6 +52,13 @@ export default function App() {
         return;
       }
 
+      // Live inspection — center map on canvasser's location
+      if (data?.type === 'live_inspection' && data?.lat != null && data?.lng != null) {
+        console.log('[App] Live inspection tapped:', data.address);
+        (global as any).pendingLiveInspectionLocation = { lat: data.lat, lng: data.lng, address: data.address };
+        return;
+      }
+
       const result = await HailAlertService.handleNotificationResponse(response);
 
       if (result && result.action === 'OPEN_NOTIFICATION_LOG') {

@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token } = req.body as { token?: string };
+  const { token, userId } = req.body as { token?: string; userId?: string };
 
   if (!token || typeof token !== 'string' || !token.startsWith('ExponentPushToken[')) {
     return res.status(400).json({ error: 'Invalid or missing push token' });
@@ -29,12 +29,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = getSupabaseClient();
 
+  const upsertPayload: Record<string, unknown> = {
+    token,
+    active: true,
+    updated_at: new Date().toISOString(),
+  };
+  if (userId) upsertPayload.user_id = userId;
+
   const { error } = await supabase
     .from('push_tokens')
-    .upsert(
-      { token, active: true, updated_at: new Date().toISOString() },
-      { onConflict: 'token' }
-    );
+    .upsert(upsertPayload, { onConflict: 'token' });
 
   if (error) {
     console.error('[RegisterToken] Supabase error:', error);

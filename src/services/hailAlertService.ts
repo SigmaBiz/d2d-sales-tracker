@@ -10,6 +10,7 @@ import { MRMSService, HailReport, StormEvent } from './mrmsService';
 import { StorageService } from './storageService';
 import { ConfidenceScoring } from './confidenceScoring';
 import { getRealtimeServerUrl } from '../config/api.config';
+import { supabase } from './supabaseClient';
 
 
 // Configure notification behavior
@@ -82,10 +83,11 @@ export class HailAlertService {
       });
       const token = tokenData.data;
 
+      const { data: { user } } = await supabase.auth.getUser();
       const res = await fetch('https://d2d-sales-tracker-tau.vercel.app/api/alerts/register-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, userId: user?.id }),
       });
 
       if (res.ok) {

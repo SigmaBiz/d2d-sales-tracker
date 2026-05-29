@@ -10,6 +10,15 @@
    - **ε** — any gaps or tensions between β, ι, and μ
    Wait for confirmation or correction before starting work.
 
+## Before implementing any feature or change
+- Restate the request back as a concrete spec before writing code:
+  list every branch, state, and option (e.g. a popup's full
+  yes/no/other flow), and every data binding (what metric each
+  input feeds, any timers).
+- Flag any place my request was ambiguous or where you're inferring
+  intent I didn't state. Do not silently fill gaps.
+- Wait for my confirmation on the restated spec before editing files.
+
 ## Phase 1 — In-Session (coherence check)
 - Track plan coherence, not context window %. The signal to stop is: making edits not in the plan, asking questions that should have been resolved in Phase 0, or explaining why something fails without proposing what will work instead.
 - When coherence drifts, name it: "I've left the plan — do you want me to re-anchor?" Do not compact and push through.

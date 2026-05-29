@@ -22,6 +22,56 @@ Once your project is ready (2-3 minutes):
 Go to SQL Editor and run this:
 
 ```sql
+-- ─── Tier 1: Push token registration (server sends alerts to devices) ──────
+CREATE TABLE push_tokens (
+  token TEXT PRIMARY KEY,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- No RLS on push_tokens — server uses service role key to read them.
+-- Anon users can upsert their own token (INSERT only, no SELECT of others).
+ALTER TABLE push_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can register their push token" ON push_tokens
+  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anyone can update their push token" ON push_tokens
+  FOR UPDATE USING (true);
+
+-- ─── Tier 1: Dedup fired alerts (prevent repeat notifications) ───────────
+CREATE TABLE fired_alerts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  alert_id TEXT NOT NULL UNIQUE,
+  event TEXT NOT NULL,
+  hail_size DECIMAL(4,2),
+  area_desc TEXT,
+  expires_at TIMESTAMP WITH TIME ZONE,
+  tokens_notified INTEGER DEFAULT 0,
+  fired_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Auto-delete expired alerts (keeps the table small)
+CREATE INDEX idx_fired_alerts_expires ON fired_alerts(expires_at);
+
+-- No public access — server writes via service role key only
+ALTER TABLE fired_alerts ENABLE ROW LEVEL SECURITY;
+
+-- ─── Tier 3: Validation log (weekly accuracy tracking) ─────────────────────
+CREATE TABLE validation_log (
+  date DATE PRIMARY KEY,
+  status TEXT NOT NULL CHECK (status IN ('processed', 'unprocessed')),
+  lsr_count INTEGER NOT NULL DEFAULT 0,
+  max_lsr_size DECIMAL(4,2),
+  mesh_count INTEGER,
+  accuracy_score DECIMAL(5,4),  -- 0.0–1.0, NULL if unprocessed
+  checked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- No public access — server writes via service role key only
+ALTER TABLE validation_log ENABLE ROW LEVEL SECURITY;
+
+-- ─── Canvassing tables ───────────────────────────────────────────────────────
+
 -- Create knocks table
 CREATE TABLE knocks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

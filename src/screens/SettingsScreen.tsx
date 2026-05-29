@@ -5,357 +5,195 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
-  TextInput,
   Alert,
   ActivityIndicator,
+  Linking,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { StorageService } from '../services/storageService';
 import { SupabaseService, TeamInfo } from '../services/supabaseService';
-import { StorageUsage } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 
 export default function SettingsScreen({ navigation }: any) {
-  const [settings, setSettings] = useState({
-    autoSync: true,
-    trackingEnabled: true,
-    showIncomeOverlay: false,
-    notificationsEnabled: true,
-    dailyKnockGoal: '100',
-  });
-  const [cloudConnected, setCloudConnected] = useState(false);
-  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [team, setTeam] = useState<TeamInfo | null>(null);
   const [loadingTeam, setLoadingTeam] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSettings();
-    checkCloudConnection();
-    SupabaseService.getMyTeam().then(t => {
-      setTeam(t);
-      setLoadingTeam(false);
-    });
-    
-    // Refresh when screen is focused
-    const interval = setInterval(() => {
-      if (cloudConnected) {
-        SupabaseService.getStorageUsage().then(setStorageUsage);
-      }
-    }, 5000); // Refresh every 5 seconds
-    
-    return () => clearInterval(interval);
-  }, [cloudConnected]);
+    loadData();
+  }, []);
 
-  const loadSettings = async () => {
-    const savedSettings = await StorageService.getSettings();
-    if (savedSettings && Object.keys(savedSettings).length > 0) {
-      setSettings({ ...settings, ...savedSettings });
-    }
+  const loadData = async () => {
+    const [teamResult, sessionResult] = await Promise.all([
+      SupabaseService.getMyTeam(),
+      supabase.auth.getSession(),
+    ]);
+    setTeam(teamResult);
+    setUserEmail(sessionResult.data.session?.user?.email ?? null);
+    setLoadingTeam(false);
   };
 
-  const checkCloudConnection = async () => {
-    let connected = await SupabaseService.initialize();
-    
-    // If not connected, try anonymous sign in
-    if (!connected) {
-      connected = await SupabaseService.signInAnonymously();
-    }
-    
-    setCloudConnected(connected);
-    
-    if (connected) {
-      const usage = await SupabaseService.getStorageUsage();
-      setStorageUsage(usage);
-    }
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await SupabaseService.signOut();
+        },
+      },
+    ]);
   };
 
-  const updateSetting = async (key: string, value: any) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    await StorageService.saveSettings(newSettings);
-  };
-
-  const clearData = () => {
+  const handleLeaveTeam = () => {
     Alert.alert(
-      'Clear All Data',
-      'Are you sure you want to delete all data? This cannot be undone.',
+      'Leave Team',
+      'You will no longer see team pins or be able to add knocks to this team.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Leave',
           style: 'destructive',
           onPress: async () => {
-            await StorageService.clearAll();
-            Alert.alert('Success', 'All data has been cleared');
+            await SupabaseService.leaveTeam();
+            setTeam(null);
           },
         },
       ]
     );
   };
 
-  const syncData = async () => {
-    if (!cloudConnected) {
-      // Try to connect first
-      const connected = await SupabaseService.initialize();
-      if (!connected) {
-        // If still not connected, try anonymous auth
-        const signedIn = await SupabaseService.signInAnonymously();
-        if (!signedIn) {
-          Alert.alert(
-            'Cloud Not Connected',
-            'Please check your internet connection and Supabase configuration.'
-          );
-          return;
-        }
-      }
-    }
-
-    setSyncing(true);
-    const result = await SupabaseService.syncKnocks();
-    setSyncing(false);
-
-    // Refresh storage usage
-    const usage = await SupabaseService.getStorageUsage();
-    setStorageUsage(usage);
-
-    Alert.alert(
-      'Sync Complete',
-      `✅ ${result.synced} knocks synced to cloud\n${result.failed > 0 ? `❌ ${result.failed} failed to sync` : ''}`
-    );
+  const handleShareInviteCode = async (code: string) => {
+    await Share.share({
+      message: `Join my D2D Sales Tracker team! Use invite code: ${code}`,
+    });
   };
 
   return (
     <ScrollView style={styles.container}>
+
+      {/* ── ACCOUNT ── */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>General Settings</Text>
-        
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Auto Sync</Text>
-            <Text style={styles.settingDescription}>
-              Automatically sync data when connected
-            </Text>
-          </View>
-          <Switch
-            value={settings.autoSync}
-            onValueChange={(value) => updateSetting('autoSync', value)}
-            trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-            thumbColor={settings.autoSync ? '#1e40af' : '#f3f4f6'}
-          />
-        </View>
+        <Text style={styles.sectionTitle}>Account</Text>
 
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Background Tracking</Text>
-            <Text style={styles.settingDescription}>
-              Track location in the background
-            </Text>
-          </View>
-          <Switch
-            value={settings.trackingEnabled}
-            onValueChange={(value) => updateSetting('trackingEnabled', value)}
-            trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-            thumbColor={settings.trackingEnabled ? '#1e40af' : '#f3f4f6'}
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Show Income Overlay</Text>
-            <Text style={styles.settingDescription}>
-              Display neighborhood income data on map
-            </Text>
-          </View>
-          <Switch
-            value={settings.showIncomeOverlay}
-            onValueChange={(value) => updateSetting('showIncomeOverlay', value)}
-            trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-            thumbColor={settings.showIncomeOverlay ? '#1e40af' : '#f3f4f6'}
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Notifications</Text>
-            <Text style={styles.settingDescription}>
-              Receive daily reminders and updates
-            </Text>
-          </View>
-          <Switch
-            value={settings.notificationsEnabled}
-            onValueChange={(value) => updateSetting('notificationsEnabled', value)}
-            trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
-            thumbColor={settings.notificationsEnabled ? '#1e40af' : '#f3f4f6'}
-          />
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Goals</Text>
-        
-        <View style={styles.goalRow}>
-          <Text style={styles.settingLabel}>Daily Knock Goal</Text>
-          <TextInput
-            style={styles.goalInput}
-            value={settings.dailyKnockGoal}
-            onChangeText={(value) => updateSetting('dailyKnockGoal', value)}
-            keyboardType="numeric"
-            placeholder="100"
-          />
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Cloud Storage</Text>
-        
-        <View style={styles.cloudStatusCard}>
-          <View style={styles.cloudStatusHeader}>
-            <Ionicons 
-              name={cloudConnected ? "cloud-done" : "cloud-offline"} 
-              size={32} 
-              color={cloudConnected ? "#22c55e" : "#6b7280"} 
-            />
-            <Text style={styles.cloudStatusText}>
-              {cloudConnected ? 'Connected to Cloud' : 'Local Storage Only'}
-            </Text>
-          </View>
-
-          {storageUsage && (
-            <View style={styles.storageInfo}>
-              <View style={styles.storageRow}>
-                <Text style={styles.storageLabel}>Storage Used:</Text>
-                <Text style={styles.storageValue}>
-                  {(storageUsage.total_bytes / (1024 * 1024)).toFixed(1)} MB / 500 MB
-                </Text>
-              </View>
-              <View style={styles.storageRow}>
-                <Text style={styles.storageLabel}>Total Knocks:</Text>
-                <Text style={styles.storageValue}>{storageUsage.knock_count.toLocaleString()}</Text>
-              </View>
-              <View style={styles.storageRow}>
-                <Text style={styles.storageLabel}>Usage:</Text>
-                <Text style={styles.storageValue}>{storageUsage.percentage_used.toFixed(1)}%</Text>
-              </View>
-              {storageUsage.percentage_used < 95 && (
-                <View style={styles.storageRow}>
-                  <Text style={styles.storageLabel}>Est. Days Left:</Text>
-                  <Text style={styles.storageValue}>
-                    {storageUsage.days_until_full > 9999 ? '∞' : storageUsage.days_until_full}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {!cloudConnected && (
-            <Text style={styles.cloudHelpText}>
-              See SUPABASE_SETUP.md to enable cloud backup
-            </Text>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data Management</Text>
-        
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={syncData}
-          disabled={syncing}
-        >
-          {syncing ? (
-            <ActivityIndicator size="small" color="#1e40af" />
-          ) : (
-            <Ionicons name="cloud-upload" size={24} color="#1e40af" />
-          )}
-          <Text style={styles.actionButtonText}>
-            {syncing ? 'Syncing...' : 'Sync Data'}
+        <View style={styles.accountRow}>
+          <Ionicons name="person-circle-outline" size={20} color="#6b7280" />
+          <Text style={styles.accountEmail} numberOfLines={1}>
+            {userEmail ?? '—'}
           </Text>
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.dangerButton]} 
-          onPress={clearData}
-        >
-          <Ionicons name="trash" size={24} color="#dc2626" />
-          <Text style={[styles.actionButtonText, styles.dangerText]}>
-            Clear All Data
-          </Text>
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+          <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Advanced</Text>
-        
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => navigation.navigate('DataFlow')}
-        >
-          <Ionicons name="analytics" size={24} color="#1e40af" />
-          <Text style={styles.actionButtonText}>
-            Data Flow Monitor
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => navigation.navigate('HailIntelligence')}
-        >
-          <Ionicons name="thunderstorm" size={24} color="#1e40af" />
-          <Text style={styles.actionButtonText}>
-            3-Tier Hail Intelligence
-          </Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* ── TEAM ── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Team</Text>
+
         {loadingTeam ? (
           <ActivityIndicator style={{ margin: 16 }} color="#1e40af" />
         ) : team ? (
-          <View style={{ paddingHorizontal: 16 }}>
-            <Text style={styles.teamName}>{team.name}</Text>
-            <Text style={styles.teamRole}>{team.role === 'owner' ? 'Owner' : 'Member'}</Text>
+          <View style={styles.teamContainer}>
+            <View style={styles.teamHeader}>
+              <Text style={styles.teamName}>{team.name}</Text>
+              <View style={[styles.roleBadge, team.role === 'owner' ? styles.roleBadgeOwner : styles.roleBadgeMember]}>
+                <Text style={[styles.roleText, team.role === 'owner' ? styles.roleTextOwner : styles.roleTextMember]}>
+                  {team.role === 'owner' ? 'Owner' : 'Member'}
+                </Text>
+              </View>
+            </View>
+
             {team.role === 'owner' && (
               <>
-                <Text style={styles.teamLabel}>Invite Code</Text>
-                <View style={styles.inviteCodeBox}>
+                <Text style={styles.teamLabel}>INVITE CODE</Text>
+                <TouchableOpacity
+                  style={styles.inviteCodeBox}
+                  onPress={() => handleShareInviteCode(team.invite_code)}
+                  activeOpacity={0.7}
+                >
                   <Text style={styles.inviteCode}>{team.invite_code}</Text>
-                </View>
+                  <View style={styles.shareChip}>
+                    <Ionicons name="share-outline" size={14} color="#166534" />
+                    <Text style={styles.shareChipText}>Share</Text>
+                  </View>
+                </TouchableOpacity>
                 {team.member_count !== undefined && (
-                  <Text style={styles.teamMeta}>{team.member_count} member{team.member_count !== 1 ? 's' : ''}</Text>
+                  <Text style={styles.teamMeta}>
+                    {team.member_count} member{team.member_count !== 1 ? 's' : ''}
+                  </Text>
                 )}
               </>
             )}
+
             {team.role === 'member' && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.dangerButton, { marginTop: 12, marginHorizontal: 0 }]}
-                onPress={() => {
-                  Alert.alert('Leave Team', 'You will no longer see team pins or be able to add knocks to this team.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Leave', style: 'destructive', onPress: async () => {
-                      await SupabaseService.leaveTeam();
-                      setTeam(null);
-                    }},
-                  ]);
-                }}
-              >
-                <Ionicons name="exit-outline" size={24} color="#dc2626" />
-                <Text style={[styles.actionButtonText, styles.dangerText]}>Leave Team</Text>
+              <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveTeam}>
+                <Ionicons name="exit-outline" size={18} color="#dc2626" />
+                <Text style={styles.leaveText}>Leave Team</Text>
               </TouchableOpacity>
             )}
           </View>
         ) : (
-          <Text style={styles.teamNone}>Solo mode — no team. Reinstall the app to set up a team.</Text>
+          <Text style={styles.soloText}>
+            Solo mode. Ask your owner for an invite code, then sign out and sign back in to join a team.
+          </Text>
         )}
       </View>
 
+      {/* ── NOTIFICATIONS ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <TouchableOpacity
+          style={styles.navRow}
+          onPress={() => Linking.openURL('app-settings:')}
+        >
+          <Ionicons name="notifications-outline" size={20} color="#1e40af" />
+          <Text style={styles.navRowText}>Open iPhone Notification Settings</Text>
+          <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── ADVANCED (owner only) ── */}
+      {team?.role === 'owner' && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Advanced</Text>
+          <TouchableOpacity
+            style={styles.navRow}
+            onPress={() => navigation.navigate('PingHistory')}
+          >
+            <Ionicons name="notifications-outline" size={20} color="#1e40af" />
+            <Text style={styles.navRowText}>Ping History</Text>
+            <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navRow}
+            onPress={() => navigation.navigate('DataFlow')}
+          >
+            <Ionicons name="analytics-outline" size={20} color="#1e40af" />
+            <Text style={styles.navRowText}>Data Flow Monitor</Text>
+            <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navRow}
+            onPress={() => navigation.navigate('HailIntelligence')}
+          >
+            <Ionicons name="thunderstorm-outline" size={20} color="#1e40af" />
+            <Text style={styles.navRowText}>3-Tier Hail Intelligence</Text>
+            <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ── ABOUT ── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <Text style={styles.aboutText}>D2D Sales Tracker v1.0.0</Text>
-        <Text style={styles.aboutText}>© 2024 Your Company</Text>
+        <Text style={styles.aboutText}>© 2026</Text>
       </View>
+
     </ScrollView>
   );
 }
@@ -367,166 +205,168 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: 'white',
-    marginVertical: 8,
+    marginTop: 12,
     paddingVertical: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6b7280',
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  settingRow: {
+
+  // Account
+  accountRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  accountEmail: {
+    fontSize: 15,
+    color: '#1f2937',
+    flex: 1,
+  },
+  signOutButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  settingLabel: {
-    fontSize: 16,
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  goalRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  goalInput: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-  },
-  dangerButton: {
-    backgroundColor: '#fee2e2',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    color: '#1e40af',
-    marginLeft: 12,
-    fontWeight: '500',
-  },
-  dangerText: {
-    color: '#dc2626',
-  },
-  aboutText: {
-    fontSize: 14,
-    color: '#6b7280',
-    paddingHorizontal: 16,
-    marginBottom: 4,
-  },
-  cloudStatusCard: {
-    marginHorizontal: 16,
-    padding: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  cloudStatusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  cloudStatusText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 12,
-    color: '#1f2937',
-  },
-  storageInfo: {
+    gap: 10,
+    marginTop: 4,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 12,
+    borderTopColor: '#f3f4f6',
   },
-  storageRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  storageLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  storageValue: {
-    fontSize: 14,
+  signOutText: {
+    fontSize: 15,
+    color: '#dc2626',
     fontWeight: '500',
-    color: '#1f2937',
   },
-  cloudHelpText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-    marginTop: 8,
-    textAlign: 'center',
+
+  // Team
+  teamContainer: {
+    paddingHorizontal: 16,
+  },
+  teamHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   teamName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 2,
   },
-  teamRole: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 16,
+  roleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  teamLabel: {
+  roleBadgeOwner: {
+    backgroundColor: '#dbeafe',
+  },
+  roleBadgeMember: {
+    backgroundColor: '#f3f4f6',
+  },
+  roleText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  roleTextOwner: {
+    color: '#1e40af',
+  },
+  roleTextMember: {
     color: '#6b7280',
-    marginBottom: 6,
+  },
+  teamLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6b7280',
+    letterSpacing: 0.8,
+    marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   inviteCodeBox: {
     backgroundColor: '#f0fdf4',
-    borderRadius: 10,
-    padding: 14,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#86efac',
     marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   inviteCode: {
     fontSize: 28,
     fontWeight: '800',
     color: '#166534',
     letterSpacing: 6,
-    textAlign: 'center',
+  },
+  shareChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  shareChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#166534',
   },
   teamMeta: {
     fontSize: 13,
     color: '#6b7280',
-    textAlign: 'center',
     marginBottom: 4,
   },
-  teamNone: {
+  leaveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  leaveText: {
+    fontSize: 15,
+    color: '#dc2626',
+    fontWeight: '500',
+  },
+  soloText: {
     fontSize: 14,
     color: '#9ca3af',
     paddingHorizontal: 16,
-    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+
+  // Nav rows
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  navRowText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1f2937',
+  },
+
+  // About
+  aboutText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    paddingHorizontal: 16,
+    marginBottom: 4,
   },
 });
