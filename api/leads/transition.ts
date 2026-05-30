@@ -18,7 +18,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
 import { getServiceClient, getAuthedActor } from '../_lib/auth';
 import {
-  resolveTransition, isTerminal, LeadAction, LeadStatus,
+  resolveTransition, isTerminal, computeReminderFireTimes, LeadAction, LeadStatus,
 } from '../_lib/leadStateMachine';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -154,24 +154,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const appt = new Date(appointmentAt as string);
       const runnerId = await resolveRunnerId(supabase, knock);
       if (runnerId) {
-        const offsets: { kind: string; ms: number }[] = [
-          { kind: 'scheduled', ms: 0 },                  // at booking time
-          { kind: '2d', ms: 2 * 24 * 60 * 60 * 1000 },
-          { kind: '1d', ms: 1 * 24 * 60 * 60 * 1000 },
-          { kind: '2h', ms: 2 * 60 * 60 * 1000 },
-        ];
-        const now = Date.now();
-        const rows = offsets
-          .map(o => ({ kind: o.kind, fire_at: o.kind === 'scheduled' ? new Date(now) : new Date(appt.getTime() - o.ms) }))
-          .filter(r => r.fire_at.getTime() >= now - 60_000) // skip reminders already in the past
-          .map(r => ({
-            knock_id: knockId,
-            runner_user_id: runnerId,
-            team_id: knock.team_id ?? actor.teamId ?? null,
-            appointment_at: appt.toISOString(),
-            fire_at: r.fire_at.toISOString(),
-            kind: r.kind,
-          }));
+        // Proportional reminders scaled to the lead window (booking → appointment),
+        // with a day-of safety net for far-out bookings. See computeReminderFireTimes.
+        const now = new Date();
+        const fires = computeReminderFireTimes(now, appt, now);
+        const rows = fires.map(f => ({
+          knock_id: knockId,
+          runner_user_id: runnerId,
+          team_id: knock.team_id ?? actor.teamId ?? null,
+          appointment_at: appt.toISOString(),
+          fire_at: f.fireAt.toISOString(),
+          kind: f.kind,
+        }));
         if (rows.length) await supabase.from('scheduled_reminders').insert(rows);
       }
     } else if (action === 'confirm' || action === 'arch_soft' || action === 'arch_hard') {

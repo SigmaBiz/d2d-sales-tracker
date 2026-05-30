@@ -165,3 +165,61 @@ export function resolveTransition(args: ResolveArgs): ResolveResult {
 export function isTerminal(status: LeadStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
+
+// ── Scheduled-reminder timing ────────────────────────────────────────────────
+
+export interface ReminderFire {
+  kind: string;          // p60 | p30 | p15 | near | single
+  fireAt: Date;
+}
+
+/**
+ * Proportional reminders for a scheduled inspection. Reminders scale with the
+ * lead window W = appointment − booking, so a booking 3h out and one 3 weeks out
+ * both get sensibly-spaced nudges (fixes the old fixed 2d/1d/2h overlap).
+ *
+ *   W ≥ 1h  → fire at appt − 60%·W, − 30%·W, − 15%·W
+ *             + safety net: if the closest (15%·W) is > 2h before the appt, add
+ *               one "near" reminder at appt − 2h (guarantees a day-of nudge for
+ *               far-out bookings — the costly no-shows).
+ *   W < 1h  → a single reminder at appt − 75%·W (early heads-up).
+ *
+ * Past-due times (≤ now) are dropped, and times within ~5 min of an already-kept
+ * one are de-duped. Always returns ≥ 0 rows (caller still pushes the instant
+ * "new scheduled" notification separately).
+ */
+export function computeReminderFireTimes(
+  bookingAt: Date,
+  appointmentAt: Date,
+  now: Date = new Date()
+): ReminderFire[] {
+  const W = appointmentAt.getTime() - bookingAt.getTime();
+  if (W <= 0) return [];
+
+  const HOUR = 60 * 60 * 1000;
+  const apptMs = appointmentAt.getTime();
+  const candidates: ReminderFire[] = [];
+
+  if (W < HOUR) {
+    candidates.push({ kind: 'single', fireAt: new Date(apptMs - 0.75 * W) });
+  } else {
+    candidates.push({ kind: 'p60', fireAt: new Date(apptMs - 0.60 * W) });
+    candidates.push({ kind: 'p30', fireAt: new Date(apptMs - 0.30 * W) });
+    candidates.push({ kind: 'p15', fireAt: new Date(apptMs - 0.15 * W) });
+    // Safety net: if the closest proportional reminder is > 2h out, guarantee a
+    // ~2h-before "day-of" nudge for long windows.
+    if (0.15 * W > 2 * HOUR) {
+      candidates.push({ kind: 'near', fireAt: new Date(apptMs - 2 * HOUR) });
+    }
+  }
+
+  // Sort, drop past-due, de-dupe within 5 minutes.
+  const DEDUPE = 5 * 60 * 1000;
+  const kept: ReminderFire[] = [];
+  for (const c of candidates.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime())) {
+    if (c.fireAt.getTime() <= now.getTime()) continue;
+    if (kept.length && Math.abs(c.fireAt.getTime() - kept[kept.length - 1].fireAt.getTime()) < DEDUPE) continue;
+    kept.push(c);
+  }
+  return kept;
+}

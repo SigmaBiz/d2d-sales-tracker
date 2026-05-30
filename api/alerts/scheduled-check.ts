@@ -19,11 +19,14 @@ function getSupabaseClient(): SupabaseClient {
   return createClient(url, key);
 }
 
+// Reminder copy keyed by how close the reminder is to the appointment.
+// kinds: p60 (early), p30 (mid), p15 (closing in), near (~day-of), single (short window).
 const REMINDER_TITLE: Record<string, string> = {
-  scheduled: '📅 Inspection scheduled — confirm it',
-  '2d': '📅 Inspection in 2 days',
-  '1d': '📅 Inspection tomorrow',
-  '2h': '⏰ Inspection in 2 hours',
+  p60: '📅 Upcoming inspection — confirm it',
+  p30: '📅 Inspection coming up',
+  p15: '⏰ Inspection soon',
+  near: '⏰ Inspection today',
+  single: '⏰ Inspection soon',
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
