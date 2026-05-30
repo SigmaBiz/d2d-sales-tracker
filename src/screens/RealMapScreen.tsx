@@ -20,6 +20,7 @@ import { supabase } from '../services/supabaseClient';
 import LeadActionMenu from '../components/LeadActionMenu';
 import { LeadStatus, STATUS_LABEL, STATUS_COLOR, isTerminal, setterReentryActions } from '../services/leadLifecycle';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { formatAsYouTypeUS, isValidUSPhone, toE164 } from '../utils/phone';
 
 const LABEL_ORDER: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
@@ -360,7 +361,7 @@ export default function RealMapScreen({ navigation }: any) {
       if (contactName || contactPhone || contactInsurance) {
         await SupabaseService.upsertContact(savedKnock.id, {
           name: contactName || undefined,
-          phone: contactPhone || undefined,
+          phone: toE164(contactPhone) ?? (contactPhone || undefined),
           insurance_carrier: contactInsurance || undefined,
         });
       }
@@ -410,7 +411,7 @@ export default function RealMapScreen({ navigation }: any) {
       if (contactName || contactPhone || contactInsurance) {
         await SupabaseService.upsertContact(savedKnock.id, {
           name: contactName || undefined,
-          phone: contactPhone || undefined,
+          phone: toE164(contactPhone) ?? (contactPhone || undefined),
           insurance_carrier: contactInsurance || undefined,
         });
       }
@@ -472,7 +473,7 @@ export default function RealMapScreen({ navigation }: any) {
     try {
       await SupabaseService.upsertContact(detailKnock.id, {
         name: contactName || undefined,
-        phone: contactPhone || undefined,
+        phone: toE164(contactPhone) ?? (contactPhone || undefined),
         insurance_carrier: contactInsurance || undefined,
       });
       // Refresh contacts display
@@ -587,7 +588,7 @@ export default function RealMapScreen({ navigation }: any) {
         if (contactName || contactPhone || contactInsurance) {
           await SupabaseService.upsertContact(pendingKnock.id, {
             name: contactName || undefined,
-            phone: contactPhone || undefined,
+            phone: toE164(contactPhone) ?? (contactPhone || undefined),
             insurance_carrier: contactInsurance || undefined,
           });
         }
@@ -612,7 +613,7 @@ export default function RealMapScreen({ navigation }: any) {
         if (contactName || contactPhone || contactInsurance) {
           await SupabaseService.upsertContact(savedKnock.id, {
             name: contactName || undefined,
-            phone: contactPhone || undefined,
+            phone: toE164(contactPhone) ?? (contactPhone || undefined),
             insurance_carrier: contactInsurance || undefined,
           });
         }
@@ -678,6 +679,7 @@ export default function RealMapScreen({ navigation }: any) {
 
   const signedCount = knocks.filter(k => k.label === 'signed').length;
   const leadCount = knocks.filter(k => k.label === 'lead').length;
+  const phoneValid = isValidUSPhone(contactPhone);   // gates Ping/Schedule (F2d)
 
   return (
     <View style={styles.container}>
@@ -966,15 +968,20 @@ export default function RealMapScreen({ navigation }: any) {
                     autoCapitalize="words"
                   />
                   <TextInput
-                    style={styles.contactInput}
+                    style={[styles.contactInput, contactPhone.trim().length > 0 && !phoneValid && styles.contactInputInvalid]}
                     placeholder="Phone"
                     placeholderTextColor="#9ca3af"
                     value={contactPhone}
-                    onChangeText={setContactPhone}
+                    onChangeText={t => setContactPhone(formatAsYouTypeUS(t))}
                     keyboardType="phone-pad"
                   />
-                  {/* Service type — only for NEW doors (not relabel). After first name + phone. */}
-                  {!pendingKnock && contactName.trim() && contactPhone.trim() && (
+                  {contactPhone.trim().length > 0 && (
+                    <Text style={phoneValid ? styles.phoneHintOk : styles.phoneHintBad}>
+                      {phoneValid ? '✓ Valid US number' : 'Enter a valid US phone number'}
+                    </Text>
+                  )}
+                  {/* Service type — only for NEW doors (not relabel). After name + VALID phone. */}
+                  {!pendingKnock && contactName.trim() && phoneValid && (
                     <>
                       <View style={styles.serviceTypeBar}>
                         <TouchableOpacity
@@ -1193,20 +1200,25 @@ export default function RealMapScreen({ navigation }: any) {
                         autoCapitalize="words"
                       />
                       <TextInput
-                        style={styles.contactInput}
+                        style={[styles.contactInput, contactPhone.trim().length > 0 && !phoneValid && styles.contactInputInvalid]}
                         placeholder="Phone Number"
                         placeholderTextColor="#9ca3af"
                         value={contactPhone}
-                        onChangeText={setContactPhone}
+                        onChangeText={t => setContactPhone(formatAsYouTypeUS(t))}
                         keyboardType="phone-pad"
                       />
+                      {contactPhone.trim().length > 0 && (
+                        <Text style={phoneValid ? styles.phoneHintOk : styles.phoneHintBad}>
+                          {phoneValid ? '✓ Valid US number' : 'Enter a valid US phone number'}
+                        </Text>
+                      )}
                       <TouchableOpacity
                         style={[
                           styles.pingOwnerButton,
-                          (!contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
+                          (!phoneValid || pingOwnerSent) && styles.pingOwnerButtonDisabled,
                         ]}
                         onPress={() => { if (detailKnock) handlePingLead(detailKnock.id); }}
-                        disabled={!contactName.trim() || !contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
+                        disabled={!contactName.trim() || !phoneValid || pingOwnerLoading || pingOwnerSent}
                       >
                         {pingOwnerLoading
                           ? <ActivityIndicator color="white" size="small" />
@@ -1576,6 +1588,9 @@ const styles = StyleSheet.create({
     padding: 10, fontSize: 14, color: '#111827',
     backgroundColor: '#f9fafb', marginBottom: 8,
   },
+  contactInputInvalid: { borderColor: '#dc2626' },
+  phoneHintOk: { fontSize: 12, color: '#16a34a', marginTop: -4, marginBottom: 8 },
+  phoneHintBad: { fontSize: 12, color: '#dc2626', marginTop: -4, marginBottom: 8 },
   contactFormActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 4 },
   contactSaveButton: {
     backgroundColor: '#1e40af', borderRadius: 8,
