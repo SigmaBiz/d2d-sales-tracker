@@ -14,7 +14,8 @@ import { IEMArchiveService } from '../services/tier2IEMService';
 import { HailAlertService } from '../services/hailAlertService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
-import NotificationLogPanel from '../components/NotificationLogPanel';
+import NotifBell from '../components/NotifBell';
+import NotifPanel from '../components/NotifPanel';
 import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL, labsForRole } from '../types';
 import { supabase } from '../services/supabaseClient';
 import LeadActionMenu from '../components/LeadActionMenu';
@@ -51,6 +52,10 @@ export default function RealMapScreen({ navigation }: any) {
   const [activeStorms, setActiveStorms] = useState<any[]>([]);
   const [showStormPanel, setShowStormPanel] = useState(false);
   const [showNotificationLog, setShowNotificationLog] = useState(false);
+  // Notification bell state (F2e)
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [urgentUnread, setUrgentUnread] = useState(false);
+  const notifPingSeen = useRef(0); // tracks App.tsx's foreground push counter
 
   // Label picker state
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -120,6 +125,7 @@ export default function RealMapScreen({ navigation }: any) {
     const unsubscribe = navigation.addListener('focus', () => {
       loadKnocks();
       loadHailData();
+      loadNotifBell();
       if ((global as any).openNotificationLog) {
         setShowNotificationLog(true);
         (global as any).openNotificationLog = false;
@@ -145,6 +151,34 @@ export default function RealMapScreen({ navigation }: any) {
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Foreground live-update: App.tsx bumps `notifPingCounter` when a push arrives
+  // while the app is open; poll it so the bell refreshes its count + animates live.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if ((global as any).notifPingCounter !== (notifPingSeen.current)) {
+        notifPingSeen.current = (global as any).notifPingCounter;
+        loadNotifBell();
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  const loadNotifBell = async () => {
+    const [count, urgent] = await Promise.all([
+      SupabaseService.getUnreadCount(),
+      SupabaseService.hasUrgentUnread(),
+    ]);
+    setUnreadCount(count);
+    setUrgentUnread(urgent);
+  };
+
+  const openNotifications = async () => {
+    setShowNotificationLog(true);
+    await SupabaseService.markNotificationsRead();
+    setUnreadCount(0);
+    setUrgentUnread(false);
+  };
 
   const autoLoadSwathDate = async (dateStr: string) => {
     try {
@@ -717,9 +751,12 @@ export default function RealMapScreen({ navigation }: any) {
 
       {/* Right buttons */}
       <View style={styles.rightButtonStack}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => setShowNotificationLog(!showNotificationLog)}>
-          <Ionicons name="notifications" size={24} color="#FF6B6B" />
-        </TouchableOpacity>
+        <NotifBell
+          style={styles.actionButton}
+          unreadCount={unreadCount}
+          urgent={urgentUnread}
+          onPress={openNotifications}
+        />
         {hailReports.length > 0 && (
           <TouchableOpacity style={styles.actionButton} onPress={() => mapRef.current?.focusOnHail(hailReports.filter(r => !r.groundTruth))}>
             <Ionicons name="thunderstorm" size={24} color="#ef4444" />
@@ -787,10 +824,13 @@ export default function RealMapScreen({ navigation }: any) {
         />
       )}
 
-      <NotificationLogPanel
+      <NotifPanel
         visible={showNotificationLog}
         onClose={() => setShowNotificationLog(false)}
-        onCreateOverlay={() => { loadHailData(); setShowNotificationLog(false); }}
+        onTeleport={(lat, lng, _knockId) => {
+          setShowNotificationLog(false);
+          mapRef.current?.centerOnLocation(lat, lng, 0.005);
+        }}
       />
 
       {/* ── "Opened?" Gate ──────────────────────────────────────────────── */}

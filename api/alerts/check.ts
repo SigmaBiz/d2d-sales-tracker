@@ -16,6 +16,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
+import { recordNotification } from '../_lib/notify';
 
 // OKC Metro counties — NWS Universal Geographic Code (UGC) format
 // These are the counties that must be in the alert's affected area
@@ -249,10 +250,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // 4. Fetch push tokens from Supabase
+  // 4. Fetch push tokens from Supabase (with user_id for the in-app feed)
   const { data: tokenRows, error: tokenError } = await supabase
     .from('push_tokens')
-    .select('token')
+    .select('token, user_id')
     .eq('active', true);
 
   if (tokenError) {
@@ -261,7 +262,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const tokens: string[] = (tokenRows || []).map((r: { token: string }) => r.token);
-  console.log(`[Alerts] ${tokens.length} active push tokens`);
+  const recipientUserIds: string[] = [
+    ...new Set((tokenRows || []).map((r: any) => r.user_id).filter(Boolean)),
+  ];
+  console.log(`[Alerts] ${tokens.length} active push tokens, ${recipientUserIds.length} users`);
 
   // 5. Fire notifications for each new alert
   let fired = 0;
@@ -282,6 +286,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           expires: alert.properties.expires,
         });
         console.log(`[Alerts] Fired: ${title} to ${tokens.length} devices`);
+      }
+
+      // In-app feed: one row per recipient user (hail = non-urgent, no teleport coords).
+      for (const uid of recipientUserIds) {
+        await recordNotification(supabase, {
+          userId: uid, type: 'hail', urgent: false,
+          title, body, data: { alertId: alert.id, hailSize, event: alert.properties.event },
+        });
       }
 
       // 6. Record as fired to prevent duplicates

@@ -11,6 +11,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { recordNotification } from '../_lib/notify';
 
 function getSupabaseClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL;
@@ -41,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // 1. Due reminders (oldest first), capped per run.
   const { data: due, error: dueErr } = await supabase
     .from('scheduled_reminders')
-    .select('id, knock_id, runner_user_id, kind, appointment_at')
+    .select('id, knock_id, runner_user_id, team_id, kind, appointment_at')
     .is('sent_at', null)
     .is('canceled_at', null)
     .lte('fire_at', nowIso)
@@ -77,6 +78,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const k = knockById.get(rem.knock_id);
       const addr = k?.address ?? 'a scheduled inspection';
+
+      // In-app feed row — reminders are urgent (the costly-miss guardrail).
+      await recordNotification(supabase, {
+        userId: rem.runner_user_id,
+        teamId: rem.team_id ?? null,
+        type: 'lead_reminder',
+        urgent: true,
+        title: REMINDER_TITLE[rem.kind] ?? '📅 Inspection reminder',
+        body: addr,
+        knockId: rem.knock_id, lat: k?.latitude, lng: k?.longitude,
+        data: { kind: rem.kind, appointment_at: rem.appointment_at },
+      });
 
       if (tokens.length > 0) {
         await axios.post(

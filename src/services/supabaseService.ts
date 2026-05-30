@@ -11,7 +11,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase, SupabaseKnock, SupabaseKnockHistory, SupabaseContact } from './supabaseClient';
-import { Knock, KnockContact, KnockOutcome } from '../types';
+import { Knock, KnockContact, KnockOutcome, AppNotification } from '../types';
 
 const OFFLINE_QUEUE_KEY = '@knock_offline_queue';
 const TEAM_ID_KEY = '@team_id';
@@ -325,6 +325,53 @@ export class SupabaseService {
       .order('created_at', { ascending: false });
     if (error) return [];
     return data as any;
+  }
+
+  // ── Notifications feed (F2e) ──────────────────────────────────────────────
+  // RLS scopes every read/update to the recipient (user_id = auth.uid()), so the
+  // client reads + marks-read directly — no endpoint needed.
+
+  static async getNotifications(limit = 50): Promise<AppNotification[]> {
+    if (!this.userId) return [];
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, type, urgent, title, body, knock_id, lat, lng, data, read_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) { console.error('[Supabase] getNotifications:', error); return []; }
+    return data as AppNotification[];
+  }
+
+  /** Unread count for the bell badge. */
+  static async getUnreadCount(): Promise<number> {
+    if (!this.userId) return 0;
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null);
+    if (error) return 0;
+    return count ?? 0;
+  }
+
+  /** Whether any UNREAD notification is urgent (drives shake + buzz). */
+  static async hasUrgentUnread(): Promise<boolean> {
+    if (!this.userId) return false;
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .is('read_at', null)
+      .eq('urgent', true);
+    if (error) return false;
+    return (count ?? 0) > 0;
+  }
+
+  /** Mark notifications read. Pass ids to mark specific ones, omit to clear all unread. */
+  static async markNotificationsRead(ids?: string[]): Promise<void> {
+    if (!this.userId) return;
+    let q = supabase.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null);
+    if (ids && ids.length) q = q.in('id', ids);
+    const { error } = await q;
+    if (error) console.warn('[Supabase] markNotificationsRead:', error.message);
   }
 
   // ── Knocks — Write ──────────────────────────────────────────────────────────

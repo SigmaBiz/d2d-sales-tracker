@@ -39,6 +39,12 @@ export default function App() {
     // Handle notifications when app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('Notification received:', notification);
+      // The server already recorded the in-app feed row; bump a counter so the
+      // notification bell (RealMapScreen) refreshes its unread count + animates live.
+      const data = notification.request.content.data as any;
+      if (data?.type === 'lead_update' || data?.type === 'lead_reminder' || data?.type === 'nudge' || data?.type === 'nws_hail_alert' || data?.type === 'hail_alert') {
+        (global as any).notifPingCounter = ((global as any).notifPingCounter ?? 0) + 1;
+      }
     });
 
     // Handle notification taps

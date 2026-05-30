@@ -20,6 +20,7 @@ import { getServiceClient, getAuthedActor } from '../_lib/auth';
 import {
   resolveTransition, isTerminal, computeReminderFireTimes, LeadAction, LeadStatus,
 } from '../_lib/leadStateMachine';
+import { recordNotification } from '../_lib/notify';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -246,8 +247,23 @@ async function notifyCounterparty(
   }
   if (!recipientId || recipientId === actorId) return;
 
+  const addr = knock.address ?? `${knock.latitude?.toFixed?.(4)}, ${knock.longitude?.toFixed?.(4)}`;
+  const title = LABEL_FOR_ACTION[action] ?? 'Lead updated';
+
+  // Record the in-app feed row FIRST (even if the recipient has no push token —
+  // they'll still see the bell on next open). Urgent = actions that need a response.
+  const URGENT_ACTIONS = new Set(['nudge', 'ping', 'schedule', 'arch_soft']);
+  await recordNotification(supabase, {
+    userId: recipientId,
+    teamId: knock.team_id ?? null,
+    type: action === 'nudge' ? 'nudge' : 'lead_update',
+    urgent: URGENT_ACTIONS.has(action),
+    title, body: addr,
+    knockId: knock.id, lat: knock.latitude, lng: knock.longitude,
+    data: { status: toStatus, action },
+  });
+
   // A user may have multiple active tokens (multiple devices / reinstalls).
-  // maybeSingle() ERRORS on >1 row — fetch all and push to each.
   const { data: tokenRows } = await supabase
     .from('push_tokens')
     .select('token')
@@ -255,9 +271,6 @@ async function notifyCounterparty(
     .eq('active', true);
   const tokens = (tokenRows ?? []).map(r => r.token).filter(Boolean);
   if (tokens.length === 0) return;
-
-  const addr = knock.address ?? `${knock.latitude?.toFixed?.(4)}, ${knock.longitude?.toFixed?.(4)}`;
-  const title = LABEL_FOR_ACTION[action] ?? 'Lead updated';
 
   await axios.post(
     'https://exp.host/--/api/v2/push/send',

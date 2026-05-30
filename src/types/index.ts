@@ -49,6 +49,21 @@ export const KNOCK_OUTCOME_LABEL: Record<KnockOutcome, string> = {
 
 export type ServiceType = 'live' | 'scheduled' | 'repair'; // repair deferred
 
+// In-app notification feed row (F2e). Mirrors the Supabase `notifications` table.
+export interface AppNotification {
+  id: string;
+  type: string;            // lead_update | lead_reminder | nudge | hail
+  urgent: boolean;
+  title: string | null;
+  body: string | null;
+  knock_id: string | null; // tap → teleport when present
+  lat: number | null;
+  lng: number | null;
+  data: Record<string, any> | null;
+  read_at: string | null;  // null = unread
+  created_at: string;
+}
+
 export type LeadStatus =
   | 'scheduled'   // setter booked a future inspection (awaiting runner acknowledge)
   | 'pinged'      // setter alerted runner of a live lead
