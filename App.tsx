@@ -66,6 +66,13 @@ export default function App() {
         return;
       }
 
+      // Scheduled-inspection reminder — teleport to the lead so the runner can confirm/act
+      if (data?.type === 'lead_reminder' && data?.lat != null && data?.lng != null) {
+        console.log('[App] Lead reminder tapped:', data.knockId, data.kind);
+        (global as any).pendingLeadLocation = { lat: data.lat, lng: data.lng, knockId: data.knockId };
+        return;
+      }
+
       const result = await HailAlertService.handleNotificationResponse(response);
 
       if (result && result.action === 'OPEN_NOTIFICATION_LOG') {

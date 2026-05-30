@@ -50,6 +50,7 @@ export const KNOCK_OUTCOME_LABEL: Record<KnockOutcome, string> = {
 export type ServiceType = 'live' | 'scheduled' | 'repair'; // repair deferred
 
 export type LeadStatus =
+  | 'scheduled'   // setter booked a future inspection (awaiting runner acknowledge)
   | 'pinged'      // setter alerted runner of a live lead
   | 'confirmed'   // runner acknowledged a scheduled lead
   | 'completed'   // inspection was run
@@ -92,6 +93,7 @@ export interface Knock {
   status?: LeadStatus;
   cycle_number?: number;     // which cycle this door is on (default 1)
   date_of_loss?: string;     // YYYY-MM-DD storm/campaign date governing the cycle
+  appointment_at?: string;   // ISO — current scheduled inspection time (scheduled flow)
   year_built?: number; // property year built (from Redfin/manual entry)
   sqft?: number;       // property square footage (from Redfin/manual entry)
   history?: Array<{

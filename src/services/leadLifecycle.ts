@@ -10,11 +10,12 @@
 import { KnockOutcome } from '../types';
 
 export type LeadStatus =
-  | 'pinged' | 'confirmed' | 'completed' | 'processing'
+  | 'scheduled' | 'pinged' | 'confirmed' | 'completed' | 'processing'
   | 'signed' | 'arch_soft' | 'arch_hard' | 'retarget';
 export type LeadAction =
-  | 'ping' | 'confirm' | 'complete' | 'processing' | 'signed'
-  | 'arch_soft' | 'arch_hard' | 'retarget' | 'revive' | 'recover';
+  | 'ping' | 'schedule' | 'confirm' | 'complete' | 'processing' | 'signed'
+  | 'arch_soft' | 'arch_hard' | 'retarget' | 'revive' | 'recover'
+  | 'nudge' | 'reschedule';
 export type Role = 'owner' | 'member';
 
 export interface ActionOption {
@@ -26,26 +27,33 @@ export interface ActionOption {
 
 const ACTION_META: Record<LeadAction, { label: string; emoji: string; destructive?: boolean }> = {
   ping:       { label: 'Ping Owner', emoji: '🔔' },
+  schedule:   { label: 'Schedule', emoji: '📅' },
   confirm:    { label: 'Acknowledge', emoji: '👍' },
   complete:   { label: 'Mark Completed', emoji: '✅' },
   processing: { label: 'Mark Processing', emoji: '⏳' },
   signed:     { label: 'Mark Signed', emoji: '🔏' },
   arch_soft:  { label: 'Return (Soft Arch)', emoji: '↩️' },
-  arch_hard:  { label: 'Archive (Hard)', emoji: '🛑', destructive: true },
+  arch_hard:  { label: 'Archive (Hard)', emoji: '🪦', destructive: true },
   retarget:   { label: 'Retarget', emoji: '🎯' },
   revive:     { label: 'Revive', emoji: '♻️' },
   recover:    { label: 'Recover Lead', emoji: '🔁' },
+  nudge:      { label: 'Nudge Runner', emoji: '👈' },
+  reschedule: { label: 'Reschedule', emoji: '🔁' },
 };
 
 /**
- * Legal next actions for the LIVE flow given current status + role.
- * Keep in lockstep with LIVE_TRANSITIONS on the server (advisory copy).
- * `recoveryUsed` / `overrideUsed` hide allowances already spent this cycle.
+ * Legal next actions for the LEAD LOG (the shared LeadActionMenu) given status + role.
+ * Advisory copy of the server LIVE_TRANSITIONS — the server re-validates everything.
+ *
+ * IMPORTANT (quantized cycle): the SETTER's only Log action is `nudge`. The setter's
+ * recover/reschedule/arch_hard response to a returned (arch_soft) lead lives in the LAB
+ * (knock detail → Contact tab), not here. So this function returns NO setter actions on
+ * arch_soft — only the runner's options. `nudgeUsedUp` hides nudge once the cap is hit.
  */
 export function legalActions(
   status: LeadStatus | null,
   role: Role | null,
-  opts: { recoveryUsed?: boolean; overrideUsed?: boolean } = {}
+  opts: { recoveryUsed?: boolean; overrideUsed?: boolean; acknowledged?: boolean; nudgeUsedUp?: boolean } = {}
 ): ActionOption[] {
   const isRunner = role === 'owner';
   const isSetter = role === 'member';
@@ -53,14 +61,22 @@ export function legalActions(
 
   switch (status) {
     case null:
-      // entry handled by the contact-form Ping button, not the action menu
+      // entry (ping/schedule) handled by the contact-form buttons, not the menu
+      break;
+    case 'scheduled':
+      if (isRunner) out.push('confirm', 'arch_soft', 'arch_hard');
+      if (isSetter && !opts.acknowledged && !opts.nudgeUsedUp) out.push('nudge');
       break;
     case 'pinged':
       if (isRunner) out.push('complete', 'arch_soft', 'arch_hard');
+      if (isSetter && !opts.nudgeUsedUp) out.push('nudge');
+      break;
+    case 'confirmed':
+      if (isRunner) out.push('complete', 'arch_soft', 'arch_hard');
       break;
     case 'arch_soft':
-      if (isSetter && !opts.recoveryUsed) out.push('recover');
-      if (isRunner) out.push('arch_hard');
+      // Setter's recover/arch_hard lives in the lab, NOT the Log. Runner: nothing here
+      // (the ball is in the setter's court until they re-enter or kill it).
       break;
     case 'completed':
       if (isRunner) out.push('processing', 'retarget');
@@ -71,7 +87,7 @@ export function legalActions(
     case 'arch_hard':
       if (isRunner && !opts.overrideUsed) out.push('revive');
       break;
-    // terminal: signed, retarget → no further actions in F2b
+    // terminal: signed, retarget → no further actions
     default:
       break;
   }
@@ -79,8 +95,18 @@ export function legalActions(
   return out.map(a => ({ action: a, ...ACTION_META[a] }));
 }
 
+/**
+ * The setter's re-entry options shown in the LAB (detail → Contact tab) when a lead
+ * has been returned (arch_soft). Default action first. service_type decides re-enter verb.
+ */
+export function setterReentryActions(serviceType?: string): ActionOption[] {
+  const reenter: LeadAction = serviceType === 'scheduled' ? 'reschedule' : 'recover';
+  return [reenter, 'arch_hard'].map(a => ({ action: a, ...ACTION_META[a] }));
+}
+
 /** Human-readable status pill text. */
 export const STATUS_LABEL: Record<LeadStatus, string> = {
+  scheduled: 'Scheduled',
   pinged: 'Pinged',
   confirmed: 'Confirmed',
   completed: 'Completed',
@@ -92,6 +118,7 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
 };
 
 export const STATUS_COLOR: Record<LeadStatus, string> = {
+  scheduled: '#a16207', // amber
   pinged: '#2563eb',
   confirmed: '#0891b2',
   completed: '#16a34a',

@@ -85,6 +85,11 @@ export default function LeadLogScreen({ navigation }: any) {
                 <Text style={styles.meta}>
                   {item.service_type ? `${item.service_type} · ` : ''}cycle {item.cycle_number ?? 1}
                 </Text>
+                {item.appointment_at && (
+                  <Text style={styles.appt}>
+                    📅 {new Date(item.appointment_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                )}
               </TouchableOpacity>
               {status && (
                 <View style={[styles.pill, { backgroundColor: STATUS_COLOR[status] }]}>
@@ -118,6 +123,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   address: { fontSize: 15, fontWeight: '600', color: '#111827' },
   meta: { fontSize: 12, color: '#6b7280', marginTop: 2, textTransform: 'capitalize' },
+  appt: { fontSize: 12, color: '#a16207', marginTop: 2, fontWeight: '600' },
   pill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   pillText: { color: 'white', fontSize: 12, fontWeight: '700' },
 });

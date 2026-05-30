@@ -33,6 +33,7 @@ export interface SupabaseKnock {
   status?: string;        // LeadStatus
   cycle_number?: number;
   date_of_loss?: string;  // YYYY-MM-DD
+  appointment_at?: string; // ISO timestamptz
 }
 
 export interface SupabaseKnockHistory {

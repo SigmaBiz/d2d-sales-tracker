@@ -18,7 +18,8 @@ import NotificationLogPanel from '../components/NotificationLogPanel';
 import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL, labsForRole } from '../types';
 import { supabase } from '../services/supabaseClient';
 import LeadActionMenu from '../components/LeadActionMenu';
-import { LeadStatus, STATUS_LABEL, STATUS_COLOR, isTerminal } from '../services/leadLifecycle';
+import { LeadStatus, STATUS_LABEL, STATUS_COLOR, isTerminal, setterReentryActions } from '../services/leadLifecycle';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const LABEL_ORDER: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
@@ -75,6 +76,14 @@ export default function RealMapScreen({ navigation }: any) {
   // Ping Owner state
   const [pingOwnerLoading, setPingOwnerLoading] = useState(false);
   const [pingOwnerSent, setPingOwnerSent] = useState(false);
+
+  // Service type + scheduled-inspection state (F2c)
+  const [serviceType, setServiceType] = useState<'live' | 'scheduled'>('live');
+  const [apptDate, setApptDate] = useState<Date | null>(null);
+  const [showApptPicker, setShowApptPicker] = useState(false);
+  // Setter reschedule (from the detail sheet) picker
+  const [showReschedPicker, setShowReschedPicker] = useState(false);
+  const [reschedKnockId, setReschedKnockId] = useState<string | null>(null);
 
   // Property data state
   const [propertyFormVisible, setPropertyFormVisible] = useState(false);
@@ -378,6 +387,83 @@ export default function RealMapScreen({ navigation }: any) {
     } finally {
       setPingOwnerLoading(false);
     }
+  };
+
+  // Create-flow schedule: save the door as a lead (+ contact), then schedule for a future time.
+  const handleSaveAndSchedule = async () => {
+    if (!pendingCoords || !apptDate) return;
+    if (apptDate.getTime() <= Date.now()) {
+      Alert.alert('Pick a future time', 'The appointment must be in the future.');
+      return;
+    }
+    setPingOwnerLoading(true);
+    try {
+      const savedKnock = await SupabaseService.saveKnock({
+        latitude: pendingCoords.lat,
+        longitude: pendingCoords.lng,
+        address: pendingAddress,
+        label: 'lead',
+        notes: pickerNotes || undefined,
+        knocked_at: new Date(),
+        user_id: SupabaseService.getUserId() ?? undefined,
+      });
+      if (contactName || contactPhone || contactInsurance) {
+        await SupabaseService.upsertContact(savedKnock.id, {
+          name: contactName || undefined,
+          phone: contactPhone || undefined,
+          insurance_carrier: contactInsurance || undefined,
+        });
+      }
+      const res = await SupabaseService.transitionLead(savedKnock.id, 'schedule', {
+        appointmentAt: apptDate.toISOString(),
+      });
+      if (!res.ok) {
+        Alert.alert('Schedule failed', res.error || 'Could not schedule inspection');
+        return;
+      }
+      closeKnockSession(savedKnock.id, 'lead');
+      doorLockRef.current = false;
+      setHardOpenVisible(false);
+      setGateOpened(null);
+      setPickerVisible(false);
+      setSelectedLabel(null);
+      setPickerNotes('');
+      setContactName(''); setContactPhone(''); setContactInsurance('');
+      setPropertyYearBuilt(''); setPropertySqft('');
+      setPingOwnerSent(false);
+      setServiceType('live'); setApptDate(null);
+      await loadKnocks();
+    } catch (err) {
+      Alert.alert('Schedule failed', 'Could not save & schedule. Check your connection.');
+      console.error('[Map] saveAndSchedule error:', err);
+    } finally {
+      setPingOwnerLoading(false);
+    }
+  };
+
+  // Setter re-entry from the lab when a lead was returned (arch_soft).
+  // recover (live re-ping) / arch_hard fire immediately; reschedule asks for a new time.
+  const handleSetterReentry = (knock: Knock, action: string) => {
+    const runReentry = async (appointmentAt?: string) => {
+      const res = await SupabaseService.transitionLead(knock.id, action, { appointmentAt });
+      if (!res.ok) { Alert.alert('Action failed', res.error || 'Could not update lead'); return; }
+      setDetailVisible(false);
+      await loadKnocks();
+    };
+    if (action === 'reschedule') {
+      // Reuse the appt picker; require a future time, then submit.
+      setReschedKnockId(knock.id);
+      setShowReschedPicker(true);
+      return;
+    }
+    if (action === 'arch_hard') {
+      Alert.alert('Archive Lead 🪦', 'This kills the lead for this cycle. Are you sure?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Archive', style: 'destructive', onPress: () => runReentry() },
+      ]);
+      return;
+    }
+    runReentry(); // recover
   };
 
   const handleSaveContact = async () => {
@@ -887,21 +973,68 @@ export default function RealMapScreen({ navigation }: any) {
                     onChangeText={setContactPhone}
                     keyboardType="phone-pad"
                   />
-                  <TouchableOpacity
-                    style={[
-                      styles.pingOwnerButton,
-                      (!contactName.trim() || !contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
-                    ]}
-                    onPress={handleSaveAndPing}
-                    disabled={!contactName.trim() || !contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
-                  >
-                    {pingOwnerLoading
-                      ? <ActivityIndicator color="white" size="small" />
-                      : <Text style={styles.pingOwnerButtonText}>
-                          {pingOwnerSent ? '✓ Owner Pinged' : '🔔 Ping Owner — Live Inspection'}
-                        </Text>
-                    }
-                  </TouchableOpacity>
+                  {/* Service type — only for NEW doors (not relabel). After first name + phone. */}
+                  {!pendingKnock && contactName.trim() && contactPhone.trim() && (
+                    <>
+                      <View style={styles.serviceTypeBar}>
+                        <TouchableOpacity
+                          style={[styles.serviceTypeBtn, serviceType === 'live' && styles.serviceTypeBtnActive]}
+                          onPress={() => setServiceType('live')}
+                        >
+                          <Text style={[styles.serviceTypeText, serviceType === 'live' && styles.serviceTypeTextActive]}>🔔 Live</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.serviceTypeBtn, serviceType === 'scheduled' && styles.serviceTypeBtnActive]}
+                          onPress={() => setServiceType('scheduled')}
+                        >
+                          <Text style={[styles.serviceTypeText, serviceType === 'scheduled' && styles.serviceTypeTextActive]}>📅 Scheduled</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {serviceType === 'live' ? (
+                        <TouchableOpacity
+                          style={[styles.pingOwnerButton, pingOwnerSent && styles.pingOwnerButtonDisabled]}
+                          onPress={handleSaveAndPing}
+                          disabled={pingOwnerLoading || pingOwnerSent}
+                        >
+                          {pingOwnerLoading
+                            ? <ActivityIndicator color="white" size="small" />
+                            : <Text style={styles.pingOwnerButtonText}>
+                                {pingOwnerSent ? '✓ Owner Pinged' : '🔔 Ping Owner — Live Inspection'}
+                              </Text>}
+                        </TouchableOpacity>
+                      ) : (
+                        <>
+                          <TouchableOpacity style={styles.apptPickerBtn} onPress={() => setShowApptPicker(true)}>
+                            <Text style={styles.apptPickerText}>
+                              {apptDate ? `📅 ${apptDate.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : '📅 Pick appointment time'}
+                            </Text>
+                          </TouchableOpacity>
+                          {showApptPicker && (
+                            <DateTimePicker
+                              value={apptDate ?? new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                              mode="datetime"
+                              minimumDate={new Date()}
+                              onChange={(_e, d) => {
+                                setShowApptPicker(Platform.OS === 'ios');
+                                if (d) setApptDate(d);
+                              }}
+                            />
+                          )}
+                          <TouchableOpacity
+                            style={[styles.pingOwnerButton, !apptDate && styles.pingOwnerButtonDisabled]}
+                            onPress={handleSaveAndSchedule}
+                            disabled={!apptDate || pingOwnerLoading}
+                          >
+                            {pingOwnerLoading
+                              ? <ActivityIndicator color="white" size="small" />
+                              : <Text style={styles.pingOwnerButtonText}>📅 Schedule Inspection</Text>}
+                          </TouchableOpacity>
+                          <Text style={styles.glowHint}>✨ Ask the homeowner to confirm the email/text they'll receive.</Text>
+                        </>
+                      )}
+                    </>
+                  )}
                   <TextInput
                     style={styles.contactInput}
                     placeholder="Insurance Carrier"
@@ -1199,12 +1332,53 @@ export default function RealMapScreen({ navigation }: any) {
                     <View style={[styles.leadPill, { backgroundColor: STATUS_COLOR[detailKnock.status as LeadStatus] }]}>
                       <Text style={styles.leadPillText}>{STATUS_LABEL[detailKnock.status as LeadStatus]}</Text>
                     </View>
-                    <LeadActionMenu
-                      knockId={detailKnock.id}
-                      status={detailKnock.status as LeadStatus}
-                      role={role}
-                      onTransitioned={async () => { setDetailVisible(false); await loadKnocks(); }}
-                    />
+                    {detailKnock.appointment_at && (
+                      <Text style={styles.apptMeta}>
+                        📅 {new Date(detailKnock.appointment_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </Text>
+                    )}
+                    {/* Setter's quantized re-entry: only when the runner RETURNED it (arch_soft). */}
+                    {role === 'member' && detailKnock.status === 'arch_soft' ? (
+                      <View style={styles.reentryRow}>
+                        {setterReentryActions(detailKnock.service_type).map(opt => (
+                          <TouchableOpacity
+                            key={opt.action}
+                            style={[styles.reentryBtn, opt.destructive && styles.reentryBtnKill]}
+                            onPress={() => handleSetterReentry(detailKnock, opt.action)}
+                          >
+                            <Text style={[styles.reentryBtnText, opt.destructive && styles.reentryBtnKillText]}>
+                              {opt.emoji} {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : (
+                      // Runner actions (and setter nudge handled inside the menu's legalActions)
+                      <LeadActionMenu
+                        knockId={detailKnock.id}
+                        status={detailKnock.status as LeadStatus}
+                        role={role}
+                        onTransitioned={async () => { setDetailVisible(false); await loadKnocks(); }}
+                      />
+                    )}
+                    {showReschedPicker && (
+                      <DateTimePicker
+                        value={new Date(Date.now() + 24 * 60 * 60 * 1000)}
+                        mode="datetime"
+                        minimumDate={new Date()}
+                        onChange={async (_e, d) => {
+                          setShowReschedPicker(false);
+                          if (d && reschedKnockId) {
+                            if (d.getTime() <= Date.now()) { Alert.alert('Pick a future time'); return; }
+                            const res = await SupabaseService.transitionLead(reschedKnockId, 'reschedule', { appointmentAt: d.toISOString() });
+                            if (!res.ok) { Alert.alert('Reschedule failed', res.error || 'Try again'); return; }
+                            setReschedKnockId(null);
+                            setDetailVisible(false);
+                            await loadKnocks();
+                          }
+                        }}
+                      />
+                    )}
                   </View>
                 )}
 
@@ -1362,6 +1536,21 @@ const styles = StyleSheet.create({
   leadStatusBox: { marginBottom: 12 },
   leadPill: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 4 },
   leadPillText: { color: 'white', fontSize: 12, fontWeight: '700' },
+  apptMeta: { fontSize: 13, color: '#6b7280', marginBottom: 8 },
+  reentryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  reentryBtn: { borderWidth: 1, borderColor: '#1e40af', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#eff6ff' },
+  reentryBtnText: { color: '#1e40af', fontWeight: '700', fontSize: 14 },
+  reentryBtnKill: { borderColor: '#dc2626', backgroundColor: '#fef2f2' },
+  reentryBtnKillText: { color: '#dc2626' },
+  // Service type + scheduled appointment
+  serviceTypeBar: { flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 10, padding: 3, marginBottom: 8, marginTop: 4 },
+  serviceTypeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  serviceTypeBtnActive: { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  serviceTypeText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  serviceTypeTextActive: { color: '#111827' },
+  apptPickerBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, borderStyle: 'dashed', paddingVertical: 12, alignItems: 'center', marginBottom: 8 },
+  apptPickerText: { color: '#374151', fontSize: 14, fontWeight: '600' },
+  glowHint: { fontSize: 12, color: '#a16207', backgroundColor: '#fef9c3', borderRadius: 8, padding: 8, marginTop: 8, textAlign: 'center' },
   relabelButton: {
     borderWidth: 2, borderColor: '#1e40af', borderRadius: 12,
     paddingVertical: 14, alignItems: 'center', marginBottom: 10,

@@ -264,7 +264,7 @@ export class SupabaseService {
   static async transitionLead(
     knockId: string,
     action: string,
-    note?: string
+    opts?: { note?: string; appointmentAt?: string }
   ): Promise<{ ok: boolean; status?: string; label?: string; error?: string }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -277,7 +277,11 @@ export class SupabaseService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ knockId, action, note }),
+        body: JSON.stringify({
+          knockId, action,
+          note: opts?.note,
+          appointmentAt: opts?.appointmentAt,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return { ok: false, error: body.error ?? `HTTP ${res.status}` };
@@ -647,6 +651,7 @@ export class SupabaseService {
       status: row.status ?? undefined,
       cycle_number: row.cycle_number ?? undefined,
       date_of_loss: row.date_of_loss ?? undefined,
+      appointment_at: row.appointment_at ?? undefined,
     };
   }
 

@@ -32,19 +32,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const actor = await getAuthedActor(req, supabase);
   if (!actor) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { knockId, action, note } = req.body as {
+  const { knockId, action, note, appointmentAt } = req.body as {
     knockId?: string;
     action?: LeadAction;
     note?: string;
+    appointmentAt?: string; // ISO — required for schedule/reschedule
   };
   if (!knockId || !action) {
     return res.status(400).json({ error: 'Missing required fields: knockId, action' });
+  }
+  if ((action === 'schedule' || action === 'reschedule') && !appointmentAt) {
+    return res.status(400).json({ error: 'Missing appointmentAt for scheduling' });
   }
 
   // 2. Load the knock (current status + cycle + ownership).
   const { data: knock, error: knockErr } = await supabase
     .from('knocks')
-    .select('id, user_id, team_id, label, status, cycle_number, address, latitude, longitude')
+    .select('id, user_id, team_id, label, status, cycle_number, service_type, appointment_at, address, latitude, longitude')
     .eq('id', knockId)
     .maybeSingle();
 
@@ -69,7 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('knock_id', knockId)
     .eq('cycle_number', cycleNumber);
 
-  const recoveryUsed = (cycleEvents ?? []).some(e => e.action === 'recover');
+  // recover and reschedule share the single per-cycle recovery allowance.
+  const recoveryUsed = (cycleEvents ?? []).some(e => e.action === 'recover' || e.action === 'reschedule');
   const overrideUsed = (cycleEvents ?? []).some(e => e.action === 'revive');
 
   // 3b. Validate the transition.
@@ -82,6 +87,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   if (!result.ok || !result.rule) {
     return res.status(result.code ?? 409).json({ error: result.error });
+  }
+
+  // 3c. Nudge cap — max 2 per cycle, only while the runner hasn't acknowledged.
+  if (action === 'nudge') {
+    const nudgeCount = (cycleEvents ?? []).filter(e => e.action === 'nudge').length;
+    if (nudgeCount >= 2) {
+      return res.status(409).json({ error: 'Nudge limit reached (2 per cycle)' });
+    }
+    const acknowledged = (cycleEvents ?? []).some(e => e.action === 'confirm');
+    if (acknowledged) {
+      return res.status(409).json({ error: 'Runner already acknowledged' });
+    }
   }
 
   const rule = result.rule;
@@ -104,34 +121,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to record event' });
   }
 
-  // Update the knock's status; on the `ping` entry mark service_type=live.
+  // Update the knock's status (skip for idempotent actions like nudge — status unchanged).
   const knockUpdate: Record<string, unknown> = { status: toStatus };
   if (action === 'ping') knockUpdate.service_type = 'live';
+  if (action === 'schedule' || action === 'reschedule') {
+    knockUpdate.service_type = 'scheduled';
+    knockUpdate.appointment_at = appointmentAt;
+  }
   // Terminal actions mirror the lifecycle outcome onto the map pin's label.
   if (rule.terminal && isTerminal(toStatus)) knockUpdate.label = toStatus;
 
-  const { error: updErr } = await supabase
-    .from('knocks')
-    .update(knockUpdate)
-    .eq('id', knockId);
-  if (updErr) {
-    console.error('[Transition] knock update error:', updErr);
-    return res.status(500).json({ error: 'Failed to update lead' });
+  if (!rule.idempotent) {
+    const { error: updErr } = await supabase
+      .from('knocks')
+      .update(knockUpdate)
+      .eq('id', knockId);
+    if (updErr) {
+      console.error('[Transition] knock update error:', updErr);
+      return res.status(500).json({ error: 'Failed to update lead' });
+    }
+  }
+
+  // ── Scheduled-reminder bookkeeping ──────────────────────────────────────────
+  // schedule/reschedule: (re)create the reminder set. confirm/arch_*: cancel pending.
+  try {
+    if (action === 'schedule' || action === 'reschedule') {
+      // Cancel any leftover pending reminders from a prior cycle/schedule, then seed fresh.
+      await supabase.from('scheduled_reminders')
+        .update({ canceled_at: new Date().toISOString() })
+        .eq('knock_id', knockId).is('sent_at', null).is('canceled_at', null);
+
+      const appt = new Date(appointmentAt as string);
+      const runnerId = await resolveRunnerId(supabase, knock);
+      if (runnerId) {
+        const offsets: { kind: string; ms: number }[] = [
+          { kind: 'scheduled', ms: 0 },                  // at booking time
+          { kind: '2d', ms: 2 * 24 * 60 * 60 * 1000 },
+          { kind: '1d', ms: 1 * 24 * 60 * 60 * 1000 },
+          { kind: '2h', ms: 2 * 60 * 60 * 1000 },
+        ];
+        const now = Date.now();
+        const rows = offsets
+          .map(o => ({ kind: o.kind, fire_at: o.kind === 'scheduled' ? new Date(now) : new Date(appt.getTime() - o.ms) }))
+          .filter(r => r.fire_at.getTime() >= now - 60_000) // skip reminders already in the past
+          .map(r => ({
+            knock_id: knockId,
+            runner_user_id: runnerId,
+            team_id: knock.team_id ?? actor.teamId ?? null,
+            appointment_at: appt.toISOString(),
+            fire_at: r.fire_at.toISOString(),
+            kind: r.kind,
+          }));
+        if (rows.length) await supabase.from('scheduled_reminders').insert(rows);
+      }
+    } else if (action === 'confirm' || action === 'arch_soft' || action === 'arch_hard') {
+      // Acknowledged or dead — stop pending reminders.
+      await supabase.from('scheduled_reminders')
+        .update({ canceled_at: new Date().toISOString() })
+        .eq('knock_id', knockId).is('sent_at', null).is('canceled_at', null);
+    }
+  } catch (remErr: any) {
+    console.warn('[Transition] reminder bookkeeping failed:', remErr?.message);
   }
 
   // Ensure a lead_cycles row exists for this cycle; update its bookkeeping.
-  await supabase.from('lead_cycles').upsert(
-    {
-      knock_id: knockId,
-      cycle_number: cycleNumber,
-      team_id: knock.team_id ?? actor.teamId ?? null,
-      ...(rule.usesOverride ? { override_used: true } : {}),
-      ...(rule.terminal
-        ? { closed_at: new Date().toISOString(), final_status: toStatus }
-        : {}),
-    },
-    { onConflict: 'knock_id,cycle_number' }
-  );
+  // (Skip for idempotent nudge — no state change to record.)
+  if (!rule.idempotent) {
+    await supabase.from('lead_cycles').upsert(
+      {
+        knock_id: knockId,
+        cycle_number: cycleNumber,
+        team_id: knock.team_id ?? actor.teamId ?? null,
+        ...(rule.usesOverride ? { override_used: true } : {}),
+        ...(rule.terminal
+          ? { closed_at: new Date().toISOString(), final_status: toStatus }
+          : {}),
+      },
+      { onConflict: 'knock_id,cycle_number' }
+    );
+  }
 
   // 5. Push the counterparty. MUST await — on Vercel the function freezes the
   //    instant the handler returns, suspending any in-flight fetch, which delivers
@@ -214,12 +282,30 @@ async function notifyCounterparty(
 
 const LABEL_FOR_ACTION: Record<string, string> = {
   ping: '🔔 New live lead',
+  schedule: '📅 New scheduled inspection',
+  confirm: '👍 Inspection confirmed',
   complete: '✅ Inspection completed',
   processing: '⏳ Lead processing',
   signed: '🔏 Lead signed',
   arch_soft: '↩️ Lead returned — recover it',
-  arch_hard: '🛑 Lead archived',
+  arch_hard: '🪦 Lead archived',
   retarget: '🎯 Lead to retarget',
   revive: '♻️ Lead revived',
   recover: '🔁 Lead re-pinged',
+  reschedule: '📅 Inspection rescheduled',
+  nudge: '👈 Nudge — confirm this lead',
 };
+
+/** The runner who should receive scheduled reminders = the knock's team owner. */
+async function resolveRunnerId(
+  supabase: ReturnType<typeof getServiceClient>,
+  knock: any
+): Promise<string | null> {
+  if (!knock.team_id) return null;
+  const { data: team } = await supabase
+    .from('teams')
+    .select('owner_id')
+    .eq('id', knock.team_id)
+    .maybeSingle();
+  return team?.owner_id ?? null;
+}
