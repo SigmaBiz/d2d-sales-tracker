@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -19,9 +20,9 @@ export default function SettingsScreen({ navigation }: any) {
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Refetch every time the tab gains focus (not just once on mount) so team state
+  // never shows stale — e.g. right after joining a team or an RLS change.
+  useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
     const [teamResult, sessionResult] = await Promise.all([
