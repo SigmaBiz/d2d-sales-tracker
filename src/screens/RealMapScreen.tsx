@@ -95,6 +95,9 @@ export default function RealMapScreen({ navigation }: any) {
   const [hardOpenVisible, setHardOpenVisible] = useState(false);
   const [gateOpened, setGateOpened] = useState<'yes' | 'no' | null>(null); // drives label filter + tab visibility
 
+  // Current user's team role — drives role-scoped labels + lead action menu.
+  const [role, setRole] = useState<'owner' | 'member' | null>(null);
+
   // ── Init ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
