@@ -17,6 +17,7 @@ import AuthScreen from '../screens/AuthScreen';
 import TeamSetupScreen from '../screens/TeamSetupScreen';
 import { SupabaseService } from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient';
+import { HailAlertService } from '../services/hailAlertService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -139,9 +140,13 @@ export default function AppNavigator() {
     // auth screen immediately, and a fresh sign-in lands on Team Setup when needed.
     const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'SIGNED_OUT') {
+        // Stop this device receiving pushes for the account that just left.
+        HailAlertService.deactivateToken().catch(() => {});
         setAuthState('unauthenticated');
       } else if (event === 'SIGNED_IN') {
         await SupabaseService.initialize();
+        // Re-bind this device's push token to the new user (one device = current user).
+        HailAlertService.registerPushToken().catch(() => {});
         const teamSetupDone = await SupabaseService.isTeamSetupDone();
         setAuthState(teamSetupDone ? 'authenticated' : 'team_setup');
       }

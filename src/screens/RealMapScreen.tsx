@@ -361,6 +361,9 @@ export default function RealMapScreen({ navigation }: any) {
       }
       // Door is now a live lead — close the F1 session, release lock, reset sheet.
       closeKnockSession(savedKnock.id, 'lead');
+      doorLockRef.current = false; // release the map lock so the setter can keep knocking
+      setHardOpenVisible(false);
+      setGateOpened(null);
       setPickerVisible(false);
       setSelectedLabel(null);
       setPickerNotes('');

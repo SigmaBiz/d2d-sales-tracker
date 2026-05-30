@@ -21,7 +21,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token, userId } = req.body as { token?: string; userId?: string };
+  const { token, userId, deactivate } = req.body as {
+    token?: string; userId?: string; deactivate?: boolean;
+  };
 
   if (!token || typeof token !== 'string' || !token.startsWith('ExponentPushToken[')) {
     return res.status(400).json({ error: 'Invalid or missing push token' });
@@ -29,6 +31,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = getSupabaseClient();
 
+  // Sign-out path: mark this device's token inactive so it stops receiving pushes.
+  if (deactivate) {
+    const { error: deErr } = await supabase
+      .from('push_tokens')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('token', token);
+    if (deErr) {
+      console.error('[RegisterToken] deactivate error:', deErr);
+      return res.status(500).json({ error: deErr.message });
+    }
+    return res.status(200).json({ success: true, deactivated: true });
+  }
+
+  // Register: bind this token to the current user. One device = one current user —
+  // a token must never stay mapped to a previously-signed-in account, or pushes
+  // route to the wrong phone. The upsert (onConflict: token) reassigns user_id,
+  // so any prior owner of this exact token is overwritten here.
   const upsertPayload: Record<string, unknown> = {
     token,
     active: true,
@@ -45,6 +64,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: error.message });
   }
 
-  console.log('[RegisterToken] Registered:', token);
+  console.log('[RegisterToken] Registered token for user:', userId ?? '(none)');
   return res.status(200).json({ success: true });
 }

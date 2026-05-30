@@ -100,6 +100,26 @@ export class HailAlertService {
       console.warn('[HailAlert] Push token registration failed:', err);
     }
   }
+
+  /**
+   * Deactivate this device's push token (on sign-out), so a signed-out phone — or
+   * the previous account on a shared device — stops receiving pushes. Paired with
+   * re-registration on sign-in to keep one device = one current user.
+   */
+  static async deactivateToken(): Promise<void> {
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: 'ffdec8ec-db31-4b46-ad99-d4434a5e5115',
+      });
+      await fetch('https://d2d-sales-tracker-tau.vercel.app/api/alerts/register-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenData.data, deactivate: true }),
+      });
+    } catch (err) {
+      console.warn('[HailAlert] Push token deactivation failed:', err);
+    }
+  }
   
   /**
    * Start monitoring for hail
