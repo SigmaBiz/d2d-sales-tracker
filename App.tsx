@@ -59,6 +59,13 @@ export default function App() {
         return;
       }
 
+      // Lead lifecycle update — teleport to that door on the map
+      if (data?.type === 'lead_update' && data?.lat != null && data?.lng != null) {
+        console.log('[App] Lead update tapped:', data.knockId, data.status);
+        (global as any).pendingLeadLocation = { lat: data.lat, lng: data.lng, knockId: data.knockId };
+        return;
+      }
+
       const result = await HailAlertService.handleNotificationResponse(response);
 
       if (result && result.action === 'OPEN_NOTIFICATION_LOG') {

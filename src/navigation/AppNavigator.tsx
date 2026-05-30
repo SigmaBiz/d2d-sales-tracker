@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import RealMapScreen from '../screens/RealMapScreen';
 import StatsScreen from '../screens/StatsScreen';
+import LeadLogScreen from '../screens/LeadLogScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import StormSearchScreen from '../screens/StormSearchScreen';
 import DataFlowDashboard from '../screens/DataFlowDashboard';
@@ -28,6 +29,8 @@ function TabNavigator() {
 
           if (route.name === 'Map') {
             iconName = focused ? 'map' : 'map-outline';
+          } else if (route.name === 'Log') {
+            iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Stats') {
             iconName = focused ? 'stats-chart' : 'stats-chart-outline';
           } else if (route.name === 'Settings') {
@@ -50,7 +53,8 @@ function TabNavigator() {
       })}
     >
       <Tab.Screen name="Map" component={RealMapScreen} options={{ title: 'Territory Map' }} />
-<Tab.Screen name="Stats" component={StatsScreen} options={{ title: 'Analytics' }} />
+      <Tab.Screen name="Log" component={LeadLogScreen} options={{ title: 'Lead Log' }} />
+      <Tab.Screen name="Stats" component={StatsScreen} options={{ title: 'Analytics' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
     </Tab.Navigator>
   );

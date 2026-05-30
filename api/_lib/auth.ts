@@ -27,6 +27,30 @@ export function getServiceClient(): SupabaseClient {
 }
 
 /**
+ * Verify the caller's Supabase JWT (Authorization: Bearer <token>) and resolve
+ * their real user id + team role. This is the trust anchor for the work ledger:
+ * the client cannot claim to be someone else, so a setter can't record a
+ * runner-only validation against their own tally.
+ *
+ * Returns null when the token is missing/invalid (caller should 401).
+ */
+export async function getAuthedActor(
+  req: { headers: Record<string, string | string[] | undefined> },
+  client?: SupabaseClient
+): Promise<ActorContext | null> {
+  const raw = req.headers['authorization'] ?? req.headers['Authorization'];
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+  if (!token) return null;
+
+  const supabase = client ?? getServiceClient();
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) return null;
+
+  return getActorContext(data.user.id, supabase);
+}
+
+/**
  * Resolve a user's team role + team id from team_members.
  * Returns role/teamId null when the user isn't on a team.
  */

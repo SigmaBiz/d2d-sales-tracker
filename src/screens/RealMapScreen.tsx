@@ -15,8 +15,10 @@ import { HailAlertService } from '../services/hailAlertService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
 import NotificationLogPanel from '../components/NotificationLogPanel';
-import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL } from '../types';
+import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL, labsForRole } from '../types';
 import { supabase } from '../services/supabaseClient';
+import LeadActionMenu from '../components/LeadActionMenu';
+import { LeadStatus, STATUS_LABEL, STATUS_COLOR, isTerminal } from '../services/leadLifecycle';
 
 const LABEL_ORDER: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
@@ -119,6 +121,13 @@ export default function RealMapScreen({ navigation }: any) {
         (global as any).pendingLiveInspectionLocation = null;
         mapRef.current?.centerOnLocation(pendingInspection.lat, pendingInspection.lng, 0.005);
       }
+
+      // Teleport from the Lead Log — center on the tapped lead's door.
+      const pendingLead = (global as any).pendingLeadLocation;
+      if (pendingLead) {
+        (global as any).pendingLeadLocation = null;
+        mapRef.current?.centerOnLocation(pendingLead.lat, pendingLead.lng, 0.005);
+      }
     });
     return unsubscribe;
   }, [navigation]);
@@ -147,6 +156,7 @@ export default function RealMapScreen({ navigation }: any) {
       setUserLocation({ lat: 35.4676, lng: -97.5164 });
     }
     await Promise.all([loadKnocks(), loadHailData(), initializeHailAlerts()]);
+    SupabaseService.getRole().then(setRole);
   };
 
   const updateLocation = async () => {
@@ -300,25 +310,64 @@ export default function RealMapScreen({ navigation }: any) {
     setDetailLoading(false);
   };
 
-  const handlePingOwner = async (address: string, lat: number, lng: number) => {
+  // Ping starts the live-inspection lifecycle for a SAVED lead (status → pinged).
+  // After this the setter is locked out of the lab until the lead is retted —
+  // the server rejects further setter actions, so the detail sheet hides Re-label.
+  const handlePingLead = async (knockId: string) => {
     setPingOwnerLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
-      const canvasserName = user?.email?.split('@')[0] ?? 'Canvasser';
-      const res = await fetch('https://d2d-sales-tracker-tau.vercel.app/api/alerts/ping-owner', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, canvasserName, address, lat, lng }),
-      });
+      const res = await SupabaseService.transitionLead(knockId, 'ping');
       if (res.ok) {
         setPingOwnerSent(true);
+        await loadKnocks();
       } else {
-        const body = await res.json().catch(() => ({}));
-        Alert.alert('Ping failed', (body as any).error || 'Could not reach owner');
+        Alert.alert('Ping failed', res.error || 'Could not start live inspection');
       }
     } catch {
       Alert.alert('Ping failed', 'Network error — try again');
+    } finally {
+      setPingOwnerLoading(false);
+    }
+  };
+
+  // Create-flow ping: save the door as a lead (+ contact), then ping in one tap.
+  const handleSaveAndPing = async () => {
+    if (!pendingCoords) return;
+    setPingOwnerLoading(true);
+    try {
+      const savedKnock = await SupabaseService.saveKnock({
+        latitude: pendingCoords.lat,
+        longitude: pendingCoords.lng,
+        address: pendingAddress,
+        label: 'lead',
+        notes: pickerNotes || undefined,
+        knocked_at: new Date(),
+        user_id: SupabaseService.getUserId() ?? undefined,
+      });
+      if (contactName || contactPhone || contactInsurance) {
+        await SupabaseService.upsertContact(savedKnock.id, {
+          name: contactName || undefined,
+          phone: contactPhone || undefined,
+          insurance_carrier: contactInsurance || undefined,
+        });
+      }
+      const res = await SupabaseService.transitionLead(savedKnock.id, 'ping');
+      if (!res.ok) {
+        Alert.alert('Ping failed', res.error || 'Could not start live inspection');
+        return;
+      }
+      // Door is now a live lead — close the F1 session, release lock, reset sheet.
+      closeKnockSession(savedKnock.id, 'lead');
+      setPickerVisible(false);
+      setSelectedLabel(null);
+      setPickerNotes('');
+      setContactName(''); setContactPhone(''); setContactInsurance('');
+      setPropertyYearBuilt(''); setPropertySqft('');
+      setPingOwnerSent(false);
+      await loadKnocks();
+    } catch (err) {
+      Alert.alert('Ping failed', 'Could not save & ping. Check your connection.');
+      console.error('[Map] saveAndPing error:', err);
     } finally {
       setPingOwnerLoading(false);
     }
@@ -758,9 +807,10 @@ export default function RealMapScreen({ navigation }: any) {
 
                   <View style={styles.labelGrid}>
                     {(pendingKnock
-                      ? LABEL_ORDER                              // relabel: all labels available
-                      : gateOpened === 'no' ? NOT_OPENED_LABELS  // didn't open
-                      : OPENED_LABELS                            // opened
+                      ? labsForRole(role)                        // relabel: role-scoped labels
+                      : gateOpened === 'no'
+                        ? NOT_OPENED_LABELS                      // didn't open (all setter-allowed)
+                        : OPENED_LABELS.filter(l => labsForRole(role).includes(l)) // opened, role-scoped
                     ).map(label => (
                       <TouchableOpacity
                         key={label}
@@ -814,14 +864,10 @@ export default function RealMapScreen({ navigation }: any) {
                   <TouchableOpacity
                     style={[
                       styles.pingOwnerButton,
-                      (!contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
+                      (!contactName.trim() || !contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
                     ]}
-                    onPress={() => {
-                      if (pendingCoords && pendingAddress) {
-                        handlePingOwner(pendingAddress, pendingCoords.lat, pendingCoords.lng);
-                      }
-                    }}
-                    disabled={!contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
+                    onPress={handleSaveAndPing}
+                    disabled={!contactName.trim() || !contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
                   >
                     {pingOwnerLoading
                       ? <ActivityIndicator color="white" size="small" />
@@ -1000,12 +1046,8 @@ export default function RealMapScreen({ navigation }: any) {
                           styles.pingOwnerButton,
                           (!contactPhone.trim() || pingOwnerSent) && styles.pingOwnerButtonDisabled,
                         ]}
-                        onPress={() => {
-                          if (detailKnock?.address) {
-                            handlePingOwner(detailKnock.address, detailKnock.latitude, detailKnock.longitude);
-                          }
-                        }}
-                        disabled={!contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
+                        onPress={() => { if (detailKnock) handlePingLead(detailKnock.id); }}
+                        disabled={!contactName.trim() || !contactPhone.trim() || pingOwnerLoading || pingOwnerSent}
                       >
                         {pingOwnerLoading
                           ? <ActivityIndicator color="white" size="small" />
@@ -1125,10 +1167,27 @@ export default function RealMapScreen({ navigation }: any) {
                   )}
                 </View>
 
-                {/* Actions */}
-                <TouchableOpacity style={styles.relabelButton} onPress={handleRelabel}>
-                  <Text style={styles.relabelButtonText}>Re-label</Text>
-                </TouchableOpacity>
+                {/* Lifecycle status + role-legal actions (in-flight leads) */}
+                {detailKnock.status && (
+                  <View style={styles.leadStatusBox}>
+                    <View style={[styles.leadPill, { backgroundColor: STATUS_COLOR[detailKnock.status as LeadStatus] }]}>
+                      <Text style={styles.leadPillText}>{STATUS_LABEL[detailKnock.status as LeadStatus]}</Text>
+                    </View>
+                    <LeadActionMenu
+                      knockId={detailKnock.id}
+                      status={detailKnock.status as LeadStatus}
+                      role={role}
+                      onTransitioned={async () => { setDetailVisible(false); await loadKnocks(); }}
+                    />
+                  </View>
+                )}
+
+                {/* Actions — Re-label only when NOT in an active lifecycle */}
+                {!detailKnock.status && (
+                  <TouchableOpacity style={styles.relabelButton} onPress={handleRelabel}>
+                    <Text style={styles.relabelButtonText}>Re-label</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={styles.followUpButton}
                   onPress={() => Alert.alert('Coming Soon', 'Appointment scheduling will be available in a future update.')}
@@ -1274,6 +1333,9 @@ const styles = StyleSheet.create({
   detailHistoryChange: { fontSize: 13, color: '#111827', fontWeight: '500' },
   detailHistoryDate: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   detailHistoryNotes: { fontSize: 12, color: '#6b7280', marginTop: 2, fontStyle: 'italic' },
+  leadStatusBox: { marginBottom: 12 },
+  leadPill: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 4 },
+  leadPillText: { color: 'white', fontSize: 12, fontWeight: '700' },
   relabelButton: {
     borderWidth: 2, borderColor: '#1e40af', borderRadius: 12,
     paddingVertical: 14, alignItems: 'center', marginBottom: 10,

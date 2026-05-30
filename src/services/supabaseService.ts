@@ -17,6 +17,7 @@ const OFFLINE_QUEUE_KEY = '@knock_offline_queue';
 const TEAM_ID_KEY = '@team_id';
 const TEAM_SETUP_DONE_KEY = '@team_setup_done';
 const MAX_HISTORY_PER_KNOCK = 10;
+const API_BASE = 'https://d2d-sales-tracker-tau.vercel.app';
 
 export interface TeamInfo {
   id: string;
@@ -225,6 +226,72 @@ export class SupabaseService {
 
   static getUserId(): string | null {
     return this.userId;
+  }
+
+  // ── Lead lifecycle (F2b) ──────────────────────────────────────────────────
+
+  /**
+   * Perform a lifecycle transition via the server endpoint (the only writer of
+   * lifecycle state). Sends the user's JWT so the server can verify identity +
+   * role before recording the event. Returns the new status on success.
+   */
+  static async transitionLead(
+    knockId: string,
+    action: string,
+    note?: string
+  ): Promise<{ ok: boolean; status?: string; label?: string; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return { ok: false, error: 'Not authenticated' };
+
+      const res = await fetch(`${API_BASE}/api/leads/transition`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ knockId, action, note }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+      return { ok: true, status: body.status, label: body.label };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? 'Network error' };
+    }
+  }
+
+  /**
+   * Active leads = knocks currently in a lifecycle (status set, not terminal).
+   * RLS scopes visibility: a member sees their own; an owner sees the team's.
+   */
+  static async getActiveLeads(): Promise<Knock[]> {
+    if (!this.userId) return [];
+    const { data, error } = await supabase
+      .from('knocks')
+      .select('*')
+      .not('status', 'is', null)
+      .order('knocked_at', { ascending: false })
+      .limit(500);
+    if (error) {
+      console.error('[Supabase] getActiveLeads error:', error);
+      return [];
+    }
+    return data.map(this.rowToKnock);
+  }
+
+  /** Append-only event history for one knock (the per-lead Log). */
+  static async getLeadEvents(knockId: string): Promise<Array<{
+    action: string; from_status: string | null; to_status: string | null;
+    actor_role: string | null; cycle_number: number; note: string | null; created_at: string;
+  }>> {
+    const { data, error } = await supabase
+      .from('lead_events')
+      .select('action, from_status, to_status, actor_role, cycle_number, note, created_at')
+      .eq('knock_id', knockId)
+      .order('created_at', { ascending: false });
+    if (error) return [];
+    return data as any;
   }
 
   // ── Knocks — Write ──────────────────────────────────────────────────────────
