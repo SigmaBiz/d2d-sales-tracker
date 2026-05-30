@@ -29,6 +29,7 @@ export interface TeamInfo {
 export class SupabaseService {
   private static userId: string | null = null;
   private static teamId: string | null = null;
+  private static role: 'owner' | 'member' | null = null;
 
   // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export class SupabaseService {
     });
 
     this.teamId = team.id;
+    this.role = 'owner';
     await AsyncStorage.setItem(TEAM_ID_KEY, team.id);
     await this.markTeamSetupDone();
 
@@ -112,6 +114,7 @@ export class SupabaseService {
     }
 
     this.teamId = team.id;
+    this.role = 'member';
     await AsyncStorage.setItem(TEAM_ID_KEY, team.id);
     await this.markTeamSetupDone();
 
@@ -160,11 +163,28 @@ export class SupabaseService {
       .eq('user_id', this.userId);
 
     this.teamId = null;
+    this.role = null;
     await AsyncStorage.removeItem(TEAM_ID_KEY);
   }
 
   static getTeamId(): string | null {
     return this.teamId;
+  }
+
+  /**
+   * Current user's team role, cached after first lookup.
+   * 'owner' = runner/admin, 'member' = setter. Null if not on a team.
+   * Pass force=true to refetch (e.g. after creating/joining/leaving a team).
+   */
+  static async getRole(force = false): Promise<'owner' | 'member' | null> {
+    if (this.role !== null && !force) return this.role;
+    const team = await this.getMyTeam();
+    this.role = team?.role ?? null;
+    return this.role;
+  }
+
+  static async isOwner(force = false): Promise<boolean> {
+    return (await this.getRole(force)) === 'owner';
   }
 
   static async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
@@ -200,6 +220,7 @@ export class SupabaseService {
   static async signOut(): Promise<void> {
     await supabase.auth.signOut();
     this.userId = null;
+    this.role = null;
   }
 
   static getUserId(): string | null {
@@ -226,6 +247,10 @@ export class SupabaseService {
       photo_url: knock.photo_url,
       storm_date: knock.storm_date,
       knocked_at: knock.knocked_at.toISOString(),
+      service_type: knock.service_type,
+      status: knock.status,
+      cycle_number: knock.cycle_number,
+      date_of_loss: knock.date_of_loss,
     };
 
     if (net.isConnected && this.userId) {
@@ -485,6 +510,10 @@ export class SupabaseService {
           knocked_at: knock.knocked_at instanceof Date
             ? knock.knocked_at.toISOString()
             : knock.knocked_at,
+          service_type: knock.service_type,
+          status: knock.status,
+          cycle_number: knock.cycle_number,
+          date_of_loss: knock.date_of_loss,
         };
 
         const { error } = await supabase.from('knocks').insert(row);
@@ -518,6 +547,10 @@ export class SupabaseService {
       syncStatus: 'synced',
       year_built: row.year_built ?? undefined,
       sqft: row.sqft ?? undefined,
+      service_type: row.service_type ?? undefined,
+      status: row.status ?? undefined,
+      cycle_number: row.cycle_number ?? undefined,
+      date_of_loss: row.date_of_loss ?? undefined,
     };
   }
 

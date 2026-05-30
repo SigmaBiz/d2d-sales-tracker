@@ -28,6 +28,11 @@ export interface SupabaseKnock {
   photo_url?: string;
   storm_date?: string; // YYYY-MM-DD
   knocked_at?: string; // ISO timestamptz
+  // Lead lifecycle (F2a)
+  service_type?: string;  // live | scheduled | repair
+  status?: string;        // LeadStatus
+  cycle_number?: number;
+  date_of_loss?: string;  // YYYY-MM-DD
 }
 
 export interface SupabaseKnockHistory {
