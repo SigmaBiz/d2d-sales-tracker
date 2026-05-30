@@ -177,28 +177,30 @@ async function notifyCounterparty(
   }
   if (!recipientId || recipientId === actorId) return;
 
-  const { data: tokenRow } = await supabase
+  // A user may have multiple active tokens (multiple devices / reinstalls).
+  // maybeSingle() ERRORS on >1 row — fetch all and push to each.
+  const { data: tokenRows } = await supabase
     .from('push_tokens')
     .select('token')
     .eq('user_id', recipientId)
-    .eq('active', true)
-    .maybeSingle();
-  if (!tokenRow?.token) return;
+    .eq('active', true);
+  const tokens = (tokenRows ?? []).map(r => r.token).filter(Boolean);
+  if (tokens.length === 0) return;
 
   const addr = knock.address ?? `${knock.latitude?.toFixed?.(4)}, ${knock.longitude?.toFixed?.(4)}`;
   const title = LABEL_FOR_ACTION[action] ?? 'Lead updated';
 
   await axios.post(
     'https://exp.host/--/api/v2/push/send',
-    [{
-      to: tokenRow.token,
+    tokens.map(token => ({
+      to: token,
       title,
       body: addr,
       data: { type: 'lead_update', knockId: knock.id, status: toStatus, action,
               lat: knock.latitude, lng: knock.longitude, address: knock.address },
       sound: 'default',
       priority: 'high',
-    }],
+    })),
     { headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, timeout: 10000 }
   );
 }
