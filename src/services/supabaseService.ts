@@ -214,6 +214,7 @@ export class SupabaseService {
       if (data.user) {
         this.userId = data.user.id;
         this.teamId = await AsyncStorage.getItem(TEAM_ID_KEY);
+        this.role = null; // clear any stale cached role; getRole() refetches for this user
         return { success: true };
       }
       return { success: false, error: 'Sign in failed' };
@@ -229,6 +230,7 @@ export class SupabaseService {
       if (data.user) {
         this.userId = data.user.id;
         this.teamId = null; // New user has no team yet
+        this.role = null;   // clear any stale cached role
         return { success: true };
       }
       return { success: false, error: 'Sign up failed' };
@@ -287,7 +289,9 @@ export class SupabaseService {
 
   /**
    * Active leads = knocks currently in a lifecycle (status set, not terminal).
-   * RLS scopes visibility: a member sees their own; an owner sees the team's.
+   * Terminal statuses (signed / arch_hard / retarget) are excluded so the Log
+   * shows only leads that still need action. RLS scopes visibility: a member sees
+   * their own; an owner sees the team's.
    */
   static async getActiveLeads(): Promise<Knock[]> {
     if (!this.userId) return [];
@@ -295,6 +299,7 @@ export class SupabaseService {
       .from('knocks')
       .select('*')
       .not('status', 'is', null)
+      .not('status', 'in', '(signed,arch_hard,retarget)')
       .order('knocked_at', { ascending: false })
       .limit(500);
     if (error) {

@@ -133,14 +133,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     { onConflict: 'knock_id,cycle_number' }
   );
 
-  // 5. Best-effort push to the counterparty (don't fail the request on push error).
-  notifyCounterparty(supabase, {
-    knock,
-    actorId: actor.userId,
-    actorRole: actor.role,
-    action,
-    toStatus,
-  }).catch(err => console.warn('[Transition] notify failed:', err?.message));
+  // 5. Push the counterparty. MUST await — on Vercel the function freezes the
+  //    instant the handler returns, suspending any in-flight fetch, which delivers
+  //    the push only on the NEXT invocation (the "ping arrives one action late" bug).
+  //    Best-effort: a push failure must not fail the transition itself.
+  try {
+    await notifyCounterparty(supabase, {
+      knock,
+      actorId: actor.userId,
+      actorRole: actor.role,
+      action,
+      toStatus,
+    });
+  } catch (err: any) {
+    console.warn('[Transition] notify failed:', err?.message);
+  }
 
   return res.status(200).json({ ok: true, status: toStatus, label: knockUpdate.label ?? knock.label });
 }

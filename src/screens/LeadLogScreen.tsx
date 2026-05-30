@@ -29,7 +29,7 @@ export default function LeadLogScreen({ navigation }: any) {
   const load = async () => {
     const [data, r] = await Promise.all([
       SupabaseService.getActiveLeads(),
-      SupabaseService.getRole(),
+      SupabaseService.getRole(true), // force — never show actions for a stale role
     ]);
     setLeads(data);
     setRole(r);
