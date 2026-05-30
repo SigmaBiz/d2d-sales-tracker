@@ -16,6 +16,7 @@ import PingHistoryScreen from '../screens/PingHistoryScreen';
 import AuthScreen from '../screens/AuthScreen';
 import TeamSetupScreen from '../screens/TeamSetupScreen';
 import { SupabaseService } from '../services/supabaseService';
+import { supabase } from '../services/supabaseClient';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -132,6 +133,20 @@ export default function AppNavigator() {
       const teamSetupDone = await SupabaseService.isTeamSetupDone();
       setAuthState(teamSetupDone ? 'authenticated' : 'team_setup');
     });
+
+    // React to auth changes (sign-out/in) instead of only checking once at launch.
+    // Platform-guaranteed signal — keeps the UI truthful: sign-out returns to the
+    // auth screen immediately, and a fresh sign-in lands on Team Setup when needed.
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_OUT') {
+        setAuthState('unauthenticated');
+      } else if (event === 'SIGNED_IN') {
+        await SupabaseService.initialize();
+        const teamSetupDone = await SupabaseService.isTeamSetupDone();
+        setAuthState(teamSetupDone ? 'authenticated' : 'team_setup');
+      }
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   if (authState === 'loading') {

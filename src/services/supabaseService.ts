@@ -63,6 +63,17 @@ export class SupabaseService {
   static async createTeam(name: string): Promise<{ success: boolean; invite_code?: string; error?: string }> {
     if (!this.userId) return { success: false, error: 'Not authenticated' };
 
+    // Guard: if the user already belongs to a team, reuse it instead of creating
+    // another. Prevents the duplicate-team mess (one account owning many teams).
+    const existing = await this.getMyTeam();
+    if (existing) {
+      this.teamId = existing.id;
+      this.role = existing.role;
+      await AsyncStorage.setItem(TEAM_ID_KEY, existing.id);
+      await this.markTeamSetupDone();
+      return { success: true, invite_code: existing.invite_code };
+    }
+
     // Generate a 6-char invite code (no confusing chars)
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let invite_code = '';
@@ -125,12 +136,17 @@ export class SupabaseService {
   static async getMyTeam(): Promise<TeamInfo | null> {
     if (!this.userId) return null;
 
-    const { data } = await supabase
+    // A user may have >1 team_members row (e.g. owns several teams). maybeSingle()
+    // ERRORS on multiple rows and returns null — which would wrongly show "Solo mode"
+    // and drop the owner to setter labs. Take the earliest-joined team deterministically.
+    const { data: rows } = await supabase
       .from('team_members')
       .select('role, teams(id, name, invite_code)')
       .eq('user_id', this.userId)
-      .maybeSingle();
+      .order('joined_at', { ascending: true })
+      .limit(1);
 
+    const data = rows?.[0];
     if (!data || !data.teams) return null;
 
     const team = data.teams as any;
@@ -166,6 +182,8 @@ export class SupabaseService {
     this.teamId = null;
     this.role = null;
     await AsyncStorage.removeItem(TEAM_ID_KEY);
+    // Clear the setup flag so a member who left is re-prompted to create/join next time.
+    await AsyncStorage.removeItem(TEAM_SETUP_DONE_KEY);
   }
 
   static getTeamId(): string | null {
@@ -222,6 +240,11 @@ export class SupabaseService {
     await supabase.auth.signOut();
     this.userId = null;
     this.role = null;
+    // Full teardown — otherwise the next login on this device inherits the prior
+    // account's team (stale @team_id) and skips Team Setup (@team_setup_done left true).
+    this.teamId = null;
+    await AsyncStorage.removeItem(TEAM_ID_KEY);
+    await AsyncStorage.removeItem(TEAM_SETUP_DONE_KEY);
   }
 
   static getUserId(): string | null {
