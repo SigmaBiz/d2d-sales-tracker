@@ -39,6 +39,7 @@ export default function RealMapScreen({ navigation }: any) {
   // Map state
   const [knocks, setKnocks] = useState<Knock[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false); // locate button in-flight (slow GPS)
   const [hailReports, setHailReports] = useState<HailReport[]>([]);
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
   const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
@@ -660,11 +661,30 @@ export default function RealMapScreen({ navigation }: any) {
         <TouchableOpacity style={styles.actionButton} onPress={loadKnocks}>
           <Ionicons name="refresh" size={24} color="#1e40af" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={async () => {
-          await updateLocation();
-          if (userLocation) mapRef.current?.centerOnLocation(userLocation.lat, userLocation.lng, 0.01);
-        }}>
-          <Ionicons name="locate" size={24} color="#1e40af" />
+        <TouchableOpacity
+          style={styles.actionButton}
+          disabled={locating}
+          onPress={async () => {
+            setLocating(true);
+            try {
+              // Center on the FRESHLY fetched coords — not the userLocation state,
+              // which is the stale closure value from the last render (centered
+              // one tap behind / no-op when null).
+              const loc = await LocationService.getCurrentLocation();
+              if (loc) {
+                const lat = loc.coords.latitude;
+                const lng = loc.coords.longitude;
+                setUserLocation({ lat, lng });
+                mapRef.current?.centerOnLocation(lat, lng, 0.01);
+              }
+            } finally {
+              setLocating(false);
+            }
+          }}
+        >
+          {locating
+            ? <ActivityIndicator size="small" color="#1e40af" />
+            : <Ionicons name="locate" size={24} color="#1e40af" />}
         </TouchableOpacity>
       </View>
 
