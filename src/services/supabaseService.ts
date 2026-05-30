@@ -106,31 +106,32 @@ export class SupabaseService {
   static async joinTeam(inviteCode: string): Promise<{ success: boolean; error?: string }> {
     if (!this.userId) return { success: false, error: 'Not authenticated' };
 
-    const { data: team, error: lookupErr } = await supabase
-      .from('teams')
-      .select('id, name')
-      .eq('invite_code', inviteCode.toUpperCase().trim())
-      .maybeSingle();
+    // The teams table is RLS-locked, so a non-member can't resolve the invite code
+    // client-side. Go through the server endpoint, which does the lookup + insert
+    // with the service role (authenticated by our JWT).
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return { success: false, error: 'Not authenticated' };
 
-    if (lookupErr || !team) return { success: false, error: 'Invalid invite code' };
+      const res = await fetch(`${API_BASE}/api/teams/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ inviteCode: inviteCode.toUpperCase().trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.success) {
+        return { success: false, error: body.error ?? `HTTP ${res.status}` };
+      }
 
-    const { error: joinErr } = await supabase.from('team_members').insert({
-      team_id: team.id,
-      user_id: this.userId,
-      role: 'member',
-    });
-
-    if (joinErr) {
-      if (joinErr.code === '23505') return { success: false, error: 'Already a member of this team' };
-      return { success: false, error: joinErr.message };
+      this.teamId = body.team.id;
+      this.role = 'member';
+      await AsyncStorage.setItem(TEAM_ID_KEY, body.team.id);
+      await this.markTeamSetupDone();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? 'Network error' };
     }
-
-    this.teamId = team.id;
-    this.role = 'member';
-    await AsyncStorage.setItem(TEAM_ID_KEY, team.id);
-    await this.markTeamSetupDone();
-
-    return { success: true };
   }
 
   static async getMyTeam(): Promise<TeamInfo | null> {
