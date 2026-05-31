@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { WeatherHistoryService, HistoricalStormEvent } from '../services/weatherHistoryService';
 import { MRMSService } from '../services/mrmsService';
+import { SupabaseService } from '../services/supabaseService';
 
 export default function StormSearchScreen({ navigation }: any) {
   const [searchLocation, setSearchLocation] = useState('');
@@ -123,18 +124,32 @@ export default function StormSearchScreen({ navigation }: any) {
       // Save the storm event
       await MRMSService.saveStormEvent(storm);
       console.log('[StormSearch] Storm saved successfully');
-      
+
+      // Owner can make this storm date the team's active campaign (date of loss).
+      const isOwner = await SupabaseService.isOwner();
+      const goToMap = () => { navigation.goBack(); navigation.navigate('Main', { screen: 'Map' }); };
+      const dolIso = new Date(event.date).toISOString().slice(0, 10);
+
+      const buttons: any[] = [{ text: 'View on Map', onPress: goToMap }];
+      if (isOwner) {
+        buttons.push({
+          text: 'Set as Active Campaign',
+          onPress: async () => {
+            const res = await SupabaseService.setTeamDefaultDateOfLoss(dolIso);
+            Alert.alert(
+              res.ok ? 'Campaign Set' : 'Error',
+              res.ok ? `New knocks will be stamped with ${dolIso} (date of loss).` : (res.error ?? 'Could not set'),
+              [{ text: 'OK', onPress: goToMap }]
+            );
+          },
+        });
+      }
+      buttons.push({ text: 'OK' });
+
       Alert.alert(
         'Storm Loaded',
-        `Historical storm data from ${event.location.name} has been loaded to the map.`,
-        [
-          { text: 'View on Map', onPress: () => {
-            // Navigate back to main tab navigator, then to Map tab
-            navigation.goBack(); // Go back to main tabs
-            navigation.navigate('Main', { screen: 'Map' }); // Navigate to Map tab
-          }},
-          { text: 'OK' }
-        ]
+        `Historical storm data from ${event.location.name} has been loaded to the map.${isOwner ? '\n\nSet this storm date as your active campaign?' : ''}`,
+        buttons
       );
     } catch (error) {
       console.error('[StormSearch] Error loading storm:', error);

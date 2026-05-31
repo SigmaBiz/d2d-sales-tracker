@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import NativeMap, { NativeMapRef } from '../components/NativeMap';
 import { LocationService } from '../services/locationService';
 import { SupabaseService } from '../services/supabaseService';
@@ -173,6 +174,39 @@ export default function RealMapScreen({ navigation }: any) {
     setUrgentUnread(urgent);
   };
 
+  // Daily-zero prompt: once per day, the ADMIN confirms the active date of loss.
+  // Setters inherit the team default silently (never prompted). Guarded so it fires
+  // at most once per calendar day per device.
+  const maybePromptDateOfLoss = async () => {
+    try {
+      if (!(await SupabaseService.isOwner())) return; // owner-only
+      const today = new Date().toISOString().slice(0, 10);
+      const lastPrompt = await AsyncStorage.getItem('@dol_prompt_day');
+      if (lastPrompt === today) return; // already handled today
+      await AsyncStorage.setItem('@dol_prompt_day', today);
+
+      const current = await SupabaseService.getTeamDefaultDateOfLoss(true);
+      const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      Alert.alert(
+        'Active Date of Loss',
+        current
+          ? `Today's knocks will be stamped with the current campaign date: ${fmt(current)}.\n\nKeep it, or change it?`
+          : `No campaign date is set. New knocks won't be tied to a storm until you set one.`,
+        current
+          ? [
+              { text: 'Change…', onPress: () => navigation.navigate('StormSearch') },
+              { text: 'Keep', style: 'cancel' },
+            ]
+          : [
+              { text: 'Set on Storm screen', onPress: () => navigation.navigate('StormSearch') },
+              { text: 'Later', style: 'cancel' },
+            ]
+      );
+    } catch (err) {
+      console.warn('[Map] DOL prompt failed:', err);
+    }
+  };
+
   const openNotifications = async () => {
     setShowNotificationLog(true);
     await SupabaseService.markNotificationsRead();
@@ -205,6 +239,7 @@ export default function RealMapScreen({ navigation }: any) {
     }
     await Promise.all([loadKnocks(), loadHailData(), initializeHailAlerts()]);
     SupabaseService.getRole().then(setRole);
+    maybePromptDateOfLoss(); // admin daily-zero date-of-loss confirm (once/day)
   };
 
   const updateLocation = async () => {
@@ -1191,6 +1226,11 @@ export default function RealMapScreen({ navigation }: any) {
                   {detailKnock.storm_date && (
                     <Text style={styles.detailMetaBadge}>
                       Storm: {detailKnock.storm_date}
+                    </Text>
+                  )}
+                  {detailKnock.date_of_loss && (
+                    <Text style={styles.detailMetaBadge}>
+                      📅 DOL: {detailKnock.date_of_loss}
                     </Text>
                   )}
                 </View>

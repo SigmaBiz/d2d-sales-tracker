@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
   Linking,
   Share,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SupabaseService, TeamInfo } from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient';
 
@@ -19,19 +21,30 @@ export default function SettingsScreen({ navigation }: any) {
   const [team, setTeam] = useState<TeamInfo | null>(null);
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [dateOfLoss, setDateOfLoss] = useState<string | null>(null); // team's active campaign
+  const [showDolPicker, setShowDolPicker] = useState(false);
 
   // Refetch every time the tab gains focus (not just once on mount) so team state
   // never shows stale — e.g. right after joining a team or an RLS change.
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [teamResult, sessionResult] = await Promise.all([
+    const [teamResult, sessionResult, dol] = await Promise.all([
       SupabaseService.getMyTeam(),
       supabase.auth.getSession(),
+      SupabaseService.getTeamDefaultDateOfLoss(true),
     ]);
     setTeam(teamResult);
     setUserEmail(sessionResult.data.session?.user?.email ?? null);
+    setDateOfLoss(dol);
     setLoadingTeam(false);
+  };
+
+  const handleSetDateOfLoss = async (d: Date) => {
+    const iso = d.toISOString().slice(0, 10); // YYYY-MM-DD
+    const res = await SupabaseService.setTeamDefaultDateOfLoss(iso);
+    if (res.ok) setDateOfLoss(iso);
+    else Alert.alert('Error', res.error ?? 'Could not set date of loss');
   };
 
   const handleSignOut = () => {
@@ -126,6 +139,29 @@ export default function SettingsScreen({ navigation }: any) {
                   <Text style={styles.teamMeta}>
                     {team.member_count} member{team.member_count !== 1 ? 's' : ''}
                   </Text>
+                )}
+
+                {/* Active campaign — date of loss (owner sets; new knocks inherit it) */}
+                <Text style={[styles.teamLabel, { marginTop: 16 }]}>ACTIVE DATE OF LOSS</Text>
+                <TouchableOpacity style={styles.dolBox} onPress={() => setShowDolPicker(true)} activeOpacity={0.7}>
+                  <Text style={styles.dolText}>
+                    {dateOfLoss
+                      ? new Date(dateOfLoss + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+                      : 'Not set — tap to choose'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={18} color="#1e40af" />
+                </TouchableOpacity>
+                <Text style={styles.dolHint}>New knocks are stamped with this campaign date.</Text>
+                {showDolPicker && (
+                  <DateTimePicker
+                    value={dateOfLoss ? new Date(dateOfLoss + 'T00:00:00') : new Date()}
+                    mode="date"
+                    maximumDate={new Date()}
+                    onChange={(_e, d) => {
+                      setShowDolPicker(Platform.OS === 'ios');
+                      if (d) handleSetDateOfLoss(d);
+                    }}
+                  />
                 )}
               </>
             )}
@@ -292,6 +328,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
+  dolBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#eff6ff', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: '#bfdbfe',
+  },
+  dolText: { fontSize: 15, fontWeight: '600', color: '#1e40af' },
+  dolHint: { fontSize: 12, color: '#9ca3af', marginTop: 6 },
   inviteCodeBox: {
     backgroundColor: '#f0fdf4',
     borderRadius: 12,

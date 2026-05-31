@@ -31,6 +31,7 @@ export class SupabaseService {
   private static userId: string | null = null;
   private static teamId: string | null = null;
   private static role: 'owner' | 'member' | null = null;
+  private static defaultDateOfLoss: string | null = null; // YYYY-MM-DD, team's active campaign
 
   // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ export class SupabaseService {
       if (session?.user) {
         this.userId = session.user.id;
         this.teamId = await AsyncStorage.getItem(TEAM_ID_KEY);
+        this.getTeamDefaultDateOfLoss().catch(() => {}); // warm the cache (non-blocking)
         return true;
       }
       return false; // No session — user must sign in via AuthScreen
@@ -207,6 +209,40 @@ export class SupabaseService {
     return (await this.getRole(force)) === 'owner';
   }
 
+  // ── Date of loss (active campaign) — F2f-1 ────────────────────────────────
+  // The team's current campaign date. New knocks auto-stamp with it; the admin
+  // sets it (storm screen / Settings); members inherit it silently.
+
+  /** Team's default date of loss (YYYY-MM-DD), cached. force=true refetches. */
+  static async getTeamDefaultDateOfLoss(force = false): Promise<string | null> {
+    if (this.defaultDateOfLoss !== null && !force) return this.defaultDateOfLoss;
+    if (!this.teamId) return null;
+    const { data } = await supabase
+      .from('teams')
+      .select('default_date_of_loss')
+      .eq('id', this.teamId)
+      .maybeSingle();
+    this.defaultDateOfLoss = (data?.default_date_of_loss as string) ?? null;
+    return this.defaultDateOfLoss;
+  }
+
+  /** Synchronous cached read (for stamping knocks without a round-trip). */
+  static getCachedDateOfLoss(): string | null {
+    return this.defaultDateOfLoss;
+  }
+
+  /** Owner sets the team's active campaign date. */
+  static async setTeamDefaultDateOfLoss(date: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.teamId) return { ok: false, error: 'No team' };
+    const { error } = await supabase
+      .from('teams')
+      .update({ default_date_of_loss: date })
+      .eq('id', this.teamId);
+    if (error) return { ok: false, error: error.message };
+    this.defaultDateOfLoss = date;
+    return { ok: true };
+  }
+
   static async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -246,6 +282,7 @@ export class SupabaseService {
     // Full teardown — otherwise the next login on this device inherits the prior
     // account's team (stale @team_id) and skips Team Setup (@team_setup_done left true).
     this.teamId = null;
+    this.defaultDateOfLoss = null;
     await AsyncStorage.removeItem(TEAM_ID_KEY);
     await AsyncStorage.removeItem(TEAM_SETUP_DONE_KEY);
   }
@@ -397,7 +434,8 @@ export class SupabaseService {
       service_type: knock.service_type,
       status: knock.status,
       cycle_number: knock.cycle_number,
-      date_of_loss: knock.date_of_loss,
+      // Stamp with the team's active campaign date if the caller didn't supply one.
+      date_of_loss: knock.date_of_loss ?? this.defaultDateOfLoss ?? undefined,
     };
 
     if (net.isConnected && this.userId) {
