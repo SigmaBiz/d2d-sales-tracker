@@ -101,7 +101,7 @@ export function legalActions(
  */
 export function setterReentryActions(serviceType?: string): ActionOption[] {
   const reenter: LeadAction = serviceType === 'scheduled' ? 'reschedule' : 'recover';
-  return [reenter, 'arch_hard'].map(a => ({ action: a, ...ACTION_META[a] }));
+  return ([reenter, 'arch_hard'] as LeadAction[]).map(a => ({ action: a, ...ACTION_META[a] }));
 }
 
 /** Human-readable status pill text. */

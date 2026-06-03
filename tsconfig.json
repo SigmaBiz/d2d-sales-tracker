@@ -7,5 +7,12 @@
     // as valid — which then throw ReferenceError in the Hermes production bundle.
     // ES-only lib makes tsc catch those undeclared-global slips at build time.
     "lib": ["ES2021"]
-  }
+  },
+  // Scope tsc to the app + serverless API via an ALLOW-LIST. An `include` is
+  // anchored to these paths, so (unlike a broad `exclude` such as **/build or
+  // dist) it can never leak into node_modules and hide a package's bundled
+  // types — e.g. @expo/vector-icons (types under build/) or @vercel/node
+  // (types under dist/). Auxiliary local tooling (mrms-proxy*) and regenerable
+  // output (dist, **/build) are simply not listed, so they aren't type-checked.
+  "include": ["src", "api", "App.tsx", "index.ts"]
 }

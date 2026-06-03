@@ -124,8 +124,7 @@ export class WeatherProxyService {
     
     try {
       const response = await fetch(`${this.config.proxyUrl}/health`, {
-        method: 'GET',
-        timeout: 5000
+        method: 'GET'
       });
       
       return response.ok;

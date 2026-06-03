@@ -153,7 +153,7 @@ export default function StormSearchScreen({ navigation }: any) {
       );
     } catch (error) {
       console.error('[StormSearch] Error loading storm:', error);
-      Alert.alert('Error', `Failed to load storm data: ${error.message}`);
+      Alert.alert('Error', `Failed to load storm data: ${(error as Error).message}`);
     }
   };
 
@@ -382,7 +382,7 @@ export default function StormSearchScreen({ navigation }: any) {
               }
             } catch (error) {
               console.error('[StormSearch] Error:', error);
-              Alert.alert('Error', `Failed to search storm history: ${error.message}`);
+              Alert.alert('Error', `Failed to search storm history: ${(error as Error).message}`);
             } finally {
               setLoading(false);
             }

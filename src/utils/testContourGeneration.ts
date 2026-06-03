@@ -17,8 +17,7 @@ const testReports: HailReport[] = [
     confidence: 92,
     city: "Oklahoma City",
     isMetroOKC: true,
-    source: "Historical MESH Data",
-    description: "Significant hail event - OKC Metro"
+    source: "Historical MESH Data"
   },
   {
     id: "hist_mesh_002",
@@ -91,7 +90,8 @@ export function testContourGeneration() {
   return contours;
 }
 
-// Run the test
-if (typeof window !== 'undefined') {
-  (window as any).testContourGeneration = testContourGeneration;
+// Run the test (browser/devtools only; React Native has no `window`)
+const _g = globalThis as any;
+if (typeof _g.window !== 'undefined') {
+  _g.window.testContourGeneration = testContourGeneration;
 }

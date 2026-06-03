@@ -15,6 +15,9 @@ export const createTestStorms = (): StormEvent[] => {
     startTime: new Date(now.getTime() - 30 * 60 * 1000), // 30 min ago
     endTime: undefined,
     maxSize: 2.5, // Severe storm
+    center: { lat: 35.6528, lon: -97.4781 },
+    isActive: true,
+    confidence: 73,
     reports: [
       {
         id: 'test_t1_1',
@@ -64,6 +67,9 @@ export const createTestStorms = (): StormEvent[] => {
     startTime: new Date('2024-09-24T18:00:00'),
     endTime: new Date('2024-09-24T20:00:00'),
     maxSize: 1.75,
+    center: { lat: 35.3395, lon: -97.4867 },
+    isActive: false,
+    confidence: 83,
     reports: [
       {
         id: 'test_t2_1',
@@ -109,6 +115,9 @@ export const createTestStorms = (): StormEvent[] => {
     startTime: new Date(now.getTime() - 10 * 60 * 1000), // 10 min ago
     endTime: undefined,
     maxSize: 1.25,
+    center: { lat: 35.2226, lon: -97.4395 },
+    isActive: true,
+    confidence: 65,
     reports: [
       {
         id: 'test_t1_3',

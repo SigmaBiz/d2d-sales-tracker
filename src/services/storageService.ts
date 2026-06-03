@@ -28,11 +28,12 @@ export class StorageService {
       const existingKnock = knocks[existingIndex];
       const history = existingKnock.history || [];
       
-      // Add previous state to history if outcome changed
-      if (existingKnock.outcome !== knock.outcome) {
+      // Add previous state to history if the label changed
+      if (existingKnock.label !== knock.label) {
         history.push({
-          outcome: existingKnock.outcome,
-          timestamp: existingKnock.timestamp,
+          previous_label: existingKnock.label,
+          new_label: knock.label,
+          changed_at: new Date(),
           notes: existingKnock.notes
         });
       }

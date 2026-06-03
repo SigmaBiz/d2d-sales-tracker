@@ -67,7 +67,7 @@ export class HailDataFlowService {
       
     } catch (error) {
       console.error('[DataFlow] Real-time stage error:', error);
-      await this.updateFlowState('realtime', 'error', null, error.message);
+      await this.updateFlowState('realtime', 'error', null, (error as Error).message);
     }
   }
   
@@ -113,7 +113,7 @@ export class HailDataFlowService {
       
     } catch (error) {
       console.error('[DataFlow] Historical stage error:', error);
-      await this.updateFlowState('historical', 'error', null, error.message);
+      await this.updateFlowState('historical', 'error', null, (error as Error).message);
     }
   }
   
@@ -145,7 +145,7 @@ export class HailDataFlowService {
       
     } catch (error) {
       console.error('[DataFlow] Validation stage error:', error);
-      await this.updateFlowState('validation', 'error', null, error.message);
+      await this.updateFlowState('validation', 'error', null, (error as Error).message);
     }
   }
   
@@ -246,7 +246,7 @@ export class HailDataFlowService {
       if (matchingReports.length > 0) {
         // Update storm with refined data
         storm.reports = matchingReports;
-        storm.peakSize = Math.max(...matchingReports.map(r => r.size));
+        storm.maxSize = Math.max(...matchingReports.map(r => r.size));
         await MRMSService.saveStormEvent(storm);
       }
     }
@@ -257,7 +257,7 @@ export class HailDataFlowService {
    */
   private static async generateTerritoryInsights(reports: HailReport[]): Promise<any> {
     // Group by area and calculate insights
-    const insights = {
+    const insights: any = {
       hotspots: [], // Areas with most damage
       optimalRoutes: [], // Best canvassing routes
       priorityZones: [], // High-value targets
@@ -310,7 +310,7 @@ export class HailDataFlowService {
    * Calculate accuracy metrics
    */
   private static async calculateAccuracyMetrics(predictions: HailReport[], groundTruth: any[]): Promise<any> {
-    const metrics = {
+    const metrics: any = {
       totalPredictions: predictions.length,
       totalActual: groundTruth.length,
       truePositives: 0,

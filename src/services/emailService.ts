@@ -39,8 +39,8 @@ export class EmailService {
 
   private static formatEmailBody(data: ContactFormData): string {
     const outcomeLabel = this.getOutcomeLabel(data.outcome);
-    const appointmentDate = data.appointmentTime.toLocaleDateString();
-    const appointmentTime = data.appointmentTime.toLocaleTimeString([], { 
+    const appointmentDate = new Date(data.appointmentTime).toLocaleDateString();
+    const appointmentTime = new Date(data.appointmentTime).toLocaleTimeString([], {
       hour: '2-digit', 
       minute: '2-digit' 
     });
