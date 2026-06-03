@@ -76,6 +76,48 @@ State the decision explicitly, then run Π₁:
 
 ---
 
+# Autonomous Execution (Operating Model)
+
+Goal: drive the externalized:internalized intent ratio toward 1 — the only stops
+left should be ones no plan could have removed. Full rationale:
+`~/Downloads/claude-code-autonomy-build.md`.
+
+## Triage every "do X" step, in this order
+1. DELETE — obsolete / artifact of an old process? Remove the work, don't just speed it up.
+2. AUTOMATE — outcome needed but the step is brainless transport (e.g. "paste this SQL
+   into Supabase")? Wire it — remove ME from the loop, not the outcome.
+3. DEFER/DELEGATE — needs real judgment or timing? Only these reach the human.
+Default to "automatable until proven otherwise." A button-push that feels like a
+checkpoint is usually a missing integration, not a real gate.
+
+## Stop ONLY for the genuine human residue
+- Credentials / access I cannot obtain.
+- Irreversible or outward-facing publish: prod DB migration, Vercel prod deploy,
+  OTA to the field crew, TestFlight submit.
+- Money / external-party actions; physical actions.
+Everything else: decide, proceed, and log the decision — don't stall.
+
+## When running unattended
+- Run to completion; don't pause on solvable choices — decide-and-log to DECISIONS.md.
+- State lives in files + git (tick the plan, one green commit per module), never only in chat.
+- End on an explicit commit + draft PR. Never auto-merge to main.
+
+## Gates (done == these pass, not "looks done")
+- `npx tsc --noEmit` → 0 errors.  `npx expo export` → clean bundle.
+- (Later: one test suite at both a local Stop hook and CI; branch protection blocks red merges.)
+
+## Rails status — CLAUDE.md governs BEHAVIOR; rails live in config. Keep this honest.
+- ✅ ACTIVE: reliable env (`~/dev`, off iCloud); the two gates above; STATE.md/PLAN.md
+  externalization; feature-branch commits + push.
+- ⏳ PENDING — do NOT assume these exist or act as if they do:
+  - permission allowlist / `dontAsk` (`.claude/settings.json`)
+  - Supabase MCP — until wired, migrations are still owner-pasted in the dashboard
+  - notification + Stop/completion hooks
+  - CI + branch protection
+  - overnight / "vampire" mode (also needs a staging DB + API key for the rate cap)
+
+---
+
 # D2D Sales Tracker — Project Context
 
 ## Business Objective
