@@ -108,13 +108,18 @@ Everything else: decide, proceed, and log the decision — don't stall.
 
 ## Rails status — CLAUDE.md governs BEHAVIOR; rails live in config. Keep this honest.
 - ✅ ACTIVE: reliable env (`~/dev`, off iCloud); the two gates above; STATE.md/PLAN.md
-  externalization; feature-branch commits + push.
+  externalization; feature-branch commits + push; **Supabase MCP (read-only)** — query /
+  inspect / verify the prod DB directly via `.mcp.json` (PAT in `$SUPABASE_ACCESS_TOKEN`,
+  scoped to project ibpqwovcrvagwbfrmbgp, `read_only=true`). Loads at session start.
 - ⏳ PENDING — do NOT assume these exist or act as if they do:
   - permission allowlist / `dontAsk` (`.claude/settings.json`)
-  - Supabase MCP — until wired, migrations are still owner-pasted in the dashboard
+  - staging Supabase DB (clone prod schema via `pg_dump --schema-only` → `d2d-staging`) —
+    the prerequisite that unlocks safe Supabase WRITE / migrations via MCP. Until it exists,
+    MCP stays read-only and migrations are owner-pasted (no safe autonomous DDL on the one
+    live prod DB). Doing it also yields a clean full-schema baseline migration.
   - notification + Stop/completion hooks
   - CI + branch protection
-  - overnight / "vampire" mode (also needs a staging DB + API key for the rate cap)
+  - overnight / "vampire" mode (also needs the staging DB + API key for the rate cap)
 
 ---
 
