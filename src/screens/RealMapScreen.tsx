@@ -1268,6 +1268,16 @@ export default function RealMapScreen({ navigation }: any) {
                   )}
                 </View>
 
+                {/* Hail history — uploaded storms that hit this address (live lookup) */}
+                <View style={styles.contactSection}>
+                  <Text style={styles.historySectionTitle}>Hail History</Text>
+                  <HailHistoryList
+                    lat={detailKnock.latitude}
+                    lng={detailKnock.longitude}
+                    onStormLoaded={loadHailData}
+                  />
+                </View>
+
                 {/* Notes */}
                 {detailKnock.notes ? (
                   <View style={styles.detailNotesBox}>
