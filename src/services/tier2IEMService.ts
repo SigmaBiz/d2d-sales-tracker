@@ -25,7 +25,9 @@ export class IEMArchiveService {
     const dateStr = date.toISOString().split('T')[0];
     console.log(`[TIER 2] Fetching MESH data for ${dateStr}`);
 
-    const url = getHistoricalServerUrl(`/api/mesh/${dateStr}`);
+    // Cache-buster: Vercel's CDN keys on the query string, so a reprocessed
+    // date (e.g. statewide re-run) is never masked by a stale cached copy.
+    const url = getHistoricalServerUrl(`/api/mesh/${dateStr}?v=${Date.now()}`);
     const response = await fetch(url);
 
     if (!response.ok) {

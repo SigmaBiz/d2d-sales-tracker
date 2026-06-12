@@ -524,12 +524,12 @@ export class StormEventsService {
    * Check if coordinates are in OKC Metro area
    */
   private static isInMetroOKC(lat: number, lon: number): boolean {
-    // OKC Metro approximate bounds
+    // Oklahoma statewide bounds (was OKC metro; widened 2026-06-12)
     const bounds = {
-      north: 35.7,
-      south: 35.2,
-      east: -97.1,
-      west: -97.7
+      north: 37.0,
+      south: 33.6,
+      east: -94.4,
+      west: -103.0
     };
     
     return lat >= bounds.south && lat <= bounds.north &&

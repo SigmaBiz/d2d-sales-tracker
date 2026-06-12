@@ -293,6 +293,32 @@ export class SupabaseService {
 
   // ── Lead lifecycle (F2b) ──────────────────────────────────────────────────
 
+  /** Owner-only: trigger server-side processing of a storm date (GitHub Actions pipeline). */
+  static async processStorm(
+    date: string
+  ): Promise<{ ok: boolean; skipWait?: boolean; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return { ok: false, error: 'Not authenticated' };
+
+      const res = await fetch(`${API_BASE}/api/storms/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ date }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+      return { ok: true, skipWait: body.skipWait };
+    } catch (err) {
+      console.error('[Supabase] processStorm:', err);
+      return { ok: false, error: 'Network error' };
+    }
+  }
+
   /**
    * Perform a lifecycle transition via the server endpoint (the only writer of
    * lifecycle state). Sends the user's JWT so the server can verify identity +

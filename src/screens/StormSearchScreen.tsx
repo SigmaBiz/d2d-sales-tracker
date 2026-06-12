@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,18 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { WeatherHistoryService, HistoricalStormEvent } from '../services/weatherHistoryService';
 import { MRMSService } from '../services/mrmsService';
 import { SupabaseService } from '../services/supabaseService';
+import { supabase } from '../services/supabaseClient';
+
+interface AvailableStorm {
+  date: string;            // YYYY-MM-DD (Postgres DATE comes back as a string)
+  point_count: number;
+  max_size_inches: number;
+}
+
+function formatStormDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-');
+  return `${m}/${d}/${y}`;
+}
 
 export default function StormSearchScreen({ navigation }: any) {
   const [searchLocation, setSearchLocation] = useState('');
@@ -23,6 +35,71 @@ export default function StormSearchScreen({ navigation }: any) {
   const [searchResults, setSearchResults] = useState<HistoricalStormEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchType, setSearchType] = useState<'location' | 'date' | 'recent'>('recent');
+
+  // Available storm maps (live from hail_grid_dates) + owner process-storm flow
+  const [availableStorms, setAvailableStorms] = useState<AvailableStorm[] | null>(null);
+  const [availableError, setAvailableError] = useState(false);
+  const [ownerRole, setOwnerRole] = useState(false);
+  const [processDate, setProcessDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1); // default: yesterday (the common "missed storm" case)
+    return d;
+  });
+  const [showProcessPicker, setShowProcessPicker] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  const loadAvailableStorms = async () => {
+    setAvailableError(false);
+    setAvailableStorms(null);
+    const { data, error } = await supabase
+      .from('hail_grid_dates')
+      .select('date, point_count, max_size_inches')
+      .order('date', { ascending: false });
+    if (error) {
+      console.error('[StormSearch] hail_grid_dates:', error);
+      setAvailableError(true);
+      return;
+    }
+    setAvailableStorms((data ?? []) as AvailableStorm[]);
+  };
+
+  useEffect(() => {
+    loadAvailableStorms();
+    SupabaseService.isOwner().then(setOwnerRole).catch(() => setOwnerRole(false));
+  }, []);
+
+  const handleProcessStorm = () => {
+    // Local-date ISO (toISOString would shift evening dates to tomorrow UTC)
+    const y = processDate.getFullYear();
+    const m = String(processDate.getMonth() + 1).padStart(2, '0');
+    const d = String(processDate.getDate()).padStart(2, '0');
+    const iso = `${y}-${m}-${d}`;
+    Alert.alert(
+      'Process Storm Data',
+      `Pull the hail map for ${m}/${d}/${y} onto the server? You'll get a push notification when the map is ready.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Process',
+          onPress: async () => {
+            setProcessing(true);
+            const res = await SupabaseService.processStorm(iso);
+            setProcessing(false);
+            if (res.ok) {
+              Alert.alert(
+                'Processing Started',
+                res.skipWait
+                  ? `The ${m}/${d}/${y} hail map is processing (~7 min). You'll get a push when it's ready.`
+                  : `Today's storm is still developing — processing starts after a ~90 min wait. You'll get a push when the map is ready.`
+              );
+            } else {
+              Alert.alert('Error', res.error ?? 'Could not start processing.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSearch = async () => {
     if (searchType === 'location' && !searchLocation.trim()) {
@@ -327,10 +404,10 @@ export default function StormSearchScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Significant Storm Dates */}
+      {/* Available Storm Maps — live list of processed dates (hail_grid_dates) */}
       <View style={styles.significantDatesContainer}>
         <View style={styles.significantDatesHeader}>
-          <Text style={styles.significantDatesTitle}>Known Storm Dates</Text>
+          <Text style={styles.significantDatesTitle}>Available Storm Maps</Text>
           <TouchableOpacity
             style={styles.clearStormsButton}
             onPress={async () => {
@@ -355,88 +432,104 @@ export default function StormSearchScreen({ navigation }: any) {
             <Text style={styles.clearStormsText}>Clear All</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.significantDateButton}
-          onPress={async () => {
-            // Create date in local timezone to avoid UTC conversion issues
-            const sept24 = new Date(2024, 8, 24); // Month is 0-indexed, so 8 = September
-            setSelectedDate(sept24);
-            setSearchType('date');
-            // Automatically search for this date
-            setLoading(true);
-            try {
-              console.log('[StormSearch] Quick searching for Sept 24, 2024');
-              const results = await WeatherHistoryService.searchStorms({
-                date: sept24
-              });
-              console.log('[StormSearch] Search complete. Results:', results);
-              console.log('[StormSearch] Found', results.length, 'storm events for Sept 24');
-              
-              if (results.length > 0) {
-                console.log('[StormSearch] First result has', results[0].reports.length, 'reports');
-              }
-              
-              setSearchResults(results);
-              if (results.length === 0) {
-                Alert.alert('No Storms Found', 'No data available for September 24, 2024.\n\nThis may be due to data source unavailability.');
-              }
-            } catch (error) {
-              console.error('[StormSearch] Error:', error);
-              Alert.alert('Error', `Failed to search storm history: ${(error as Error).message}`);
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          <Text style={styles.significantDateText}>09/24/2024 - OKC Metro Hail</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.significantDateButton}
-          onPress={async () => {
-            const mar10 = new Date(2026, 2, 10); // Month is 0-indexed, so 2 = March
-            setSelectedDate(mar10);
-            setSearchType('date');
-            setLoading(true);
-            try {
-              const results = await WeatherHistoryService.searchStorms({ date: mar10 });
-              setSearchResults(results);
-              if (results.length === 0) {
-                Alert.alert('No Storms Found', 'No data available for this date.');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to search storm history');
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          <Text style={styles.significantDateText}>03/10/2026 - Yukon/Mustang/OKC Hail</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.significantDateButton}
-          onPress={async () => {
-            const may8 = new Date(2026, 4, 8); // Month is 0-indexed, so 4 = May
-            setSelectedDate(may8);
-            setSearchType('date');
-            setLoading(true);
-            try {
-              const results = await WeatherHistoryService.searchStorms({ date: may8 });
-              setSearchResults(results);
-              if (results.length === 0) {
-                Alert.alert('No Storms Found', 'No data available for this date.');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to search storm history');
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          <Text style={styles.significantDateText}>05/08/2026 - OKC Metro Wide Hail</Text>
-        </TouchableOpacity>
+        {availableError ? (
+          <View style={styles.availableStateRow}>
+            <Text style={styles.availableErrorText}>Couldn't load the storm list</Text>
+            <TouchableOpacity onPress={loadAvailableStorms}>
+              <Text style={styles.availableRetryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : availableStorms === null ? (
+          <ActivityIndicator size="small" color="#1e40af" style={styles.availableSpinner} />
+        ) : availableStorms.length === 0 ? (
+          <Text style={styles.availableEmptyText}>
+            No processed storm maps yet — process one below, or wait for the next storm alert.
+          </Text>
+        ) : (
+          availableStorms.map(storm => (
+            <TouchableOpacity
+              key={storm.date}
+              style={styles.significantDateButton}
+              onPress={() => {
+                // Reuse the swath_ready auto-load path: RealMapScreen reads
+                // pendingSwathDate on focus and loads the swath itself.
+                (global as any).pendingSwathDate = storm.date;
+                navigation.goBack();
+                navigation.navigate('Main', { screen: 'Map' });
+              }}
+            >
+              <Text style={styles.significantDateText}>
+                🌩️ {formatStormDate(storm.date)}
+              </Text>
+              <Text style={styles.availableDetailText}>
+                {storm.point_count} hail points · max {storm.max_size_inches.toFixed(2)}″ · tap to view
+              </Text>
+            </TouchableOpacity>
+          ))
+        )}
       </View>
+
+      {/* Process Storm Data — owner only; triggers the server-side GRIB2 pipeline */}
+      {ownerRole && (
+        <View style={styles.significantDatesContainer}>
+          <Text style={styles.significantDatesTitle}>Process Storm Data</Text>
+          <Text style={styles.processHint}>
+            Pull a date's hail map onto the server — no computer needed. The map and
+            address lookups update automatically when it finishes.
+          </Text>
+          <TouchableOpacity style={styles.dateButton} onPress={() => setShowProcessPicker(true)}>
+            <Ionicons name="calendar" size={20} color="#6b7280" />
+            <Text style={styles.dateButtonText}>{processDate.toLocaleDateString()}</Text>
+          </TouchableOpacity>
+          {showProcessPicker && Platform.OS === 'ios' && (
+            <View style={styles.iosDatePickerContainer}>
+              <DateTimePicker
+                value={processDate}
+                mode="date"
+                display="spinner"
+                onChange={(event, date) => {
+                  if (date) setProcessDate(date);
+                }}
+                maximumDate={new Date()}
+                minimumDate={new Date('2019-10-01')}
+              />
+              <TouchableOpacity
+                style={styles.iosDateDoneButton}
+                onPress={() => setShowProcessPicker(false)}
+              >
+                <Text style={styles.iosDateDoneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {showProcessPicker && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={processDate}
+              mode="date"
+              display="default"
+              onChange={(event, date) => {
+                setShowProcessPicker(false);
+                if (date) setProcessDate(date);
+              }}
+              maximumDate={new Date()}
+              minimumDate={new Date('2019-10-01')}
+            />
+          )}
+          <TouchableOpacity
+            style={[styles.searchButton, processing && styles.searchButtonDisabled]}
+            disabled={processing}
+            onPress={handleProcessStorm}
+          >
+            {processing ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Ionicons name="cloud-download" size={20} color="white" />
+                <Text style={styles.searchButtonText}>Process Storm</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Note about capabilities */}
       <View style={styles.noteContainer}>
@@ -672,6 +765,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1e40af',
     fontWeight: '500',
+  },
+  availableDetailText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  availableEmptyText: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    paddingVertical: 8,
+  },
+  availableStateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  availableErrorText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#ef4444',
+  },
+  availableRetryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e40af',
+  },
+  availableSpinner: {
+    paddingVertical: 12,
+  },
+  processHint: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 4,
+    marginBottom: 10,
   },
   iosDatePickerContainer: {
     backgroundColor: '#f9fafb',
