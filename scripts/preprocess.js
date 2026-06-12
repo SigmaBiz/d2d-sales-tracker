@@ -191,6 +191,35 @@ async function uploadToR2(client, dateStr, payload) {
   console.log(`[preprocess] Uploaded: ${key}`);
 }
 
+// ─── Supabase hail_grid ingest ───────────────────────────────────────────────
+// Mirrors the R2 upload: same reports, one row per grid point, so the
+// address→storms lookup learns about this date automatically.
+async function upsertToHailGrid(reports, dateStr) {
+  const url = process.env.SUPABASE_URL || 'https://ibpqwovcrvagwbfrmbgp.supabase.co';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    console.warn('[preprocess] SUPABASE_SERVICE_ROLE_KEY not set — skipping hail_grid ingest.');
+    console.warn('[preprocess] Address→storms lookup will not include this date until backfilled:');
+    console.warn(`[preprocess]   node scripts/backfill-hail-grid.js ${dateStr}`);
+    return;
+  }
+  const { createClient } = require(path.join(__dirname, '../api/node_modules/@supabase/supabase-js'));
+  const supabase = createClient(url, key);
+  const rows = reports.map(r => ({
+    date: dateStr,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    size_inches: r.size,
+  }));
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase
+      .from('hail_grid')
+      .upsert(rows.slice(i, i + 500), { onConflict: 'date,latitude,longitude', ignoreDuplicates: true });
+    if (error) throw new Error(`hail_grid upsert failed: ${error.message}`);
+  }
+  console.log(`[preprocess] ✓ ${rows.length} rows upserted into Supabase hail_grid for ${dateStr}`);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -305,6 +334,11 @@ async function main() {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
     console.log(`[preprocess] Saved locally (no R2): ${outPath}`);
+  }
+
+  // Ingest into Supabase hail_grid (address→storms lookup)
+  if (reports.length > 0) {
+    await upsertToHailGrid(reports, dateStr);
   }
 }
 

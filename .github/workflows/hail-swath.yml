@@ -63,12 +63,16 @@ jobs:
           echo "Downloaded and decompressed GRIB2 file."
           ls -lh /tmp/mesh.grib2
 
+      - name: Install preprocessor deps
+        run: npm ci --prefix api
+
       - name: Run preprocessor and upload to R2
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           node scripts/preprocess.js /tmp/mesh.grib2 ${{ github.event.inputs.storm_date }}
 
