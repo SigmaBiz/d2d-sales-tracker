@@ -13,14 +13,14 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
-// Configuration
-const OKC_METRO_BOUNDS = {
-  north: 35.7,
-  south: 35.1,
-  east: -97.1,
-  west: -97.8
+// Configuration — Oklahoma statewide (was OKC metro; widened 2026-06-12)
+const OK_BOUNDS = {
+  north: 37.0,
+  south: 33.6,
+  east: -94.4,
+  west: -103.0
 };
 
 // R2 Client (S3-compatible)
@@ -37,7 +37,7 @@ interface MESHResponse {
   date: string;
   generated_at: string;
   data_source: string;
-  bounds: typeof OKC_METRO_BOUNDS;
+  bounds: typeof OK_BOUNDS;
   reports: unknown[];
   summary: {
     totalReports: number;
@@ -88,7 +88,9 @@ export default async function handler(
 
       console.log(`[MESH] Cache HIT for ${date}`);
 
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      // 10 min, not 24h: dates can be REPROCESSED (e.g. statewide re-runs) and
+      // the CDN must not mask the fresh R2 object for a day.
+      res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate');
       res.setHeader('X-Cache-Status', 'HIT');
 
       return res.status(200).json({
@@ -117,32 +119,33 @@ export default async function handler(
       { timeout: 5000 }
     );
 
+    // Statewide flag (hasOKHail); falls back to the metro flag if the SPC
+    // endpoint hasn't been redeployed yet.
     spcPreFilter = {
       checked: true,
-      hadSignificantHail: spcResponse.data.hasOKCMetroHail,
-      spcReports: spcResponse.data.okcMetroReports || 0
+      hadSignificantHail: spcResponse.data.hasOKHail ?? spcResponse.data.hasOKCMetroHail,
+      spcReports: spcResponse.data.okReports ?? spcResponse.data.okcMetroReports ?? 0
     };
 
     console.log(`[MESH] SPC: ${spcPreFilter.hadSignificantHail ? 'significant hail' : 'no significant hail'}`);
 
     if (spcPreFilter.hadSignificantHail === false) {
+      // NEVER write this empty result to R2: the workflow writes the real
+      // swath to the same key, and a pre-filter false-negative (or a request
+      // racing the workflow) used to permanently poison the date with an
+      // empty object (this is what hid the 2026-06-11 El Reno storm).
       const emptyResult: MESHResponse = {
         date,
         generated_at: new Date().toISOString(),
         data_source: 'SPC Pre-filter (no significant hail this date)',
-        bounds: OKC_METRO_BOUNDS,
+        bounds: OK_BOUNDS,
         reports: [],
         summary: { totalReports: 0, maxSize: 0, avgSize: 0 },
         spcPreFilter,
         responseTime: `${Date.now() - startTime}ms`
       };
 
-      // Cache the empty result so we don't re-query SPC repeatedly
-      if (r2Client) {
-        await cacheToR2(date, emptyResult);
-      }
-
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate');
       res.setHeader('X-SPC-Prefilter', 'no-significant-hail');
 
       return res.status(200).json(emptyResult);
@@ -164,24 +167,4 @@ export default async function handler(
     detail: 'GRIB2 processing requires eccodes (system binary) and runs on your Mac, not in this serverless function. The preprocessor uploads results to R2, after which this endpoint will serve them instantly.',
     spcPreFilter
   });
-}
-
-/**
- * Cache result to R2
- */
-async function cacheToR2(date: string, data: MESHResponse): Promise<void> {
-  if (!r2Client) return;
-
-  try {
-    await r2Client.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: `mesh/${date}.json`,
-      Body: JSON.stringify(data),
-      ContentType: 'application/json',
-      CacheControl: 'public, max-age=31536000, immutable'
-    }));
-    console.log(`[MESH] Cached to R2: mesh/${date}.json`);
-  } catch (err) {
-    console.error('[MESH] R2 cache write failed:', err);
-  }
 }

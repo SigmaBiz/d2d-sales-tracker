@@ -151,6 +151,11 @@ export default async function handler(
         date,
         hasSignificantHail,
         hasOKCMetroHail,
+        // Statewide aliases — the mesh pre-filter keys on these (2026-06-12):
+        // a storm anywhere in OK now counts (El Reno was filtered out by the
+        // metro-only flag).
+        hasOKHail: hasSignificantHail,
+        okReports: significantHail.length,
         totalReports: records.length,
         oklahomaReports: significantHail.length,
         okcMetroReports: okcMetroHail.length,
@@ -187,6 +192,8 @@ export default async function handler(
           date,
           hasSignificantHail: null,
           hasOKCMetroHail: null,
+          hasOKHail: null,
+          okReports: 0,
           totalReports: 0,
           oklahomaReports: 0,
           okcMetroReports: 0,

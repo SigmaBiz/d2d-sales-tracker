@@ -24,11 +24,13 @@ try { require(path.join(__dirname, '../api/node_modules/dotenv')).config({ path:
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
+// Oklahoma statewide (was OKC metro; widened 2026-06-12 — El Reno sat outside
+// the old west edge and got clipped from its own storm's swath).
 const OKC_BOUNDS = {
-  north: 35.7,
-  south: 35.1,
-  east:  -97.1,
-  west:  -97.8
+  north: 37.0,
+  south: 33.6,
+  east:  -94.4,
+  west:  -103.0
 };
 
 const MIN_HAIL_INCHES = 0.75;
@@ -44,6 +46,16 @@ const CITIES = [
   { name: 'Newcastle',    lat: 35.2426, lon: -97.5987, radius: 0.08 },
   { name: 'Bethany',      lat: 35.5184, lon: -97.6336, radius: 0.07 },
   { name: 'Del City',     lat: 35.4426, lon: -97.4406, radius: 0.07 },
+  // Statewide additions (2026-06-12)
+  { name: 'El Reno',      lat: 35.5323, lon: -97.9550, radius: 0.10 },
+  { name: 'Tulsa',        lat: 36.1540, lon: -95.9928, radius: 0.20 },
+  { name: 'Broken Arrow', lat: 36.0526, lon: -95.7908, radius: 0.10 },
+  { name: 'Lawton',       lat: 34.6036, lon: -98.3959, radius: 0.12 },
+  { name: 'Stillwater',   lat: 36.1156, lon: -97.0584, radius: 0.10 },
+  { name: 'Enid',         lat: 36.3956, lon: -97.8784, radius: 0.10 },
+  { name: 'Shawnee',      lat: 35.3273, lon: -96.9253, radius: 0.10 },
+  { name: 'Chickasha',    lat: 35.0526, lon: -97.9364, radius: 0.08 },
+  { name: 'Ardmore',      lat: 34.1743, lon: -97.1436, radius: 0.10 },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,7 +65,7 @@ function getCityName(lat, lon) {
     const dist = Math.sqrt(Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2));
     if (dist <= city.radius) return city.name;
   }
-  return 'OKC Metro';
+  return 'Oklahoma';
 }
 
 function getConfidence(inches) {
@@ -117,7 +129,7 @@ function parseGrib2(gribPath, dateStr) {
         // Convert 0-360 longitude to -180-180
         const lon = lonRaw > 180 ? lonRaw - 360 : lonRaw;
 
-        // Filter to OKC Metro
+        // Filter to Oklahoma
         if (lat < OKC_BOUNDS.south || lat > OKC_BOUNDS.north) continue;
         if (lon < OKC_BOUNDS.west  || lon > OKC_BOUNDS.east)  continue;
 
@@ -212,9 +224,11 @@ async function upsertToHailGrid(reports, dateStr) {
     size_inches: r.size,
   }));
   for (let i = 0; i < rows.length; i += 500) {
+    // Merge (not ignore) on conflict: a reprocessed date refreshes sizes if
+    // MESH values were revised between the realtime and archive passes.
     const { error } = await supabase
       .from('hail_grid')
-      .upsert(rows.slice(i, i + 500), { onConflict: 'date,latitude,longitude', ignoreDuplicates: true });
+      .upsert(rows.slice(i, i + 500), { onConflict: 'date,latitude,longitude', ignoreDuplicates: false });
     if (error) throw new Error(`hail_grid upsert failed: ${error.message}`);
   }
   console.log(`[preprocess] ✓ ${rows.length} rows upserted into Supabase hail_grid for ${dateStr}`);
