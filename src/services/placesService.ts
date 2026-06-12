@@ -14,6 +14,10 @@ export interface PlacePrediction {
 const OKC_CENTER = { latitude: 35.4676, longitude: -97.5164 };
 const BIAS_RADIUS_METERS = 50000; // bias (not restrict) to the OKC metro
 
+// Google validates iOS-app-restricted keys on REST calls via this header.
+// Must match the restriction configured on the key in Google Cloud.
+const IOS_BUNDLE_ID = 'com.sigmabiz.d2dsalestracker';
+
 export class PlacesService {
   static hasKey(): boolean {
     return GOOGLE_PLACES_API_KEY.length > 0;
@@ -30,6 +34,7 @@ export class PlacesService {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+        'X-Ios-Bundle-Identifier': IOS_BUNDLE_ID,
       },
       body: JSON.stringify({
         input,
@@ -62,6 +67,7 @@ export class PlacesService {
         headers: {
           'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
           'X-Goog-FieldMask': 'location,formattedAddress',
+          'X-Ios-Bundle-Identifier': IOS_BUNDLE_ID,
         },
       },
     );
