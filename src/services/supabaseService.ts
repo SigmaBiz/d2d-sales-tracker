@@ -32,6 +32,7 @@ export class SupabaseService {
   private static teamId: string | null = null;
   private static role: 'owner' | 'member' | null = null;
   private static defaultDateOfLoss: string | null = null; // YYYY-MM-DD, team's active campaign
+  private static dailyDoorGoal: number | null = null;     // team daily door goal (analytics)
 
   // ── Auth ────────────────────────────────────────────────────────────────────
 
@@ -243,6 +244,46 @@ export class SupabaseService {
     return { ok: true };
   }
 
+  // ── Daily door goal (analytics v1) ────────────────────────────────────────
+
+  /**
+   * Team's daily door goal, cached. Defaults to 75 on any error or missing
+   * value — tolerates the column not existing yet (pre-migration) and solo
+   * users with no team.
+   */
+  static async getTeamDailyDoorGoal(force = false): Promise<number> {
+    if (this.dailyDoorGoal !== null && !force) return this.dailyDoorGoal;
+    if (!this.teamId) return 75;
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('daily_door_goal')
+        .eq('id', this.teamId)
+        .maybeSingle();
+      if (error) {
+        console.warn('[Supabase] getTeamDailyDoorGoal:', error.message);
+        return 75;
+      }
+      this.dailyDoorGoal = (data?.daily_door_goal as number) ?? 75;
+      return this.dailyDoorGoal;
+    } catch {
+      return 75;
+    }
+  }
+
+  /** Owner sets the team's daily door goal (clamped 1–500). */
+  static async setTeamDailyDoorGoal(goal: number): Promise<{ ok: boolean; error?: string }> {
+    if (!this.teamId) return { ok: false, error: 'No team' };
+    const clamped = Math.max(1, Math.min(500, Math.round(goal)));
+    const { error } = await supabase
+      .from('teams')
+      .update({ daily_door_goal: clamped })
+      .eq('id', this.teamId);
+    if (error) return { ok: false, error: error.message };
+    this.dailyDoorGoal = clamped;
+    return { ok: true };
+  }
+
   static async signIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -283,6 +324,7 @@ export class SupabaseService {
     // account's team (stale @team_id) and skips Team Setup (@team_setup_done left true).
     this.teamId = null;
     this.defaultDateOfLoss = null;
+    this.dailyDoorGoal = null;
     await AsyncStorage.removeItem(TEAM_ID_KEY);
     await AsyncStorage.removeItem(TEAM_SETUP_DONE_KEY);
   }
@@ -525,14 +567,22 @@ export class SupabaseService {
 
   // ── Knocks — Read ───────────────────────────────────────────────────────────
 
-  static async getKnocks(): Promise<Knock[]> {
+  /**
+   * Knocks visible to this user (RLS scopes team vs own). Pass `since` for
+   * date-bounded analytics queries — the limit rises to 5000 because a
+   * month+trend window at goal pace exceeds the default 2000 cap.
+   */
+  static async getKnocks(since?: Date): Promise<Knock[]> {
     if (!this.userId) return [];
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('knocks')
       .select('*')
       .order('knocked_at', { ascending: false })
-      .limit(2000);
+      .limit(since ? 5000 : 2000);
+    if (since) query = query.gte('knocked_at', since.toISOString());
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[Supabase] getKnocks error:', error);
