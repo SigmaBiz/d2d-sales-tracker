@@ -1,0 +1,106 @@
+name: Hail Swath Processor
+
+on:
+  workflow_dispatch:
+    inputs:
+      storm_date:
+        description: 'Storm date (YYYY-MM-DD)'
+        required: true
+      alert_id:
+        description: 'NWS alert ID that triggered this run'
+        required: false
+      skip_wait:
+        description: 'Skip the 90-min MESH accumulation wait (past-date backfill)'
+        required: false
+        default: 'false'
+      notify:
+        description: 'Send the swath-ready push to the crew'
+        required: false
+        default: 'true'
+
+# One run per storm date: a second dispatch queues behind the first instead of
+# racing it (check.ts dispatches once per NWS alert, so multi-warning nights
+# used to start duplicate runs).
+concurrency:
+  group: hail-swath-${{ github.event.inputs.storm_date }}
+  cancel-in-progress: false
+
+jobs:
+  process-swath:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install eccodes
+        run: sudo apt-get install -y eccodes
+
+      - name: Wait 90 minutes for storm to develop
+        if: ${{ github.event.inputs.skip_wait != 'true' }}
+        run: |
+          echo "Storm date: ${{ github.event.inputs.storm_date }}"
+          echo "Waiting 90 minutes for MESH to accumulate..."
+          sleep 5400
+
+      - name: Find and download latest NOAA MESH file
+        run: |
+          STORM_DATE="${{ github.event.inputs.storm_date }}"
+          DATE_NODASH="${STORM_DATE//-/}"
+
+          echo "Looking for MESH_Max_1440min for ${STORM_DATE} (${DATE_NODASH})"
+
+          # Fetch NOAA directory listing and find latest file for this date
+          NOAA_DIR="https://mrms.ncep.noaa.gov/data/2D/MESH_Max_1440min/"
+          LATEST_FILE=$(curl -s "$NOAA_DIR" | grep -oP "MRMS_MESH_Max_1440min_00\.50_${DATE_NODASH}-\d{6}\.grib2\.gz" | sort | tail -1)
+
+          if [ -z "$LATEST_FILE" ]; then
+            echo "No NOAA real-time file found for ${STORM_DATE}. Trying next day (Iowa State archive)..."
+            # Fall back to Iowa State archive (storm_date + 1 day)
+            NEXT_DATE=$(date -d "${STORM_DATE} + 1 day" +%Y%m%d 2>/dev/null || date -j -v+1d -f "%Y-%m-%d" "${STORM_DATE}" +%Y%m%d)
+            YYYY="${STORM_DATE:0:4}"
+            MM="${STORM_DATE:5:2}"
+            DD="${STORM_DATE:8:2}"
+            IOWA_URL="https://mtarchive.geol.iastate.edu/${YYYY}/${MM}/${DD}/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_${NEXT_DATE}-000000.grib2.gz"
+            echo "Trying Iowa State: $IOWA_URL"
+            curl -fL -o /tmp/mesh.grib2.gz "$IOWA_URL"
+          else
+            echo "Found NOAA file: ${LATEST_FILE}"
+            curl -fL -o /tmp/mesh.grib2.gz "${NOAA_DIR}${LATEST_FILE}"
+          fi
+
+          gunzip /tmp/mesh.grib2.gz
+          echo "Downloaded and decompressed GRIB2 file."
+          ls -lh /tmp/mesh.grib2
+
+      - name: Install preprocessor deps
+        run: npm ci --prefix api
+
+      - name: Run preprocessor and upload to R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/preprocess.js /tmp/mesh.grib2 ${{ github.event.inputs.storm_date }}
+
+      - name: Notify app — swath ready
+        if: ${{ github.event.inputs.notify != 'false' }}
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          ACTIONS_SECRET: ${{ secrets.ACTIONS_SECRET }}
+        run: |
+          curl -fX POST \
+            -H "Content-Type: application/json" \
+            -H "x-actions-secret: ${ACTIONS_SECRET}" \
+            -d '{"date":"${{ github.event.inputs.storm_date }}"}' \
+            "${VERCEL_URL}/api/alerts/swath-ready"
+          echo "Swath-ready notification sent."
