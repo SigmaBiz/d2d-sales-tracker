@@ -8,90 +8,87 @@ import {
   ActivityIndicator,
   Keyboard,
   FlatList,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { PlacesService, PlacePrediction } from '../services/placesService';
 
 interface AddressSearchBarProps {
   onAddressSelect: (address: string, lat: number, lng: number) => void;
   placeholder?: string;
 }
 
-interface SearchResult {
-  place_id: string;
-  display_name: string;
-  lat: string;
-  lon: string;
-}
+const DEBOUNCE_MS = 300; // Uber-feel; each debounced keystroke = 1 autocomplete request
+const MIN_CHARS = 3;
 
 export default function AddressSearchBar({ onAddressSelect, placeholder = "Search address..." }: AddressSearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+  const requestSeq = useRef(0); // drop out-of-order responses
 
-  const searchAddress = async (query: string) => {
-    if (query.length < 3) {
-      setSearchResults([]);
+  const fetchPredictions = async (query: string) => {
+    if (query.length < MIN_CHARS) {
+      setPredictions([]);
+      setShowResults(false);
       return;
     }
-
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = PlacesService.newSessionToken();
+    }
+    const seq = ++requestSeq.current;
     setIsSearching(true);
     try {
-      // Using Nominatim (OpenStreetMap) geocoding API - free and no API key required
-      // Add Oklahoma bounds to prioritize local results
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-        `q=${encodeURIComponent(query)}&` +
-        `format=json&` +
-        `addressdetails=1&` +
-        `limit=5&` +
-        `countrycodes=us&` +
-        `viewbox=-103.0,37.0,-94.4,33.6&` + // Oklahoma bounding box
-        `bounded=0` // Also show results outside bounds
-      );
-      
-      const data = await response.json();
-      setSearchResults(data);
+      const results = await PlacesService.getPredictions(query, sessionTokenRef.current);
+      if (seq !== requestSeq.current) return; // stale response
+      setSearchError(false);
+      setPredictions(results);
       setShowResults(true);
     } catch (error) {
-      console.error('Error searching address:', error);
-      setSearchResults([]);
+      if (seq !== requestSeq.current) return;
+      console.error('[AddressSearch] prediction error:', error);
+      setSearchError(true);
+      setPredictions([]);
+      setShowResults(true); // show the explicit error row — never fail silently
     } finally {
-      setIsSearching(false);
+      if (seq === requestSeq.current) setIsSearching(false);
     }
   };
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
-    
-    // Clear previous timeout
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
-    
-    // Set new timeout for debounced search
-    searchTimeout.current = setTimeout(() => {
-      searchAddress(text);
-    }, 500);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => fetchPredictions(text), DEBOUNCE_MS);
   };
 
-  const handleSelectResult = (result: SearchResult) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-    
-    setSearchQuery(result.display_name);
+  const handleSelectPrediction = async (prediction: PlacePrediction) => {
+    const token = sessionTokenRef.current ?? PlacesService.newSessionToken();
+    sessionTokenRef.current = null; // selection ends the billing session
     setShowResults(false);
     Keyboard.dismiss();
-    
-    onAddressSelect(result.display_name, lat, lng);
+    setIsSearching(true);
+    try {
+      const { address, lat, lng } = await PlacesService.getPlaceLocation(prediction.placeId, token);
+      setSearchQuery(address || `${prediction.mainText}, ${prediction.secondaryText}`);
+      onAddressSelect(address || prediction.mainText, lat, lng);
+    } catch (error) {
+      console.error('[AddressSearch] place details error:', error);
+      setSearchError(true);
+      setShowResults(true);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const clearSearch = () => {
     setSearchQuery('');
-    setSearchResults([]);
+    setPredictions([]);
     setShowResults(false);
+    setSearchError(false);
+    sessionTokenRef.current = null;
   };
 
   return (
@@ -104,7 +101,7 @@ export default function AddressSearchBar({ onAddressSelect, placeholder = "Searc
           placeholderTextColor="#9ca3af"
           value={searchQuery}
           onChangeText={handleSearchChange}
-          onFocus={() => setShowResults(searchResults.length > 0)}
+          onFocus={() => setShowResults(predictions.length > 0 || searchError)}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
@@ -118,26 +115,38 @@ export default function AddressSearchBar({ onAddressSelect, placeholder = "Searc
           </TouchableOpacity>
         )}
       </View>
-      
-      {showResults && searchResults.length > 0 && (
+
+      {showResults && (
         <View style={styles.resultsContainer}>
-          <FlatList
-            data={searchResults}
-            keyExtractor={(item) => item.place_id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.resultItem}
-                onPress={() => handleSelectResult(item)}
-              >
-                <Ionicons name="location" size={16} color="#6b7280" style={styles.resultIcon} />
-                <Text style={styles.resultText} numberOfLines={2}>
-                  {item.display_name}
-                </Text>
-              </TouchableOpacity>
-            )}
-            style={styles.resultsList}
-            keyboardShouldPersistTaps="handled"
-          />
+          {searchError ? (
+            <View style={styles.errorRow}>
+              <Ionicons name="cloud-offline" size={16} color="#ef4444" style={styles.resultIcon} />
+              <Text style={styles.errorText}>
+                {PlacesService.hasKey()
+                  ? 'Search unavailable — check connection'
+                  : 'Search unavailable — API key missing'}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={predictions}
+              keyExtractor={item => item.placeId}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.resultItem}
+                  onPress={() => handleSelectPrediction(item)}
+                >
+                  <Ionicons name="location" size={16} color="#6b7280" style={styles.resultIcon} />
+                  <View style={styles.resultTextBox}>
+                    <Text style={styles.resultMain} numberOfLines={1}>{item.mainText}</Text>
+                    <Text style={styles.resultSecondary} numberOfLines={1}>{item.secondaryText}</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              style={styles.resultsList}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
         </View>
       )}
     </View>
@@ -206,9 +215,28 @@ const styles = StyleSheet.create({
   resultIcon: {
     marginRight: 12,
   },
-  resultText: {
+  resultTextBox: {
+    flex: 1,
+  },
+  resultMain: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  resultSecondary: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 1,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  errorText: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: '#ef4444',
   },
 });
