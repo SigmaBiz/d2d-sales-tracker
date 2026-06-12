@@ -164,9 +164,14 @@ async function triggerSwathProcessing(stormDate: string, alertId: string): Promi
     return;
   }
 
+  // The workflow must exist on the dispatched ref. The app's working branch is
+  // not main, so the ref is configurable; the dispatch had silently 404'd for
+  // every storm until this was made explicit (found 2026-06-12).
+  const ref = process.env.GITHUB_WORKFLOW_REF || 'main';
+
   await axios.post(
     `https://api.github.com/repos/${repo}/actions/workflows/hail-swath.yml/dispatches`,
-    { ref: 'main', inputs: { storm_date: stormDate, alert_id: alertId } },
+    { ref, inputs: { storm_date: stormDate, alert_id: alertId } },
     {
       headers: {
         Authorization: `Bearer ${token}`,
