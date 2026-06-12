@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -23,20 +23,24 @@ export default function SettingsScreen({ navigation }: any) {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [dateOfLoss, setDateOfLoss] = useState<string | null>(null); // team's active campaign
   const [showDolPicker, setShowDolPicker] = useState(false);
+  const [dailyGoal, setDailyGoal] = useState<number>(75); // team daily door goal
+  const goalSaveTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Refetch every time the tab gains focus (not just once on mount) so team state
   // never shows stale — e.g. right after joining a team or an RLS change.
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [teamResult, sessionResult, dol] = await Promise.all([
+    const [teamResult, sessionResult, dol, goal] = await Promise.all([
       SupabaseService.getMyTeam(),
       supabase.auth.getSession(),
       SupabaseService.getTeamDefaultDateOfLoss(true),
+      SupabaseService.getTeamDailyDoorGoal(true),
     ]);
     setTeam(teamResult);
     setUserEmail(sessionResult.data.session?.user?.email ?? null);
     setDateOfLoss(dol);
+    setDailyGoal(goal);
     setLoadingTeam(false);
   };
 
@@ -45,6 +49,19 @@ export default function SettingsScreen({ navigation }: any) {
     const res = await SupabaseService.setTeamDefaultDateOfLoss(iso);
     if (res.ok) setDateOfLoss(iso);
     else Alert.alert('Error', res.error ?? 'Could not set date of loss');
+  };
+
+  /** Optimistic step + debounced save (one write after the taps settle). */
+  const stepDailyGoal = (delta: number) => {
+    setDailyGoal(prev => {
+      const next = Math.max(5, Math.min(500, prev + delta));
+      if (goalSaveTimer.current) clearTimeout(goalSaveTimer.current);
+      goalSaveTimer.current = setTimeout(async () => {
+        const res = await SupabaseService.setTeamDailyDoorGoal(next);
+        if (!res.ok) Alert.alert('Error', res.error ?? 'Could not save the goal');
+      }, 600);
+      return next;
+    });
   };
 
   const handleSignOut = () => {
@@ -163,6 +180,19 @@ export default function SettingsScreen({ navigation }: any) {
                     }}
                   />
                 )}
+
+                {/* Team daily door goal (analytics) */}
+                <Text style={[styles.teamLabel, { marginTop: 16 }]}>TEAM DAILY DOOR GOAL</Text>
+                <View style={styles.goalRow}>
+                  <TouchableOpacity style={styles.goalStepBtn} onPress={() => stepDailyGoal(-5)}>
+                    <Ionicons name="remove" size={20} color="#1e40af" />
+                  </TouchableOpacity>
+                  <Text style={styles.goalValue}>{dailyGoal} doors/day</Text>
+                  <TouchableOpacity style={styles.goalStepBtn} onPress={() => stepDailyGoal(5)}>
+                    <Ionicons name="add" size={20} color="#1e40af" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.dolHint}>Daily door target for goal tracking in Stats.</Text>
               </>
             )}
 
@@ -335,6 +365,17 @@ const styles = StyleSheet.create({
   },
   dolText: { fontSize: 15, fontWeight: '600', color: '#1e40af' },
   dolHint: { fontSize: 12, color: '#9ca3af', marginTop: 6 },
+  goalRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#eff6ff', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10,
+    borderWidth: 1, borderColor: '#bfdbfe',
+  },
+  goalStepBtn: {
+    width: 38, height: 38, borderRadius: 8, backgroundColor: 'white',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: '#bfdbfe',
+  },
+  goalValue: { fontSize: 16, fontWeight: '600', color: '#1e40af' },
   inviteCodeBox: {
     backgroundColor: '#f0fdf4',
     borderRadius: 12,
