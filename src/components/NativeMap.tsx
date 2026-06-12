@@ -21,6 +21,8 @@ import { HailReport } from '../services/mrmsService';
 const RES = 0.01; // degrees per grid cell — matches MRMS native resolution
 const PAD = 0.3;  // degrees of padding around the data extent so edges fade naturally
 const THRESHOLDS = [0.75, 1.0, 1.5, 2.0];
+const TARGET_CELLS = 40000; // hard cap on the interpolation grid (statewide guard)
+const CUTOFF = 0.5;         // deg — pairs with the d2 > 0.25 influence cutoff below
 
 function contourFillColor(threshold: number): string {
   if (threshold >= 2.0) return '#ef444438'; // red ~22% opacity
@@ -46,35 +48,90 @@ interface ContourPoly {
 function buildContours(meshReports: HailReport[]): ContourPoly[] {
   if (meshReports.length === 0) return [];
 
-  // Compute bounds dynamically from actual data + padding so the swath is never clipped
-  const lats = meshReports.map(r => r.latitude);
-  const lons = meshReports.map(r => r.longitude);
+  // Compute bounds dynamically from actual data + padding so the swath is never
+  // clipped. Loops, not Math.max(...spread): Hermes throws RangeError past
+  // ~50k spread arguments, which statewide storms can exceed.
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  for (const r of meshReports) {
+    if (r.latitude < minLat) minLat = r.latitude;
+    if (r.latitude > maxLat) maxLat = r.latitude;
+    if (r.longitude < minLon) minLon = r.longitude;
+    if (r.longitude > maxLon) maxLon = r.longitude;
+  }
   const bounds = {
-    north: Math.max(...lats) + PAD,
-    south: Math.min(...lats) - PAD,
-    east:  Math.max(...lons) + PAD,
-    west:  Math.min(...lons) - PAD,
+    north: maxLat + PAD,
+    south: minLat - PAD,
+    east:  maxLon + PAD,
+    west:  minLon - PAD,
   };
-  const gridW = Math.round((bounds.east - bounds.west) / RES);
-  const gridH = Math.round((bounds.north - bounds.south) / RES);
+
+  // Adaptive resolution: metro-size extents stay at native 0.01° (identical
+  // output to the original); statewide extents coarsen (~0.03°) so the grid
+  // never exceeds TARGET_CELLS — bounded compute regardless of storm size.
+  const extentArea = (bounds.north - bounds.south) * (bounds.east - bounds.west);
+  const res = Math.max(RES, Math.sqrt(extentArea / TARGET_CELLS));
+  const gridW = Math.round((bounds.east - bounds.west) / res);
+  const gridH = Math.round((bounds.north - bounds.south) / res);
+
+  // Downsample inputs onto the render lattice when coarsened (max size wins —
+  // preserves peak hail, dilates the swath by ≤ res/2). 0.01°-spaced points
+  // add nothing to a coarser grid; this bounds the worst-case op count.
+  let points = meshReports;
+  if (res > RES) {
+    const best = new Map<number, HailReport>();
+    for (const r of meshReports) {
+      const key = Math.round((r.latitude - bounds.south) / res) * 100000
+                + Math.round((r.longitude - bounds.west) / res);
+      const cur = best.get(key);
+      if (!cur || r.size > cur.size) best.set(key, r);
+    }
+    points = Array.from(best.values());
+  }
+
+  // Spatial hash at CUTOFF-sized buckets: every report within 0.5° of a cell
+  // lives in the cell's 3×3 bucket neighborhood, so the IDW loop scans only
+  // those instead of every report. Same output as the brute-force loop (the
+  // d2 > 0.25 cutoff already excluded everything farther).
+  const bucketsW = Math.max(1, Math.ceil((bounds.east - bounds.west) / CUTOFF));
+  const bucketsH = Math.max(1, Math.ceil((bounds.north - bounds.south) / CUTOFF));
+  const buckets = new Map<number, HailReport[]>();
+  for (const r of points) {
+    const key = Math.floor((r.latitude - bounds.south) / CUTOFF) * bucketsW
+              + Math.floor((r.longitude - bounds.west) / CUTOFF);
+    let arr = buckets.get(key);
+    if (!arr) buckets.set(key, arr = []);
+    arr.push(r);
+  }
 
   // IDW interpolation
   const values = new Float64Array(gridW * gridH);
 
   for (let y = 0; y < gridH; y++) {
-    const lat = bounds.north - y * RES;
+    const lat = bounds.north - y * res;
+    const by = Math.floor((lat - bounds.south) / CUTOFF);
     for (let x = 0; x < gridW; x++) {
-      const lon = bounds.west + x * RES;
+      const lon = bounds.west + x * res;
+      const bx = Math.floor((lon - bounds.west) / CUTOFF);
       let wSum = 0;
       let wTot = 0;
-      for (const r of meshReports) {
-        const dx = lon - r.longitude;
-        const dy = lat - r.latitude;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > 0.25) continue; // ~55km cutoff — fades smoothly beyond data edges
-        const w = d2 < 1e-10 ? 1e10 : 1 / d2;
-        wSum += r.size * w;
-        wTot += w;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = by + dy;
+        if (ny < 0 || ny >= bucketsH) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = bx + dx;
+          if (nx < 0 || nx >= bucketsW) continue;
+          const arr = buckets.get(ny * bucketsW + nx);
+          if (!arr) continue;
+          for (const r of arr) {
+            const ddx = lon - r.longitude;
+            const ddy = lat - r.latitude;
+            const d2 = ddx * ddx + ddy * ddy;
+            if (d2 > 0.25) continue; // ~55km cutoff — fades smoothly beyond data edges
+            const w = d2 < 1e-10 ? 1e10 : 1 / d2;
+            wSum += r.size * w;
+            wTot += w;
+          }
+        }
       }
       values[y * gridW + x] = wTot > 0 ? wSum / wTot : 0;
     }
