@@ -30,12 +30,15 @@ const LABEL_ORDER: KnockOutcome[] = [
   'conversation', 'inspected', 'follow_up', 'lead', 'signed', 'scout',
 ];
 
-// Gate-filtered label sets. "No" (door didn't open) → outcomes you can tell
-// without engaging anyone. "Yes" (door opened) → outcomes that require talking.
-const NOT_OPENED_LABELS: KnockOutcome[] = ['no_home', 'no_soliciting', 'scout'];
-const OPENED_LABELS: KnockOutcome[] = [
-  'not_interested', 'renter', 'conversation', 'inspected', 'follow_up', 'lead', 'signed',
-];
+// Gate-filtered label sets live in utils/analytics (single source of truth for
+// the gate semantics AND the stats classification).
+import {
+  NOT_OPENED_LABELS,
+  OPENED_PICKER_LABELS,
+  computeRangeStats,
+  rangeWindow,
+  openRateBand,
+} from '../utils/analytics';
 
 export default function RealMapScreen({ navigation }: any) {
   const mapRef = useRef<NativeMapRef>(null);
@@ -758,8 +761,12 @@ export default function RealMapScreen({ navigation }: any) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const signedCount = knocks.filter(k => k.label === 'signed').length;
-  const leadCount = knocks.filter(k => k.label === 'lead').length;
+  // Today-only field stats: Doors → Opened → Pipeline (scout isn't a door).
+  const todayStats = React.useMemo(
+    () => computeRangeStats(knocks, rangeWindow('today')),
+    [knocks]
+  );
+  const rateBand = openRateBand(todayStats.openRate);
   const phoneValid = isValidUSPhone(contactPhone);   // gates Ping/Schedule (F2d)
 
   return (
@@ -777,21 +784,28 @@ export default function RealMapScreen({ navigation }: any) {
         onSearchedPinPress={() => setHailCardVisible(true)}
       />
 
-      {/* Stats bar */}
+      {/* Stats bar — today's field stats (Doors → Opened → Pipeline) */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{knocks.length}</Text>
-          <Text style={styles.statLabel}>Total Knocks</Text>
+          <Text style={styles.statValue}>{todayStats.doors}</Text>
+          <Text style={styles.statLabel}>Doors Today</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{signedCount}</Text>
-          <Text style={styles.statLabel}>Signed</Text>
+          <Text style={styles.statValue}>
+            {todayStats.opened}
+            {todayStats.openRate != null && (
+              <Text style={[styles.statRate, { color: rateBand.color }]}>
+                {'  '}{Math.round(todayStats.openRate * 100)}%
+              </Text>
+            )}
+          </Text>
+          <Text style={styles.statLabel}>Opened</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{leadCount}</Text>
-          <Text style={styles.statLabel}>Leads</Text>
+          <Text style={styles.statValue}>{todayStats.pipeline}</Text>
+          <Text style={styles.statLabel}>Pipeline</Text>
         </View>
       </View>
 
@@ -1032,7 +1046,7 @@ export default function RealMapScreen({ navigation }: any) {
                       ? labsForRole(role)                        // relabel: role-scoped labels
                       : gateOpened === 'no'
                         ? NOT_OPENED_LABELS                      // didn't open (all setter-allowed)
-                        : OPENED_LABELS.filter(l => labsForRole(role).includes(l)) // opened, role-scoped
+                        : OPENED_PICKER_LABELS.filter(l => labsForRole(role).includes(l)) // opened, role-scoped
                     ).map(label => (
                       <TouchableOpacity
                         key={label}
@@ -1589,6 +1603,7 @@ const styles = StyleSheet.create({
   },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { fontSize: 20, fontWeight: 'bold', color: '#1e40af' },
+  statRate: { fontSize: 13, fontWeight: '600' },
   statLabel: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   statDivider: { width: 1, height: 30, backgroundColor: '#e5e7eb' },
   rightButtonStack: { position: 'absolute', right: 16, bottom: 80 },
