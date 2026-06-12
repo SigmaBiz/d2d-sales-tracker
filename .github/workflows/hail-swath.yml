@@ -40,7 +40,11 @@ jobs:
           node-version: '20'
 
       - name: Install eccodes
-        run: sudo apt-get install -y eccodes
+        # Ubuntu ships the GRIB2 CLI tools (grib_get_data) as libeccodes-tools;
+        # package lists must be refreshed first or apt exits 100.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes-tools
 
       - name: Wait 90 minutes for storm to develop
         if: ${{ github.event.inputs.skip_wait != 'true' }}
