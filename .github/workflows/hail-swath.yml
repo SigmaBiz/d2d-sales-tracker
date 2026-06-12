@@ -66,11 +66,14 @@ jobs:
 
           if [ -z "$LATEST_FILE" ]; then
             echo "No NOAA real-time file found for ${STORM_DATE}. Trying next day (Iowa State archive)..."
-            # Fall back to Iowa State archive (storm_date + 1 day)
+            # Fall back to Iowa State archive. The 24h-max file timestamped
+            # 00:00Z on storm_date+1 covers the storm day, and the archive
+            # directories are organized by the FILE's date — both path and
+            # filename use NEXT_DATE (using the storm date's path 404s).
             NEXT_DATE=$(date -d "${STORM_DATE} + 1 day" +%Y%m%d 2>/dev/null || date -j -v+1d -f "%Y-%m-%d" "${STORM_DATE}" +%Y%m%d)
-            YYYY="${STORM_DATE:0:4}"
-            MM="${STORM_DATE:5:2}"
-            DD="${STORM_DATE:8:2}"
+            YYYY="${NEXT_DATE:0:4}"
+            MM="${NEXT_DATE:4:2}"
+            DD="${NEXT_DATE:6:2}"
             IOWA_URL="https://mtarchive.geol.iastate.edu/${YYYY}/${MM}/${DD}/mrms/ncep/MESH_Max_1440min/MESH_Max_1440min_00.50_${NEXT_DATE}-000000.grib2.gz"
             echo "Trying Iowa State: $IOWA_URL"
             curl -fL -o /tmp/mesh.grib2.gz "$IOWA_URL"
