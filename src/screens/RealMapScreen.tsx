@@ -15,6 +15,7 @@ import { IEMArchiveService } from '../services/tier2IEMService';
 import { HailAlertService } from '../services/hailAlertService';
 import HailOverlay from '../components/HailOverlay';
 import AddressSearchBar from '../components/AddressSearchBar';
+import HailHistoryList from '../components/HailHistoryList';
 import NotifBell from '../components/NotifBell';
 import NotifPanel from '../components/NotifPanel';
 import { Knock, KnockContact, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL, labsForRole } from '../types';
@@ -881,6 +882,25 @@ export default function RealMapScreen({ navigation }: any) {
         }}
       />
 
+      {/* Searched-address storm card */}
+      {searchedPin && hailCardVisible && (
+        <View style={styles.hailCard}>
+          <View style={styles.hailCardHeader}>
+            <Text style={styles.hailCardAddress} numberOfLines={2}>
+              📍 {searchedPin.address}
+            </Text>
+            <TouchableOpacity onPress={clearSearchedPin}>
+              <Ionicons name="close-circle" size={22} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+          <HailHistoryList
+            lat={searchedPin.lat}
+            lng={searchedPin.lng}
+            onStormLoaded={loadHailData}
+          />
+        </View>
+      )}
+
       {/* ── "Opened?" Gate ──────────────────────────────────────────────── */}
       <Modal
         visible={hardOpenVisible}
@@ -1524,6 +1544,32 @@ function formatDate(date: Date | string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  hailCard: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  hailCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  hailCardAddress: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginRight: 8,
+  },
   statsBar: {
     position: 'absolute', top: 10, left: 16, right: 16,
     backgroundColor: 'white', borderRadius: 12,
