@@ -115,6 +115,8 @@ interface NativeMapProps {
   mapType: 'standard' | 'satellite' | 'hybrid';
   onMapPress: (lat: number, lng: number) => void;
   onKnockPress: (knock: Knock) => void;
+  searchedPin: { lat: number; lng: number; address: string } | null;
+  onSearchedPinPress: () => void;
 }
 
 export interface NativeMapRef {
@@ -132,6 +134,8 @@ const NativeMap = forwardRef<NativeMapRef, NativeMapProps>(({
   mapType,
   onMapPress,
   onKnockPress,
+  searchedPin,
+  onSearchedPinPress,
 }, ref) => {
   const mapRef = useRef<MapView>(null);
 
@@ -217,6 +221,19 @@ const NativeMap = forwardRef<NativeMapRef, NativeMapProps>(({
           </View>
         </Marker>
       ))}
+
+      {/* Searched-address pin — blue standard pin, distinct from emoji knocks.
+          Press reopens the storm card; never enters the knock "Opened?" gate. */}
+      {searchedPin && (
+        <Marker
+          coordinate={{ latitude: searchedPin.lat, longitude: searchedPin.lng }}
+          pinColor="#2563eb"
+          onPress={e => {
+            e.stopPropagation();
+            onSearchedPinPress();
+          }}
+        />
+      )}
 
       {/* Knock markers — emoji pin */}
       {knocks.map(knock => (

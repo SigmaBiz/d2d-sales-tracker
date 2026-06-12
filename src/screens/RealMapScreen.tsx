@@ -48,6 +48,10 @@ export default function RealMapScreen({ navigation }: any) {
   const [verifiedReports, setVerifiedReports] = useState<HailReport[]>([]);
   const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
 
+  // Searched-address pin + its hail-history card (address search feature)
+  const [searchedPin, setSearchedPin] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [hailCardVisible, setHailCardVisible] = useState(false);
+
 
   // Storm panel
   const [activeStorms, setActiveStorms] = useState<any[]>([]);
@@ -740,8 +744,15 @@ export default function RealMapScreen({ navigation }: any) {
     }
   };
 
-  const handleAddressSelect = (_address: string, lat: number, lng: number) => {
+  const handleAddressSelect = (address: string, lat: number, lng: number) => {
     mapRef.current?.centerOnLocation(lat, lng, 0.005);
+    setSearchedPin({ lat, lng, address });
+    setHailCardVisible(true);
+  };
+
+  const clearSearchedPin = () => {
+    setSearchedPin(null);
+    setHailCardVisible(false);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -761,6 +772,8 @@ export default function RealMapScreen({ navigation }: any) {
         mapType={mapType}
         onMapPress={handleMapPress}
         onKnockPress={handleKnockPress}
+        searchedPin={searchedPin}
+        onSearchedPinPress={() => setHailCardVisible(true)}
       />
 
       {/* Stats bar */}
