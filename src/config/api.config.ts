@@ -22,3 +22,13 @@ export function getHistoricalServerUrl(endpoint: string): string {
 export function getProxyServerUrl(endpoint: string): string {
   return `${VERCEL_URL}${endpoint}`;
 }
+
+/**
+ * Google Places API (New) — address autocomplete. The key is restricted to the
+ * iOS bundle ID + Places API in Google Cloud, so shipping it in the bundle is
+ * acceptable. Set EXPO_PUBLIC_GOOGLE_PLACES_API_KEY in .env (and as an EAS env
+ * var for cloud builds). Empty key → AddressSearchBar shows an explicit
+ * "Search unavailable" state (never a silent failure).
+ */
+export const GOOGLE_PLACES_API_KEY =
+  process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
