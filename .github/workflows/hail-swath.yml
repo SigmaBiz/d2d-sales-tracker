@@ -37,7 +37,8 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22+: supabase-js requires native WebSocket (Node 20 lacks it)
+          node-version: '22'
 
       - name: Install eccodes
         # Ubuntu ships the GRIB2 CLI tools (grib_get_data) as libeccodes-tools;
