@@ -10,6 +10,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SupabaseService } from '../services/supabaseService';
+import {
+  remainingShiftMinutes, doorBudgetMinutes, paceBand, PACE_COLOR,
+  formatMinutes, ShiftWindow, DEFAULT_SHIFTS,
+} from '../utils/pacing';
+import { getShifts, getGoalOverride } from '../services/pacingSettings';
 import { Knock, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL } from '../types';
 import {
   RangeKey,
@@ -46,12 +51,15 @@ export default function StatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [dailyGoal, setDailyGoal] = useState(75);
+  const [shifts, setShiftWindows] = useState<ShiftWindow[]>(DEFAULT_SHIFTS);
   const [limitHit, setLimitHit] = useState(false);
 
   const loadData = async (r: RangeKey) => {
     // One fetch covers BOTH windows: previous window starts before (and is
     // contiguous with) the current one, so its start bounds everything needed.
     const since = previousWindow(r)?.start ?? rangeWindow(r).start ?? undefined;
+    const [sh, override] = await Promise.all([getShifts(), getGoalOverride()]);
+    setShiftWindows(sh);
     const [knocksData, teamData, goal] = await Promise.all([
       SupabaseService.getKnocks(since),
       SupabaseService.getMyTeam(),
@@ -59,7 +67,7 @@ export default function StatsScreen() {
     ]);
     setKnocks(knocksData);
     setIsOwner(teamData?.role === 'owner');
-    setDailyGoal(goal);
+    setDailyGoal(override ?? goal);
     setLimitHit(knocksData.length >= (since ? 5000 : 2000));
     setLoading(false);
     setRefreshing(false);
@@ -79,6 +87,11 @@ export default function StatsScreen() {
   const rateBand = openRateBand(current.openRate);
   const trend = trendPct(current.avgDailyDoors, previous?.avgDailyDoors ?? null);
   const goalProgress = Math.min(1, todayStats.doors / Math.max(1, dailyGoal));
+  // Same pace math as the map, so the two screens can't disagree.
+  const minsLeft = remainingShiftMinutes(new Date(), shifts);
+  const doorsLeft = dailyGoal - todayStats.doors;
+  const paceBudget = doorBudgetMinutes(doorsLeft, minsLeft);
+  const band = paceBand(paceBudget);
   const achievement = current.avgDailyDoors != null ? current.avgDailyDoors / dailyGoal : null;
 
   const breakdownTotal = Object.values(current.counts).reduce((s, n) => s + n, 0);
@@ -157,6 +170,28 @@ export default function StatsScreen() {
         </View>
         <View style={styles.goalBarTrack}>
           <View style={[styles.goalBarFill, { width: `${goalProgress * 100}%` }]} />
+        </View>
+
+        {/* Pace — mirrors the map's readout */}
+        <View style={styles.paceLine}>
+          {paceBudget !== null ? (
+            <Text style={styles.paceLineText}>
+              <Text style={{ color: PACE_COLOR[band], fontWeight: '800' }}>
+                {paceBudget.toFixed(1)} min/door
+              </Text>
+              <Text style={{ color: '#6b7280' }}>
+                {'  ·  '}{doorsLeft} to go{'  ·  '}{formatMinutes(minsLeft)} of shift left
+              </Text>
+            </Text>
+          ) : doorsLeft <= 0 ? (
+            <Text style={[styles.paceLineText, { color: PACE_COLOR.green, fontWeight: '800' }]}>
+              Goal met ✓
+            </Text>
+          ) : (
+            <Text style={[styles.paceLineText, { color: '#9ca3af' }]}>
+              Off shift — {doorsLeft} doors to go
+            </Text>
+          )}
         </View>
 
         {range !== 'today' && (
@@ -321,6 +356,8 @@ const styles = StyleSheet.create({
   goalToday: { fontSize: 26, fontWeight: '800', color: '#111827' },
   goalOf: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
   goalCaption: { fontSize: 12, color: '#9ca3af' },
+  paceLine: { marginTop: 10, alignItems: 'center' },
+  paceLineText: { fontSize: 13 },
   goalBarTrack: { height: 10, backgroundColor: '#f3f4f6', borderRadius: 5, overflow: 'hidden', marginHorizontal: 16 },
   goalBarFill: { height: 10, backgroundColor: '#1e40af', borderRadius: 5 },
   goalMetaRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 12, marginTop: 14, marginHorizontal: 16 },

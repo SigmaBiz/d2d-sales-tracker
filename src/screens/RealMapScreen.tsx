@@ -838,8 +838,9 @@ export default function RealMapScreen({ navigation }: any) {
         onSearchedPinPress={() => setHailCardVisible(true)}
       />
 
-      {/* Stats bar — today's field stats (Doors → Opened → Pipeline) */}
+      {/* Stats bar — today's field stats (Doors → Opened → Pipeline) + pace */}
       <View style={styles.statsBar}>
+        <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{todayStats.doors}</Text>
           <Text style={styles.statLabel}>Doors Today</Text>
@@ -861,25 +862,32 @@ export default function RealMapScreen({ navigation }: any) {
           <Text style={styles.statValue}>{todayStats.pipeline}</Text>
           <Text style={styles.statLabel}>Pipeline</Text>
         </View>
-      </View>
+        </View>
 
-      {/* Pace readout — tap to set today's goal (override expires at midnight) */}
-      <TouchableOpacity style={styles.paceBar} onPress={() => setGoalSheetVisible(true)}>
-        <Text style={styles.paceText}>
-          <Text style={{ fontWeight: '800' }}>{todayStats.doors}/{doorGoal}</Text>
-          {'  ·  '}
-          {pace.budget !== null ? (
-            <Text style={{ color: PACE_COLOR[pace.band], fontWeight: '800' }}>
-              {pace.budget.toFixed(1)} min/door
+        {/* Pace line — INSIDE the stats card on purpose. As a separate absolute
+            overlay it sat under AddressSearchBar (top:80, zIndex:1000) and was
+            invisible. In-flow here, nothing can paint over it. */}
+        <TouchableOpacity style={styles.paceRow} onPress={() => setGoalSheetVisible(true)}>
+          <Text style={styles.paceText}>
+            <Text style={{ fontWeight: '800', color: '#111827' }}>
+              {todayStats.doors}/{doorGoal}
             </Text>
-          ) : pace.doorsLeft <= 0 ? (
-            <Text style={{ color: PACE_COLOR.green, fontWeight: '800' }}>goal met ✓</Text>
-          ) : (
-            <Text style={{ color: '#6b7280', fontWeight: '800' }}>off shift</Text>
-          )}
-          {'  ·  '}{formatMinutes(pace.minsLeft)} left
-        </Text>
-      </TouchableOpacity>
+            {'   '}
+            {pace.budget !== null ? (
+              <Text style={{ color: PACE_COLOR[pace.band], fontWeight: '800' }}>
+                {pace.budget.toFixed(1)} min/door
+              </Text>
+            ) : pace.doorsLeft <= 0 ? (
+              <Text style={{ color: PACE_COLOR.green, fontWeight: '800' }}>goal met ✓</Text>
+            ) : (
+              <Text style={{ color: '#6b7280', fontWeight: '800' }}>off shift</Text>
+            )}
+            {'   '}
+            <Text style={{ color: '#6b7280' }}>{formatMinutes(pace.minsLeft)} left</Text>
+            <Text style={styles.paceTapHint}>  ✎</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Address search */}
       <AddressSearchBar onAddressSelect={handleAddressSelect} />
@@ -988,7 +996,7 @@ export default function RealMapScreen({ navigation }: any) {
       )}
 
       {!pickerVisible && (
-        <DoorTimerChip visible={timerVisible} onCutShort={cutDoorTimerShort} />
+        <DoorTimerChip visible={timerVisible} onStop={cutDoorTimerShort} floating />
       )}
 
       {/* ── Today's door goal (override expires at midnight) ─────────────── */}
@@ -1063,8 +1071,8 @@ export default function RealMapScreen({ navigation }: any) {
               onPress={() => {
                 setGateOpened('no');
                 if (pendingCoords) openKnockSession(pendingCoords.lat, pendingCoords.lng, false);
-                DoorTimerService.start('knocking'); // no answer yet — 2 min
-                setTimerVisible(true);
+                // No alarm for a door that didn't open — nothing is holding you
+                // there, you just walk. Only the shift pace applies.
                 setPickerTab('knock');
                 setHardOpenVisible(false);
                 setPickerVisible(true);
@@ -1108,6 +1116,10 @@ export default function RealMapScreen({ navigation }: any) {
 
           <View style={styles.pickerSheet}>
             <View style={styles.pickerHandle} />
+
+            {/* Door timer — IN FLOW, not an overlay. As an absolutely-positioned
+                bar it covered the Save Knock button. */}
+            <DoorTimerChip visible={timerVisible} onStop={cutDoorTimerShort} />
 
             {/* Address row — always visible above tabs */}
             {geocodingAddress ? (
@@ -1341,7 +1353,6 @@ export default function RealMapScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
           </View>
-          <DoorTimerChip visible={timerVisible} onCutShort={cutDoorTimerShort} />
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1712,14 +1723,13 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginRight: 8,
   },
-  paceBar: {
-    position: 'absolute', top: 86, left: 16, right: 16,
-    backgroundColor: 'white', borderRadius: 10,
-    paddingVertical: 7, paddingHorizontal: 12, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08, shadowRadius: 2, elevation: 3,
+  statsRow: { flexDirection: 'row', alignItems: 'center' },
+  paceRow: {
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e5e7eb',
+    paddingTop: 7, marginTop: 9, marginHorizontal: 12, alignItems: 'center',
   },
   paceText: { fontSize: 13, color: '#374151' },
+  paceTapHint: { fontSize: 11, color: '#9ca3af' },
   goalSheet: {
     backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20,
     padding: 20, paddingBottom: 32,
@@ -1737,9 +1747,9 @@ const styles = StyleSheet.create({
   goalStepText: { fontSize: 20, fontWeight: '800', color: '#1e40af' },
   goalValue: { fontSize: 40, fontWeight: '800', color: '#111827', minWidth: 90, textAlign: 'center' },
   statsBar: {
-    position: 'absolute', top: 10, left: 16, right: 16,
+    position: 'absolute', top: 10, left: 16, right: 16, zIndex: 1001,
     backgroundColor: 'white', borderRadius: 12,
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 12,
+    flexDirection: 'column', paddingVertical: 12,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1, shadowRadius: 3.84, elevation: 5,
   },

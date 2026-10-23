@@ -156,7 +156,7 @@ export default function AddressSearchBar({ onAddressSelect, placeholder = "Searc
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 80, // Below the stats bar
+    top: 118, // Below the stats bar (two lines now: stats + pace)
     left: 16,
     right: 16,
     zIndex: 1000,
