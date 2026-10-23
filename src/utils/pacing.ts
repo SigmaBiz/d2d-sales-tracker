@@ -22,13 +22,31 @@ export const DEFAULT_SHIFTS: ShiftWindow[] = [
 /** Per-door time caps in SECONDS. null = never alarm. */
 export type DoorPhase = 'knocking' | 'conversation' | 'inspect' | 'signing' | 'exempt';
 
-export const CAP_SECONDS: Record<DoorPhase, number | null> = {
+/**
+ * ⚠️ TEMPORARY — alarm smoke test (2026-10-23).
+ * Set back to `false` and re-publish once the locked-screen test passes.
+ * While true, every door alarms in ~10s — NOT usable for real knocking.
+ */
+const ALARM_TEST_MODE = true;
+
+const REAL_CAPS: Record<DoorPhase, number | null> = {
   knocking: 120,       // 2 min — most doors are a 30s no-answer
   conversation: 300,   // 5 min — they opened and are engaged
   inspect: 900,        // qualifying pre-inspection: 5 + 10
   signing: 2100,       // post-signature full inspection: 5 + 30
   exempt: null,        // contract signing / claim filing — never interrupt
 };
+
+const TEST_CAPS: Record<DoorPhase, number | null> = {
+  knocking: 10,
+  conversation: 10,    // the one that arms on "Yes — door opened"
+  inspect: 20,         // proves +10 Inspect re-arms rather than double-firing
+  signing: 30,
+  exempt: null,        // must stay silent even in test mode
+};
+
+export const CAP_SECONDS: Record<DoorPhase, number | null> =
+  ALARM_TEST_MODE ? TEST_CAPS : REAL_CAPS;
 
 export const PHASE_LABEL: Record<DoorPhase, string> = {
   knocking: 'Knocking',
