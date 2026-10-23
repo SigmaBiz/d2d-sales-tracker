@@ -23,11 +23,12 @@ export const DEFAULT_SHIFTS: ShiftWindow[] = [
 export type DoorPhase = 'knocking' | 'conversation' | 'inspect' | 'signing' | 'exempt';
 
 /**
- * ⚠️ TEMPORARY — alarm smoke test (2026-10-23).
- * Set back to `false` and re-publish once the locked-screen test passes.
- * While true, every door alarms in ~10s — NOT usable for real knocking.
+ * Alarm smoke-test switch. Flip to `true` to make every door alarm in ~10s so
+ * the OS-scheduled notification can be re-verified without waiting 5 minutes
+ * per attempt. VERIFIED on device 2026-10-23: fires both locked and unlocked.
+ * Must stay `false` in anything the crew uses.
  */
-const ALARM_TEST_MODE = true;
+const ALARM_TEST_MODE = false;
 
 const REAL_CAPS: Record<DoorPhase, number | null> = {
   knocking: 120,       // 2 min — most doors are a 30s no-answer
