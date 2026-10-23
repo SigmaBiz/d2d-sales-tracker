@@ -24,6 +24,13 @@ import LeadActionMenu from '../components/LeadActionMenu';
 import { LeadStatus, STATUS_LABEL, STATUS_COLOR, isTerminal, setterReentryActions } from '../services/leadLifecycle';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatAsYouTypeUS, isValidUSPhone, toE164 } from '../utils/phone';
+import DoorTimerChip from '../components/DoorTimerChip';
+import { DoorTimerService } from '../services/doorTimerService';
+import {
+  remainingShiftMinutes, doorBudgetMinutes, paceBand, PACE_COLOR,
+  formatMinutes, ShiftWindow, DEFAULT_SHIFTS,
+} from '../utils/pacing';
+import { getShifts, getGoalOverride, setGoalOverride } from '../services/pacingSettings';
 
 const LABEL_ORDER: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
@@ -120,6 +127,13 @@ export default function RealMapScreen({ navigation }: any) {
   // "Opened?" gate — shown between map tap and label picker
   const [hardOpenVisible, setHardOpenVisible] = useState(false);
   const [gateOpened, setGateOpened] = useState<'yes' | 'no' | null>(null); // drives label filter + tab visibility
+  // ── Pacing: door timer + "how long can I afford at this door" ──
+  const [timerVisible, setTimerVisible] = useState(false);
+  const [shifts, setShifts] = useState<ShiftWindow[]>(DEFAULT_SHIFTS);
+  const [doorGoal, setDoorGoal] = useState<number>(75);
+  const [goalSheetVisible, setGoalSheetVisible] = useState(false);
+  // Re-renders the pace readout as the shift burns down (cosmetic only).
+  const [paceTick, setPaceTick] = useState(0);
 
   // Current user's team role — drives role-scoped labels + lead action menu.
   const [role, setRole] = useState<'owner' | 'member' | null>(null);
@@ -133,6 +147,9 @@ export default function RealMapScreen({ navigation }: any) {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      loadPacing();
+      // App may have been killed mid-door, leaving an alarm queued.
+      DoorTimerService.clearOrphans();
       loadKnocks();
       loadHailData();
       loadNotifBell();
@@ -171,6 +188,29 @@ export default function RealMapScreen({ navigation }: any) {
         loadNotifBell();
       }
     }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+
+  /** "They're not opening" — silence the alarm early; labelling still required. */
+  const cutDoorTimerShort = () => {
+    DoorTimerService.stop();
+    setTimerVisible(false);
+  };
+
+  const loadPacing = async () => {
+    const [sh, override, teamGoal] = await Promise.all([
+      getShifts(),
+      getGoalOverride(),
+      SupabaseService.getTeamDailyDoorGoal(),
+    ]);
+    setShifts(sh);
+    setDoorGoal(override ?? teamGoal);
+  };
+
+  // Burn-down tick for the pace readout. Cosmetic — the alarm is OS-scheduled.
+  useEffect(() => {
+    const id = setInterval(() => setPaceTick(t => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
 
@@ -326,6 +366,10 @@ export default function RealMapScreen({ navigation }: any) {
   };
 
   const closeKnockSession = async (knockId?: string, outcomeLabel?: string) => {
+    // Kill the escape alarm first — a stray buzz after walking away is the
+    // one failure mode that would make the crew turn this feature off.
+    DoorTimerService.stop();
+    setTimerVisible(false);
     // Wait for the in-flight /open so we have a session id to close.
     if (openInFlightRef.current) {
       try { await openInFlightRef.current; } catch {}
@@ -768,6 +812,15 @@ export default function RealMapScreen({ navigation }: any) {
     [knocks]
   );
   const rateBand = openRateBand(todayStats.openRate);
+  // Pace: minutes affordable per remaining door. paceTick re-runs this as the
+  // shift burns down even when no knock has been saved.
+  const pace = React.useMemo(() => {
+    const minsLeft = remainingShiftMinutes(new Date(), shifts);
+    const doorsLeft = doorGoal - todayStats.doors;
+    const budget = doorBudgetMinutes(doorsLeft, minsLeft);
+    return { minsLeft, doorsLeft, budget, band: paceBand(budget) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayStats.doors, doorGoal, shifts, paceTick]);
   const phoneValid = isValidUSPhone(contactPhone);   // gates Ping/Schedule (F2d)
 
   return (
@@ -809,6 +862,24 @@ export default function RealMapScreen({ navigation }: any) {
           <Text style={styles.statLabel}>Pipeline</Text>
         </View>
       </View>
+
+      {/* Pace readout — tap to set today's goal (override expires at midnight) */}
+      <TouchableOpacity style={styles.paceBar} onPress={() => setGoalSheetVisible(true)}>
+        <Text style={styles.paceText}>
+          <Text style={{ fontWeight: '800' }}>{todayStats.doors}/{doorGoal}</Text>
+          {'  ·  '}
+          {pace.budget !== null ? (
+            <Text style={{ color: PACE_COLOR[pace.band], fontWeight: '800' }}>
+              {pace.budget.toFixed(1)} min/door
+            </Text>
+          ) : pace.doorsLeft <= 0 ? (
+            <Text style={{ color: PACE_COLOR.green, fontWeight: '800' }}>goal met ✓</Text>
+          ) : (
+            <Text style={{ color: '#6b7280', fontWeight: '800' }}>off shift</Text>
+          )}
+          {'  ·  '}{formatMinutes(pace.minsLeft)} left
+        </Text>
+      </TouchableOpacity>
 
       {/* Address search */}
       <AddressSearchBar onAddressSelect={handleAddressSelect} />
@@ -916,6 +987,47 @@ export default function RealMapScreen({ navigation }: any) {
         </View>
       )}
 
+      {!pickerVisible && (
+        <DoorTimerChip visible={timerVisible} onCutShort={cutDoorTimerShort} />
+      )}
+
+      {/* ── Today's door goal (override expires at midnight) ─────────────── */}
+      <Modal
+        visible={goalSheetVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGoalSheetVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={styles.modalDismiss} onPress={() => setGoalSheetVisible(false)} />
+          <View style={styles.goalSheet}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.goalTitle}>Today's door goal</Text>
+            <Text style={styles.goalSub}>
+              Just for today — tomorrow returns to the team default.
+            </Text>
+            <View style={styles.goalRow}>
+              <TouchableOpacity
+                style={styles.goalStep}
+                onPress={() => { const n = Math.max(5, doorGoal - 5); setDoorGoal(n); setGoalOverride(n); }}
+              >
+                <Text style={styles.goalStepText}>−5</Text>
+              </TouchableOpacity>
+              <Text style={styles.goalValue}>{doorGoal}</Text>
+              <TouchableOpacity
+                style={styles.goalStep}
+                onPress={() => { const n = Math.min(500, doorGoal + 5); setDoorGoal(n); setGoalOverride(n); }}
+              >
+                <Text style={styles.goalStepText}>+5</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setGoalSheetVisible(false)}>
+              <Text style={styles.closeButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── "Opened?" Gate ──────────────────────────────────────────────── */}
       <Modal
         visible={hardOpenVisible}
@@ -937,6 +1049,8 @@ export default function RealMapScreen({ navigation }: any) {
               onPress={() => {
                 setGateOpened('yes');
                 if (pendingCoords) openKnockSession(pendingCoords.lat, pendingCoords.lng, true);
+                DoorTimerService.start('conversation'); // they opened — 5 min
+                setTimerVisible(true);
                 setPickerTab('knock');
                 setHardOpenVisible(false);
                 setPickerVisible(true);
@@ -949,6 +1063,8 @@ export default function RealMapScreen({ navigation }: any) {
               onPress={() => {
                 setGateOpened('no');
                 if (pendingCoords) openKnockSession(pendingCoords.lat, pendingCoords.lng, false);
+                DoorTimerService.start('knocking'); // no answer yet — 2 min
+                setTimerVisible(true);
                 setPickerTab('knock');
                 setHardOpenVisible(false);
                 setPickerVisible(true);
@@ -1225,6 +1341,7 @@ export default function RealMapScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
           </View>
+          <DoorTimerChip visible={timerVisible} onCutShort={cutDoorTimerShort} />
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1595,6 +1712,30 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginRight: 8,
   },
+  paceBar: {
+    position: 'absolute', top: 86, left: 16, right: 16,
+    backgroundColor: 'white', borderRadius: 10,
+    paddingVertical: 7, paddingHorizontal: 12, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08, shadowRadius: 2, elevation: 3,
+  },
+  paceText: { fontSize: 13, color: '#374151' },
+  goalSheet: {
+    backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, paddingBottom: 32,
+  },
+  goalTitle: { fontSize: 18, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  goalSub: { fontSize: 13, color: '#6b7280', textAlign: 'center', marginTop: 6 },
+  goalRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 24, marginVertical: 20,
+  },
+  goalStep: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#eff6ff',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  goalStepText: { fontSize: 20, fontWeight: '800', color: '#1e40af' },
+  goalValue: { fontSize: 40, fontWeight: '800', color: '#111827', minWidth: 90, textAlign: 'center' },
   statsBar: {
     position: 'absolute', top: 10, left: 16, right: 16,
     backgroundColor: 'white', borderRadius: 12,

@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SupabaseService, TeamInfo } from '../services/supabaseService';
 import { supabase } from '../services/supabaseClient';
+import { ShiftWindow, DEFAULT_SHIFTS, formatClock } from '../utils/pacing';
+import { getShifts, setShifts as saveShifts } from '../services/pacingSettings';
 
 export default function SettingsScreen({ navigation }: any) {
   const [team, setTeam] = useState<TeamInfo | null>(null);
@@ -24,6 +26,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [dateOfLoss, setDateOfLoss] = useState<string | null>(null); // team's active campaign
   const [showDolPicker, setShowDolPicker] = useState(false);
   const [dailyGoal, setDailyGoal] = useState<number>(75); // team daily door goal
+  const [shifts, setShifts] = useState<ShiftWindow[]>(DEFAULT_SHIFTS); // personal, device-local
   const goalSaveTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Refetch every time the tab gains focus (not just once on mount) so team state
@@ -31,12 +34,14 @@ export default function SettingsScreen({ navigation }: any) {
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   const loadData = async () => {
-    const [teamResult, sessionResult, dol, goal] = await Promise.all([
+    const [teamResult, sessionResult, dol, goal, sh] = await Promise.all([
       SupabaseService.getMyTeam(),
       supabase.auth.getSession(),
       SupabaseService.getTeamDefaultDateOfLoss(true),
       SupabaseService.getTeamDailyDoorGoal(true),
+      getShifts(),
     ]);
+    setShifts(sh);
     setTeam(teamResult);
     setUserEmail(sessionResult.data.session?.user?.email ?? null);
     setDateOfLoss(dol);
@@ -60,6 +65,22 @@ export default function SettingsScreen({ navigation }: any) {
         const res = await SupabaseService.setTeamDailyDoorGoal(next);
         if (!res.ok) Alert.alert('Error', res.error ?? 'Could not save the goal');
       }, 600);
+      return next;
+    });
+  };
+
+  /** Nudge one edge of one shift by `delta` minutes. Clamped so a window can
+   *  never invert (a zero-length shift silently zeroes the pace budget). */
+  const stepShift = (idx: number, edge: 'startMin' | 'endMin', delta: number) => {
+    setShifts(prev => {
+      const next = prev.map((w, i) => {
+        if (i !== idx) return w;
+        const candidate = Math.max(0, Math.min(24 * 60 - 1, w[edge] + delta));
+        const updated = { ...w, [edge]: candidate };
+        if (updated.endMin - updated.startMin < 30) return w; // reject, keep 30m floor
+        return updated;
+      });
+      saveShifts(next);
       return next;
     });
   };
@@ -211,6 +232,37 @@ export default function SettingsScreen({ navigation }: any) {
       </View>
 
       {/* ── NOTIFICATIONS ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Shift</Text>
+        <Text style={styles.dolHint}>
+          Drives the “min/door” pace budget on the map. Personal to this phone.
+        </Text>
+        {shifts.map((w, i) => (
+          <View key={i} style={styles.shiftRow}>
+            <Text style={styles.shiftLabel}>{i === 0 ? 'Morning' : 'Evening'}</Text>
+            <View style={styles.shiftEdge}>
+              <TouchableOpacity onPress={() => stepShift(i, 'startMin', -30)}>
+                <Ionicons name="chevron-back" size={18} color="#1e40af" />
+              </TouchableOpacity>
+              <Text style={styles.shiftTime}>{formatClock(w.startMin)}</Text>
+              <TouchableOpacity onPress={() => stepShift(i, 'startMin', 30)}>
+                <Ionicons name="chevron-forward" size={18} color="#1e40af" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.shiftDash}>–</Text>
+            <View style={styles.shiftEdge}>
+              <TouchableOpacity onPress={() => stepShift(i, 'endMin', -30)}>
+                <Ionicons name="chevron-back" size={18} color="#1e40af" />
+              </TouchableOpacity>
+              <Text style={styles.shiftTime}>{formatClock(w.endMin)}</Text>
+              <TouchableOpacity onPress={() => stepShift(i, 'endMin', 30)}>
+                <Ionicons name="chevron-forward" size={18} color="#1e40af" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notifications</Text>
         <TouchableOpacity
@@ -365,6 +417,17 @@ const styles = StyleSheet.create({
   },
   dolText: { fontSize: 15, fontWeight: '600', color: '#1e40af' },
   dolHint: { fontSize: 12, color: '#9ca3af', marginTop: 6 },
+  shiftRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 8, gap: 6,
+  },
+  shiftLabel: { fontSize: 13, fontWeight: '700', color: '#374151', width: 64 },
+  shiftEdge: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  shiftTime: {
+    fontSize: 13, fontWeight: '600', color: '#111827',
+    minWidth: 58, textAlign: 'center', fontVariant: ['tabular-nums'],
+  },
+  shiftDash: { fontSize: 13, color: '#9ca3af' },
   goalRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#eff6ff', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10,
