@@ -680,6 +680,58 @@ export class SupabaseService {
   }
 
   /**
+   * Doors with a callable contact (phone captured) — the follow-up "CRM" list.
+   * Two explicit queries instead of a PostgREST implicit join: the contacts→knocks
+   * FK was owner-pasted and isn't in the repo's migrations, so we don't lean on it.
+   * Excludes terminal doors (signed/arch_hard — mirrored onto label on transition).
+   */
+  static async getContactedDoors(
+    since?: string
+  ): Promise<Array<{ knock: Knock; contact: KnockContact }>> {
+    if (!this.userId) return [];
+
+    const { data: contacts, error: cErr } = await supabase
+      .from('contacts')
+      .select('*')
+      .not('phone', 'is', null)
+      .limit(300); // cap keeps the .in() URL bounded; revisit if the book grows
+    if (cErr || !contacts?.length) return [];
+
+    // One contact per knock (upsertContact invariant) — map for the merge below.
+    const byKnock = new Map<string, KnockContact>();
+    for (const c of contacts) {
+      byKnock.set(c.knock_id, {
+        id: c.id,
+        knock_id: c.knock_id,
+        name: c.name ?? undefined,
+        phone: c.phone ?? undefined,
+        email: c.email ?? undefined,
+        insurance_carrier: c.insurance_carrier ?? undefined,
+        is_owner: c.is_owner ?? true,
+      });
+    }
+
+    let query = supabase
+      .from('knocks')
+      .select('*')
+      .in('id', [...byKnock.keys()])
+      .not('label', 'in', '(signed,arch_hard)')
+      .order('knocked_at', { ascending: false })
+      .limit(500);
+    if (since) query = query.gte('knocked_at', since);
+
+    const { data: knocks, error: kErr } = await query;
+    if (kErr) {
+      console.error('[Supabase] getContactedDoors error:', kErr);
+      return [];
+    }
+    return knocks.map(k => {
+      const knock = this.rowToKnock(k);
+      return { knock, contact: byKnock.get(knock.id)! };
+    });
+  }
+
+  /**
    * Upsert a contact for a knock — inserts if none exists, updates if one does.
    * ζ-verdict: one contact per knock (Z₂ — simple, guaranteed fast in field).
    */
