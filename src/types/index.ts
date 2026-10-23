@@ -10,7 +10,9 @@ export type KnockOutcome =
   | 'lead'             // ✅ Hot, qualified prospect
   | 'scout'            // 📍 Address noted for future canvassing
   | 'flaked'           // 🥀 Homeowner backed out / never genuinely interested
-  | 'retarget';        // 🎯 Inspection ran but couldn't close — worth another pass
+  | 'retarget'         // 🎯 Inspection ran but couldn't close — worth another pass
+  | 'not_eligible'     // 🏚️ For sale/rent sign or unmaintained — property disqualified
+  | 'revisit';         // 👀 Didn't open, but roof worth coming back for (damage/age)
 
 export const KNOCK_OUTCOME_EMOJI: Record<KnockOutcome, string> = {
   no_home:        '👻',
@@ -25,6 +27,8 @@ export const KNOCK_OUTCOME_EMOJI: Record<KnockOutcome, string> = {
   scout:          '📍',
   flaked:         '🥀',
   retarget:       '🎯',
+  not_eligible:   '🏚️',
+  revisit:        '👀',
 };
 
 export const KNOCK_OUTCOME_LABEL: Record<KnockOutcome, string> = {
@@ -40,6 +44,8 @@ export const KNOCK_OUTCOME_LABEL: Record<KnockOutcome, string> = {
   scout:          'Scout',
   flaked:         'Flaked',
   retarget:       'Retarget',
+  not_eligible:   'Not Eligible',
+  revisit:        'Revisit',
 };
 
 // ── Lead lifecycle (F2a foundations) ──────────────────────────────────────────
@@ -81,7 +87,7 @@ export type LeadStatus =
 // the server re-validates every write — this is a UX convenience, not the gate.
 export const SETTER_LABS: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
-  'conversation', 'follow_up', 'lead', 'scout',
+  'conversation', 'follow_up', 'lead', 'scout', 'not_eligible', 'revisit',
 ];
 export const RUNNER_LABS: KnockOutcome[] = [
   ...SETTER_LABS, 'inspected', 'signed', 'flaked', 'retarget',

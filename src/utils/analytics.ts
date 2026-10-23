@@ -13,7 +13,9 @@ import { Knock, KnockOutcome } from '../types';
 // ── Label sets ────────────────────────────────────────────────────────────────
 
 /** Gate "No" outcomes — the door did not open. */
-export const NOT_OPENED_LABELS: KnockOutcome[] = ['no_home', 'no_soliciting', 'scout'];
+export const NOT_OPENED_LABELS: KnockOutcome[] = [
+  'no_home', 'no_soliciting', 'scout', 'not_eligible', 'revisit',
+];
 
 /**
  * Picker concept (NOT the analytics classification): labels a user may choose
@@ -39,8 +41,14 @@ export const CONVERSATION_PLUS: string[] = [
 
 // ── Classification ────────────────────────────────────────────────────────────
 
-/** A door interaction. Scout = marking a property without knocking — not a door. */
-export const isDoor = (k: Knock): boolean => k.label !== 'scout';
+/**
+ * A door interaction. Scout = marking a property without knocking — not a door.
+ * Not Eligible = property disqualified (for sale/rent/unmaintained) — also not a
+ * door attempt, so it never drags the open rate. Revisit IS a door (knocked,
+ * nobody home, roof promising).
+ */
+export const isDoor = (k: Knock): boolean =>
+  k.label !== 'scout' && k.label !== 'not_eligible';
 
 /** Door opened = any door whose label isn't a not-opened outcome. */
 export const isOpened = (k: Knock): boolean =>

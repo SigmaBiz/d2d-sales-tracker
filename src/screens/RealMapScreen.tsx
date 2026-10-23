@@ -28,6 +28,7 @@ import { formatAsYouTypeUS, isValidUSPhone, toE164 } from '../utils/phone';
 const LABEL_ORDER: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
   'conversation', 'inspected', 'follow_up', 'lead', 'signed', 'scout',
+  'not_eligible', 'revisit',
 ];
 
 // Gate-filtered label sets live in utils/analytics (single source of truth for
