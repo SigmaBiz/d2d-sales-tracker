@@ -8,6 +8,9 @@
  *    own leads, a runner (owner) sees the whole team's.
  *  - Contacts: the follow-up "CRM" list — every non-terminal door with a callable
  *    phone number, defaulting to this week. Tap row → teleport; tap phone → dialer.
+ *  - Revisit: the return queue — doors labelled 👀 Revisit (knocked, nobody home,
+ *    roof worth another trip), ranked by star rating with the note alongside, so
+ *    the rating and the written reason can be judged together. Tap row → teleport.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -23,8 +26,9 @@ import {
 } from '../services/leadLifecycle';
 import { rangeWindow } from '../utils/analytics';
 import LeadActionMenu from '../components/LeadActionMenu';
+import StarRating from '../components/StarRating';
 
-type Mode = 'active' | 'contacts';
+type Mode = 'active' | 'contacts' | 'revisit';
 type ContactRange = 'week' | 'all';
 
 /** "today" / "3d ago" style stamp for contact rows. */
@@ -40,6 +44,7 @@ export default function LeadLogScreen({ navigation }: any) {
   const [range, setRange] = useState<ContactRange>('week');
   const [leads, setLeads] = useState<Knock[]>([]);
   const [contacted, setContacted] = useState<Array<{ knock: Knock; contact: KnockContact }>>([]);
+  const [revisits, setRevisits] = useState<Knock[]>([]);
   const [role, setRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,11 +57,13 @@ export default function LeadLogScreen({ navigation }: any) {
       ]);
       setLeads(data);
       setRole(rr);
-    } else {
+    } else if (m === 'contacts') {
       const since = r === 'week'
         ? rangeWindow('week').start?.toISOString()
         : undefined;
       setContacted(await SupabaseService.getContactedDoors(since));
+    } else {
+      setRevisits(await SupabaseService.getRevisitDoors());
     }
     setLoading(false);
     setRefreshing(false);
@@ -88,14 +95,14 @@ export default function LeadLogScreen({ navigation }: any) {
   const header = (
     <View style={styles.headerWrap}>
       <View style={styles.segment}>
-        {(['active', 'contacts'] as Mode[]).map(m => (
+        {(['active', 'contacts', 'revisit'] as Mode[]).map(m => (
           <TouchableOpacity
             key={m}
             style={[styles.segmentBtn, mode === m && styles.segmentBtnOn]}
             onPress={() => switchMode(m)}
           >
             <Text style={[styles.segmentText, mode === m && styles.segmentTextOn]}>
-              {m === 'active' ? 'Active' : 'Contacts'}
+              {m === 'active' ? 'Active' : m === 'contacts' ? 'Contacts' : 'Revisit'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -129,21 +136,27 @@ export default function LeadLogScreen({ navigation }: any) {
     );
   }
 
-  const empty = mode === 'active' ? leads.length === 0 : contacted.length === 0;
+  const empty = mode === 'active'
+    ? leads.length === 0
+    : mode === 'contacts' ? contacted.length === 0 : revisits.length === 0;
   if (empty) {
     return (
       <View style={styles.container}>
         {header}
         <View style={styles.center}>
           <Text style={styles.emptyText}>
-            {mode === 'active' ? 'No active leads.' : 'No contacts yet.'}
+            {mode === 'active' ? 'No active leads.'
+              : mode === 'contacts' ? 'No contacts yet.'
+              : 'Nothing to revisit.'}
           </Text>
           <Text style={styles.emptySub}>
             {mode === 'active'
               ? 'Leads appear here once a setter pings an owner or schedules an inspection.'
-              : range === 'week'
-                ? 'Doors where you save a phone number show up here. Try "All" for older ones.'
-                : 'Doors where you save a phone number show up here.'}
+              : mode === 'revisit'
+                ? 'Label a door 👀 Revisit — nobody home but the roof is worth another trip — and it lands here, ranked by its star rating.'
+                : range === 'week'
+                  ? 'Doors where you save a phone number show up here. Try "All" for older ones.'
+                  : 'Doors where you save a phone number show up here.'}
           </Text>
         </View>
       </View>
@@ -190,6 +203,36 @@ export default function LeadLogScreen({ navigation }: any) {
               </View>
             );
           }}
+        />
+      </View>
+    );
+  }
+
+  if (mode === 'revisit') {
+    return (
+      <View style={styles.container}>
+        {header}
+        <FlatList
+          data={revisits}
+          keyExtractor={item => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1e40af" />}
+          contentContainerStyle={{ padding: 12 }}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.card} onPress={() => teleport(item)}>
+              <Text style={styles.address} numberOfLines={1}>
+                📍 {item.address ?? `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}`}
+              </Text>
+              <View style={styles.revisitMeta}>
+                <StarRating value={item.rating ?? null} size={16} />
+                <Text style={styles.revisitAge}>{daysAgo(item.knocked_at)}</Text>
+              </View>
+              {item.notes ? (
+                <Text style={styles.revisitNote} numberOfLines={2}>{item.notes}</Text>
+              ) : (
+                <Text style={styles.revisitNoNote}>No note</Text>
+              )}
+            </TouchableOpacity>
+          )}
         />
       </View>
     );
@@ -274,6 +317,17 @@ const styles = StyleSheet.create({
   appt: { fontSize: 12, color: '#a16207', marginTop: 2, fontWeight: '600' },
   pill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   pillText: { color: 'white', fontSize: 12, fontWeight: '700' },
+  revisitMeta: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginTop: 6,
+  },
+  revisitAge: { fontSize: 12, color: '#6b7280', fontWeight: '600' },
+  revisitNote: {
+    fontSize: 13, color: '#374151', marginTop: 7, lineHeight: 18,
+  },
+  revisitNoNote: {
+    fontSize: 12, color: '#9ca3af', marginTop: 7, fontStyle: 'italic',
+  },
   callBtn: {
     marginTop: 10, backgroundColor: '#eff6ff', borderRadius: 8,
     paddingVertical: 8, alignItems: 'center',

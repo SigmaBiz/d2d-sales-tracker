@@ -418,6 +418,47 @@ export class SupabaseService {
     return data.map(this.rowToKnock);
   }
 
+  /**
+   * The Revisit queue — doors labelled `revisit` (knocked, didn't open, roof
+   * worth a second trip), best-rated first. Unrated ones sort LAST rather than
+   * dropping out: an un-scored revisit door is still a door to go back to.
+   */
+  static async getRevisitDoors(): Promise<Knock[]> {
+    if (!this.userId) return [];
+    const { data, error } = await supabase
+      .from('knocks')
+      .select('*')
+      .eq('label', 'revisit')
+      .order('rating', { ascending: false, nullsFirst: false })
+      .order('knocked_at', { ascending: false })
+      .limit(500);
+    if (error) {
+      console.error('[Supabase] getRevisitDoors error:', error);
+      return [];
+    }
+    return data.map(this.rowToKnock);
+  }
+
+  /** Set/clear a door's star rating (0–5, half steps). null clears it. */
+  static async setKnockRating(
+    knockId: string,
+    rating: number | null
+  ): Promise<{ ok: boolean; error?: string }> {
+    // Round to the nearest half so a stray value can't trip knocks_rating_chk.
+    const clean = rating === null
+      ? null
+      : Math.max(0, Math.min(5, Math.round(rating * 2) / 2));
+    const { error } = await supabase
+      .from('knocks')
+      .update({ rating: clean })
+      .eq('id', knockId);
+    if (error) {
+      console.error('[Supabase] setKnockRating error:', error);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  }
+
   /** Append-only event history for one knock (the per-lead Log). */
   static async getLeadEvents(knockId: string): Promise<Array<{
     action: string; from_status: string | null; to_status: string | null;
@@ -496,6 +537,7 @@ export class SupabaseService {
       longitude: knock.longitude,
       label: knock.label,
       notes: knock.notes,
+      rating: knock.rating,
       photo_url: knock.photo_url,
       storm_date: knock.storm_date,
       knocked_at: knock.knocked_at.toISOString(),
@@ -818,6 +860,7 @@ export class SupabaseService {
           longitude: knock.longitude,
           label: knock.label,
           notes: knock.notes,
+          rating: knock.rating,
           photo_url: knock.photo_url,
           storm_date: knock.storm_date,
           knocked_at: knock.knocked_at instanceof Date
@@ -854,6 +897,7 @@ export class SupabaseService {
       longitude: row.longitude,
       label: row.label as KnockOutcome,
       notes: row.notes ?? undefined,
+      rating: row.rating ?? undefined,
       photo_url: row.photo_url ?? undefined,
       storm_date: row.storm_date ?? undefined,
       knocked_at: new Date(row.knocked_at),

@@ -105,6 +105,8 @@ export interface Knock {
   address?: string;
   label: KnockOutcome;
   notes?: string;
+  /** 0–5 in half steps. Pairs with `notes` to rank the Revisit queue. */
+  rating?: number;
   photo_url?: string;
   storm_date?: string; // YYYY-MM-DD of storm that prompted this canvass
   knocked_at: Date;

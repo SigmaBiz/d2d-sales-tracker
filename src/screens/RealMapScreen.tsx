@@ -25,6 +25,7 @@ import { LeadStatus, STATUS_LABEL, STATUS_COLOR, isTerminal, setterReentryAction
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatAsYouTypeUS, isValidUSPhone, toE164 } from '../utils/phone';
 import DoorTimerChip from '../components/DoorTimerChip';
+import StarRating from '../components/StarRating';
 import { DoorTimerService } from '../services/doorTimerService';
 import {
   remainingShiftMinutes, doorBudgetMinutes, paceBand, PACE_COLOR,
@@ -80,6 +81,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [pendingKnock, setPendingKnock] = useState<Knock | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<KnockOutcome | null>(null);
   const [pickerNotes, setPickerNotes] = useState('');
+  const [pickerRating, setPickerRating] = useState<number | null>(null); // door star rating
   const [savingKnock, setSavingKnock] = useState(false);
 
   // Detail sheet state
@@ -403,7 +405,7 @@ export default function RealMapScreen({ navigation }: any) {
     setPendingCoords({ lat, lng });
     setPendingKnock(null);
     setGateOpened(null);
-    setPickerNotes('');
+    setPickerNotes(''); setPickerRating(null);
     setSelectedLabel(null);
     setContactName(''); setContactPhone(''); setContactInsurance('');
     setPropertyYearBuilt(''); setPropertySqft('');
@@ -478,6 +480,7 @@ export default function RealMapScreen({ navigation }: any) {
         address: pendingAddress,
         label: 'lead',
         notes: pickerNotes || undefined,
+        rating: pickerRating ?? undefined,
         knocked_at: new Date(),
         user_id: SupabaseService.getUserId() ?? undefined,
       });
@@ -500,7 +503,7 @@ export default function RealMapScreen({ navigation }: any) {
       setGateOpened(null);
       setPickerVisible(false);
       setSelectedLabel(null);
-      setPickerNotes('');
+      setPickerNotes(''); setPickerRating(null);
       setContactName(''); setContactPhone(''); setContactInsurance('');
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
@@ -528,6 +531,7 @@ export default function RealMapScreen({ navigation }: any) {
         address: pendingAddress,
         label: 'lead',
         notes: pickerNotes || undefined,
+        rating: pickerRating ?? undefined,
         knocked_at: new Date(),
         user_id: SupabaseService.getUserId() ?? undefined,
       });
@@ -551,7 +555,7 @@ export default function RealMapScreen({ navigation }: any) {
       setGateOpened(null);
       setPickerVisible(false);
       setSelectedLabel(null);
-      setPickerNotes('');
+      setPickerNotes(''); setPickerRating(null);
       setContactName(''); setContactPhone(''); setContactInsurance('');
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
@@ -626,6 +630,25 @@ export default function RealMapScreen({ navigation }: any) {
     ]);
   };
 
+  /** Rate from the detail sheet. Optimistic so the stars respond instantly;
+   *  reverts and reports if the write is rejected (e.g. migration not applied). */
+  const handleSetRating = async (rating: number | null) => {
+    if (!detailKnock) return;
+    const prev = detailKnock.rating ?? null;
+    setDetailKnock({ ...detailKnock, rating: rating ?? undefined });
+    setKnocks(list => list.map(k =>
+      k.id === detailKnock.id ? { ...k, rating: rating ?? undefined } : k
+    ));
+    const res = await SupabaseService.setKnockRating(detailKnock.id, rating);
+    if (!res.ok) {
+      setDetailKnock(d => (d && d.id === detailKnock.id ? { ...d, rating: prev ?? undefined } : d));
+      setKnocks(list => list.map(k =>
+        k.id === detailKnock.id ? { ...k, rating: prev ?? undefined } : k
+      ));
+      Alert.alert('Could not save rating', res.error ?? 'Try again.');
+    }
+  };
+
   const handleSaveProperty = async () => {
     if (!detailKnock) return;
     setSavingProperty(true);
@@ -677,7 +700,7 @@ export default function RealMapScreen({ navigation }: any) {
     setTimeout(() => {
       setPendingKnock(detailKnock);
       setPendingCoords({ lat: detailKnock.latitude, lng: detailKnock.longitude });
-      setPickerNotes(detailKnock.notes ?? '');
+      setPickerNotes(detailKnock.notes ?? ''); setPickerRating(detailKnock.rating ?? null);
       setSelectedLabel(detailKnock.label);
       // Pre-fill address — no need to re-geocode
       setPendingAddress(detailKnock.address);
@@ -735,6 +758,7 @@ export default function RealMapScreen({ navigation }: any) {
           address: pendingAddress,
           label: selectedLabel,
           notes: pickerNotes || undefined,
+          rating: pickerRating ?? undefined,
           knocked_at: new Date(),
           user_id: SupabaseService.getUserId() ?? undefined,
         });
@@ -763,7 +787,7 @@ export default function RealMapScreen({ navigation }: any) {
       setHardOpenVisible(false);
       setPickerVisible(false);
       setSelectedLabel(null);
-      setPickerNotes('');
+      setPickerNotes(''); setPickerRating(null);
       setContactName(''); setContactPhone(''); setContactInsurance('');
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
@@ -1221,6 +1245,11 @@ export default function RealMapScreen({ navigation }: any) {
                     ))}
                   </View>
 
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.ratingLabel}>RATING</Text>
+                    <StarRating value={pickerRating} onChange={setPickerRating} size={26} showValue />
+                  </View>
+
                   <TextInput
                     style={[styles.notesInput, { marginBottom: 8 }]}
                     placeholder="Add a note (optional)"
@@ -1370,7 +1399,7 @@ export default function RealMapScreen({ navigation }: any) {
                 onPress={() => {
                   setPickerVisible(false);
                   setSelectedLabel(null);
-                  setPickerNotes('');
+                  setPickerNotes(''); setPickerRating(null);
                 }}
               >
                 <Text style={styles.closeButtonText}>Cancel</Text>
@@ -1439,12 +1468,26 @@ export default function RealMapScreen({ navigation }: any) {
                     pin to peek can't work (the native annotation view swallows
                     the gesture; see NativeMap), so a single tap landing you
                     straight on the notes is the reliable read path. */}
-                {detailKnock.notes ? (
-                  <View style={styles.detailNotesBox}>
-                    <Text style={styles.detailNotesLabel}>📝 NOTES</Text>
-                    <Text style={styles.detailNotesText}>{detailKnock.notes}</Text>
+                {/* Rating lives WITH the notes: they're the two signals the
+                    Revisit queue ranks on, so they're read and edited together.
+                    Shown even with no note, so a door can be rated on sight. */}
+                <View style={styles.detailNotesBox}>
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.detailNotesLabel}>RATING</Text>
+                    <StarRating
+                      value={detailKnock.rating ?? null}
+                      onChange={handleSetRating}
+                      size={26}
+                      showValue
+                    />
                   </View>
-                ) : null}
+                  {detailKnock.notes ? (
+                    <>
+                      <Text style={[styles.detailNotesLabel, { marginTop: 8 }]}>📝 NOTES</Text>
+                      <Text style={styles.detailNotesText}>{detailKnock.notes}</Text>
+                    </>
+                  ) : null}
+                </View>
 
                 {/* Hail history — uploaded storms that hit this address (live lookup) */}
                 <View style={styles.contactSection}>
@@ -1752,6 +1795,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
+  ratingRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginBottom: 8, paddingHorizontal: 2,
+  },
+  ratingLabel: {
+    fontSize: 10, fontWeight: '800', color: '#6b7280', letterSpacing: 0.6,
+  },
   detailNotesLabel: {
     fontSize: 10, fontWeight: '800', color: '#92400e',
     letterSpacing: 0.6, marginBottom: 4,

@@ -25,6 +25,7 @@ export interface SupabaseKnock {
   longitude: number;
   label: string;
   notes?: string;
+  rating?: number; // 0–5 in half steps; ranks the Revisit queue
   photo_url?: string;
   storm_date?: string; // YYYY-MM-DD
   knocked_at?: string; // ISO timestamptz
