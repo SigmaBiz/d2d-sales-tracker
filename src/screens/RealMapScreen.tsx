@@ -1435,6 +1435,17 @@ export default function RealMapScreen({ navigation }: any) {
                   )}
                 </View>
 
+                {/* Notes — moved ABOVE Hail History on purpose. Long-pressing a
+                    pin to peek can't work (the native annotation view swallows
+                    the gesture; see NativeMap), so a single tap landing you
+                    straight on the notes is the reliable read path. */}
+                {detailKnock.notes ? (
+                  <View style={styles.detailNotesBox}>
+                    <Text style={styles.detailNotesLabel}>📝 NOTES</Text>
+                    <Text style={styles.detailNotesText}>{detailKnock.notes}</Text>
+                  </View>
+                ) : null}
+
                 {/* Hail history — uploaded storms that hit this address (live lookup) */}
                 <View style={styles.contactSection}>
                   <Text style={styles.historySectionTitle}>Hail History</Text>
@@ -1444,13 +1455,6 @@ export default function RealMapScreen({ navigation }: any) {
                     onStormLoaded={loadHailData}
                   />
                 </View>
-
-                {/* Notes */}
-                {detailKnock.notes ? (
-                  <View style={styles.detailNotesBox}>
-                    <Text style={styles.detailNotesText}>{detailKnock.notes}</Text>
-                  </View>
-                ) : null}
 
                 {/* Homeowner Info */}
                 <View style={styles.contactSection}>
@@ -1748,6 +1752,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
+  detailNotesLabel: {
+    fontSize: 10, fontWeight: '800', color: '#92400e',
+    letterSpacing: 0.6, marginBottom: 4,
+  },
   notesPeek: {
     position: 'absolute', top: 124, left: 16, right: 16, zIndex: 950,
     backgroundColor: '#fffbeb', borderRadius: 12,
