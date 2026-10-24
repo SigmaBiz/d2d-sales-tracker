@@ -134,7 +134,10 @@ export default function RealMapScreen({ navigation }: any) {
   const [shifts, setShifts] = useState<ShiftWindow[]>(DEFAULT_SHIFTS);
   const [doorGoal, setDoorGoal] = useState<number>(75);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
-  const [notesPeek, setNotesPeek] = useState<Knock | null>(null); // long-press peek
+  // Knock the Lead Log asked us to OPEN (not merely center on). Held until
+  // loadKnocks has populated `knocks` — the focus handler fires before the
+  // fetch resolves, so the door usually isn't in state yet.
+  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
   // Re-renders the pace readout as the shift burns down (cosmetic only).
   const [paceTick, setPaceTick] = useState(0);
 
@@ -172,15 +175,28 @@ export default function RealMapScreen({ navigation }: any) {
         mapRef.current?.centerOnLocation(pendingInspection.lat, pendingInspection.lng, 0.005);
       }
 
-      // Teleport from the Lead Log — center on the tapped lead's door.
+      // Teleport from the Lead Log — center on the door AND open its card.
       const pendingLead = (global as any).pendingLeadLocation;
       if (pendingLead) {
         (global as any).pendingLeadLocation = null;
         mapRef.current?.centerOnLocation(pendingLead.lat, pendingLead.lng, 0.005);
+        if (pendingLead.knockId) setPendingOpenId(pendingLead.knockId);
       }
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Open the teleported door's detail card as soon as it lands in `knocks`.
+  // Watching the list rather than chaining off loadKnocks keeps this correct
+  // whichever order focus + fetch complete in.
+  useEffect(() => {
+    if (!pendingOpenId) return;
+    const target = knocks.find(k => k.id === pendingOpenId);
+    if (!target) return;
+    setPendingOpenId(null);
+    if (doorLockRef.current) return; // mid-knock — don't hijack the sheet
+    handleKnockPress(target);
+  }, [knocks, pendingOpenId]);
 
   // Foreground live-update: App.tsx bumps `notifPingCounter` when a push arrives
   // while the app is open; poll it so the bell refreshes its count + animates live.
@@ -867,7 +883,6 @@ export default function RealMapScreen({ navigation }: any) {
         onKnockPress={handleKnockPress}
         searchedPin={searchedPin}
         onSearchedPinPress={() => setHailCardVisible(true)}
-        onKnockLongPress={setNotesPeek}
       />
 
       {/* Stats bar — today's field stats (Doors → Opened → Pipeline) + pace */}
@@ -1031,21 +1046,6 @@ export default function RealMapScreen({ navigation }: any) {
         <DoorTimerChip visible={timerVisible} onStop={cutDoorTimerShort} floating />
       )}
 
-      {/* Notes peek — long-press a 📝 pin. Deliberately not a modal: it must not
-          block the map, and tapping it just gets out of the way. */}
-      {notesPeek && (
-        <TouchableOpacity
-          style={styles.notesPeek}
-          activeOpacity={0.9}
-          onPress={() => setNotesPeek(null)}
-        >
-          <Text style={styles.notesPeekHeader} numberOfLines={1}>
-            {KNOCK_OUTCOME_EMOJI[notesPeek.label]} {notesPeek.address ?? 'This door'}
-          </Text>
-          <Text style={styles.notesPeekBody}>{notesPeek.notes}</Text>
-          <Text style={styles.notesPeekHint}>tap to dismiss</Text>
-        </TouchableOpacity>
-      )}
 
       {/* ── Today's door goal (override expires at midnight) ─────────────── */}
       <Modal
@@ -1806,17 +1806,6 @@ const styles = StyleSheet.create({
     fontSize: 10, fontWeight: '800', color: '#92400e',
     letterSpacing: 0.6, marginBottom: 4,
   },
-  notesPeek: {
-    position: 'absolute', top: 124, left: 16, right: 16, zIndex: 950,
-    backgroundColor: '#fffbeb', borderRadius: 12,
-    borderWidth: 1.5, borderColor: '#fbbf24',
-    paddingHorizontal: 14, paddingVertical: 11,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 5, elevation: 5,
-  },
-  notesPeekHeader: { fontSize: 13, fontWeight: '700', color: '#92400e' },
-  notesPeekBody: { fontSize: 14, color: '#1f2937', marginTop: 5, lineHeight: 19 },
-  notesPeekHint: { fontSize: 10, color: '#b45309', marginTop: 7, textAlign: 'right' },
   paceRow: {
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e5e7eb',
     paddingTop: 7, marginTop: 9, marginHorizontal: 12, alignItems: 'center',

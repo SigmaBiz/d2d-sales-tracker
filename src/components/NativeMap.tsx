@@ -174,9 +174,6 @@ interface NativeMapProps {
   onKnockPress: (knock: Knock) => void;
   searchedPin: { lat: number; lng: number; address: string } | null;
   onSearchedPinPress: () => void;
-  /** Long-press near a door that HAS notes. Resolved here — this component owns
-   *  the live region, so it's the only place that knows the current zoom. */
-  onKnockLongPress?: (knock: Knock) => void;
 }
 
 export interface NativeMapRef {
@@ -196,13 +193,8 @@ const NativeMap = forwardRef<NativeMapRef, NativeMapProps>(({
   onKnockPress,
   searchedPin,
   onSearchedPinPress,
-  onKnockLongPress,
 }, ref) => {
   const mapRef = useRef<MapView>(null);
-  // Live zoom, for scaling the long-press hit tolerance. Marker has no
-  // onLongPress (verified in MapMarker.d.ts), so the gesture is resolved from
-  // MapView.onLongPress + nearest-knock-with-notes instead.
-  const latDeltaRef = useRef<number>(0.05);
 
   // Compute contours only when hailReports changes — memoized to avoid re-running IDW on every render
   const contourPolygons = useMemo(() => {
@@ -259,24 +251,6 @@ const NativeMap = forwardRef<NativeMapRef, NativeMapProps>(({
       onPress={e => {
         const { latitude, longitude } = e.nativeEvent.coordinate;
         onMapPress(latitude, longitude);
-      }}
-      onRegionChangeComplete={r => { latDeltaRef.current = r.latitudeDelta; }}
-      onLongPress={e => {
-        if (!onKnockLongPress) return;
-        const { latitude, longitude } = e.nativeEvent.coordinate;
-        // Scale tolerance with zoom so it still works zoomed out without
-        // grabbing a neighbour when zoomed in. Floor keeps it usable up close.
-        const tol = Math.max(0.00035, latDeltaRef.current * 0.04);
-        let best: Knock | null = null;
-        let bestD = Infinity;
-        for (const k of knocks) {
-          if (!k.notes || !k.notes.trim()) continue;   // only doors with notes
-          const dLat = k.latitude - latitude;
-          const dLng = (k.longitude - longitude) * Math.cos(latitude * Math.PI / 180);
-          const d = Math.sqrt(dLat * dLat + dLng * dLng);
-          if (d < bestD) { bestD = d; best = k; }
-        }
-        if (best && bestD <= tol) onKnockLongPress(best);
       }}
     >
       {/* Hail contour polygons — smooth IDW-interpolated swaths, lowest threshold first */}
