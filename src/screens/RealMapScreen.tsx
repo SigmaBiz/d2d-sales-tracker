@@ -132,6 +132,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [shifts, setShifts] = useState<ShiftWindow[]>(DEFAULT_SHIFTS);
   const [doorGoal, setDoorGoal] = useState<number>(75);
   const [goalSheetVisible, setGoalSheetVisible] = useState(false);
+  const [notesPeek, setNotesPeek] = useState<Knock | null>(null); // long-press peek
   // Re-renders the pace readout as the shift burns down (cosmetic only).
   const [paceTick, setPaceTick] = useState(0);
 
@@ -612,6 +613,12 @@ export default function RealMapScreen({ navigation }: any) {
   const handleAddressPress = (address: string) => {
     const encoded = encodeURIComponent(address);
     Alert.alert(address, undefined, [
+      {
+        // https form (not maps://) so it deep-links to Maps on device and falls
+        // back to the web instead of dead-linking. dirflg=d == driving.
+        text: 'Directions',
+        onPress: () => Linking.openURL(`https://maps.apple.com/?daddr=${encoded}&dirflg=d`),
+      },
       { text: 'Share / Copy', onPress: () => Share.share({ message: address }) },
       { text: 'Open on Redfin', onPress: () => Linking.openURL(`https://www.redfin.com/search#query=${encoded}`) },
       { text: 'Open on Zillow', onPress: () => Linking.openURL(`https://www.zillow.com/homes/${encoded}_rb/`) },
@@ -836,6 +843,7 @@ export default function RealMapScreen({ navigation }: any) {
         onKnockPress={handleKnockPress}
         searchedPin={searchedPin}
         onSearchedPinPress={() => setHailCardVisible(true)}
+        onKnockLongPress={setNotesPeek}
       />
 
       {/* Stats bar — today's field stats (Doors → Opened → Pipeline) + pace */}
@@ -997,6 +1005,22 @@ export default function RealMapScreen({ navigation }: any) {
 
       {!pickerVisible && (
         <DoorTimerChip visible={timerVisible} onStop={cutDoorTimerShort} floating />
+      )}
+
+      {/* Notes peek — long-press a 📝 pin. Deliberately not a modal: it must not
+          block the map, and tapping it just gets out of the way. */}
+      {notesPeek && (
+        <TouchableOpacity
+          style={styles.notesPeek}
+          activeOpacity={0.9}
+          onPress={() => setNotesPeek(null)}
+        >
+          <Text style={styles.notesPeekHeader} numberOfLines={1}>
+            {KNOCK_OUTCOME_EMOJI[notesPeek.label]} {notesPeek.address ?? 'This door'}
+          </Text>
+          <Text style={styles.notesPeekBody}>{notesPeek.notes}</Text>
+          <Text style={styles.notesPeekHint}>tap to dismiss</Text>
+        </TouchableOpacity>
       )}
 
       {/* ── Today's door goal (override expires at midnight) ─────────────── */}
@@ -1724,6 +1748,17 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
+  notesPeek: {
+    position: 'absolute', top: 124, left: 16, right: 16, zIndex: 950,
+    backgroundColor: '#fffbeb', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#fbbf24',
+    paddingHorizontal: 14, paddingVertical: 11,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 5, elevation: 5,
+  },
+  notesPeekHeader: { fontSize: 13, fontWeight: '700', color: '#92400e' },
+  notesPeekBody: { fontSize: 14, color: '#1f2937', marginTop: 5, lineHeight: 19 },
+  notesPeekHint: { fontSize: 10, color: '#b45309', marginTop: 7, textAlign: 'right' },
   paceRow: {
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e5e7eb',
     paddingTop: 7, marginTop: 9, marginHorizontal: 12, alignItems: 'center',
