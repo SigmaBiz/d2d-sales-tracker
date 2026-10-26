@@ -27,6 +27,7 @@ import { formatAsYouTypeUS, isValidUSPhone, toE164 } from '../utils/phone';
 import DoorTimerChip from '../components/DoorTimerChip';
 import StarRating from '../components/StarRating';
 import { openConfirmationDraft } from '../services/appointmentEmail';
+import SlotPicker, { Slot } from '../components/SlotPicker';
 import { DoorTimerService } from '../services/doorTimerService';
 import {
   remainingShiftMinutes, doorBudgetMinutes, paceBand, PACE_COLOR,
@@ -107,6 +108,8 @@ export default function RealMapScreen({ navigation }: any) {
   // Service type + scheduled-inspection state (F2c)
   const [serviceType, setServiceType] = useState<'live' | 'scheduled'>('live');
   const [apptDate, setApptDate] = useState<Date | null>(null);
+  const [apptSlot, setApptSlot] = useState<Slot | null>(null);   // chosen Google slot
+  const [slotsUnavailable, setSlotsUnavailable] = useState(false); // → manual picker
   const [showApptPicker, setShowApptPicker] = useState(false);
   // Setter reschedule (from the detail sheet) picker
   const [showReschedPicker, setShowReschedPicker] = useState(false);
@@ -569,6 +572,20 @@ export default function RealMapScreen({ navigation }: any) {
         Alert.alert('Schedule failed', res.error || 'Could not schedule inspection');
         return;
       }
+      // Create the calendar event + homeowner invite. Best-effort: the lifecycle
+      // transition above already recorded the appointment, so a calendar failure
+      // is reported but never unwinds a booking made in front of a homeowner.
+      const slotEnd = apptSlot?.endISO ?? new Date(apptDate.getTime() + 60 * 60 * 1000).toISOString();
+      const booking = await SupabaseService.bookCalendarEvent({
+        knockId: savedKnock.id,
+        startISO: apptDate.toISOString(),
+        endISO: slotEnd,
+        attendeeEmail: contactEmail.trim() || undefined,
+        address: pendingAddress ?? undefined,
+        contactName: contactName || undefined,
+        notes: pickerNotes || undefined,
+      });
+
       // Snapshot before the reset below wipes the fields.
       const confirmArgs = {
         address: pendingAddress ?? undefined,
@@ -588,14 +605,25 @@ export default function RealMapScreen({ navigation }: any) {
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
       setServiceType('live'); setApptDate(null);
+      setApptSlot(null); setSlotsUnavailable(false);
       await loadKnocks();
 
-      // Prompt rather than auto-open: the mail composer takes over the screen,
-      // and at a door you may want to keep moving and send it from the truck.
-      if (confirmArgs.contactEmail) {
+      // ALWAYS confirm. A silent success is what made a working booking read as
+      // "nothing happened" during field testing.
+      const when = new Date(confirmArgs.appointmentAt).toLocaleString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      });
+      const calLine = booking.ok
+        ? (confirmArgs.contactEmail
+            ? '\nAdded to your calendar — the homeowner has been emailed an invite.'
+            : '\nAdded to your calendar.')
+        : '\nNot added to your calendar (the appointment is still saved).';
+
+      if (confirmArgs.contactEmail && !booking.ok) {
+        // Google didn't send an invite, so offer the manual draft instead.
         Alert.alert(
-          'Scheduled ✓',
-          'Send the homeowner a confirmation email now?',
+          `Scheduled ✓  ${when}`,
+          `${calLine}\n\nSend the homeowner a confirmation email now?`,
           [
             { text: 'Later', style: 'cancel' },
             {
@@ -607,6 +635,8 @@ export default function RealMapScreen({ navigation }: any) {
             },
           ]
         );
+      } else {
+        Alert.alert(`Scheduled ✓  ${when}`, calLine.trim());
       }
     } catch (err) {
       Alert.alert('Schedule failed', 'Could not save & schedule. Check your connection.');
@@ -1350,12 +1380,30 @@ export default function RealMapScreen({ navigation }: any) {
                         </TouchableOpacity>
                       ) : (
                         <>
-                          <TouchableOpacity style={styles.apptPickerBtn} onPress={() => setShowApptPicker(true)}>
+                          {!slotsUnavailable && (
+                            <SlotPicker
+                              selected={apptSlot}
+                              onSelect={slot => {
+                                setApptSlot(slot);
+                                setApptDate(new Date(slot.startISO)); // drives the existing save path
+                              }}
+                              onUnavailable={() => setSlotsUnavailable(true)}
+                            />
+                          )}
+                          {slotsUnavailable && (
+                          <TouchableOpacity style={styles.apptPickerBtn} onPress={() => {
+                            // Seed the default so the displayed time is actually
+                            // committed — the picker previously showed a time it
+                            // had never saved, leaving the button silently dead.
+                            if (!apptDate) setApptDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+                            setShowApptPicker(true);
+                          }}>
                             <Text style={styles.apptPickerText}>
                               {apptDate ? `📅 ${apptDate.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : '📅 Pick appointment time'}
                             </Text>
                           </TouchableOpacity>
-                          {showApptPicker && (
+                          )}
+                          {slotsUnavailable && showApptPicker && (
                             <DateTimePicker
                               value={apptDate ?? new Date(Date.now() + 24 * 60 * 60 * 1000)}
                               mode="datetime"

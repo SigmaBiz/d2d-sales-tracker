@@ -459,6 +459,57 @@ export class SupabaseService {
     return { ok: true };
   }
 
+  /**
+   * Open appointment slots from the owner's Google Calendar.
+   * NEVER throws: a calendar failure must degrade to the manual time picker,
+   * not block booking while a homeowner is standing there.
+   */
+  static async getCalendarSlots(
+    days = 7
+  ): Promise<{ configured: boolean; slots: Array<{ startISO: string; endISO: string }> }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return { configured: false, slots: [] };
+
+      const res = await fetch(`${API_BASE}/api/calendar/slots?days=${days}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return { configured: false, slots: [] };
+      const body = await res.json();
+      return { configured: Boolean(body.configured), slots: body.slots ?? [] };
+    } catch {
+      return { configured: false, slots: [] };
+    }
+  }
+
+  /**
+   * Create the calendar event + send the homeowner their invite.
+   * Best-effort: the lifecycle transition already recorded the appointment, so a
+   * calendar failure is reported but never unwinds the booking.
+   */
+  static async bookCalendarEvent(args: {
+    knockId: string; startISO: string; endISO: string;
+    attendeeEmail?: string; address?: string; contactName?: string; notes?: string;
+  }): Promise<{ ok: boolean; htmlLink?: string; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return { ok: false, error: 'Not authenticated' };
+
+      const res = await fetch(`${API_BASE}/api/calendar/book`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(args),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+      return { ok: true, htmlLink: body.htmlLink };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? 'Network error' };
+    }
+  }
+
   /** Append-only event history for one knock (the per-lead Log). */
   static async getLeadEvents(knockId: string): Promise<Array<{
     action: string; from_status: string | null; to_status: string | null;
