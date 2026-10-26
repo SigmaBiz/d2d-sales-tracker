@@ -55,8 +55,16 @@ export interface TransitionRule {
  */
 export const LIVE_TRANSITIONS: Record<LeadAction, TransitionRule[]> = {
   // ── Entry ────────────────────────────────────────────────────────────────
-  ping:       [{ from: null, to: 'pinged', role: 'member' }],
-  schedule:   [{ from: null, to: 'scheduled', role: 'member' }],
+  // Owner rules are ADDITIVE so a solo operator can enter the lifecycle at all.
+  // Without them the owner is locked out of ping AND schedule, which made the
+  // whole lead lifecycle (and therefore appointments) unreachable working alone.
+  // Two-person behaviour is unchanged — resolveTransition disambiguates on
+  // (from + role) — and notifyCounterparty already no-ops when the actor IS the
+  // recipient, so a solo owner never pushes themselves.
+  ping:       [{ from: null, to: 'pinged',    role: 'member' },
+               { from: null, to: 'pinged',    role: 'owner'  }],
+  schedule:   [{ from: null, to: 'scheduled', role: 'member' },
+               { from: null, to: 'scheduled', role: 'owner'  }],
 
   // ── Runner advances ──────────────────────────────────────────────────────
   confirm:    [{ from: 'scheduled', to: 'confirmed', role: 'owner' }], // acknowledge a scheduled lead

@@ -779,7 +779,7 @@ export class SupabaseService {
    */
   static async upsertContact(
     knockId: string,
-    data: { name?: string; phone?: string; insurance_carrier?: string }
+    data: { name?: string; phone?: string; email?: string; insurance_carrier?: string }
   ): Promise<void> {
     const { data: existing } = await supabase
       .from('contacts')
@@ -791,6 +791,7 @@ export class SupabaseService {
       await supabase.from('contacts').update({
         name: data.name ?? null,
         phone: data.phone ?? null,
+        email: data.email ?? null,
         insurance_carrier: data.insurance_carrier ?? null,
       }).eq('id', existing.id);
     } else {
@@ -798,6 +799,7 @@ export class SupabaseService {
         knock_id: knockId,
         name: data.name,
         phone: data.phone,
+        email: data.email,
         insurance_carrier: data.insurance_carrier,
         is_owner: true,
       });

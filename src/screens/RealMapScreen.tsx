@@ -26,6 +26,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { formatAsYouTypeUS, isValidUSPhone, toE164 } from '../utils/phone';
 import DoorTimerChip from '../components/DoorTimerChip';
 import StarRating from '../components/StarRating';
+import { openConfirmationDraft } from '../services/appointmentEmail';
 import { DoorTimerService } from '../services/doorTimerService';
 import {
   remainingShiftMinutes, doorBudgetMinutes, paceBand, PACE_COLOR,
@@ -96,6 +97,7 @@ export default function RealMapScreen({ navigation }: any) {
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactInsurance, setContactInsurance] = useState('');
+  const [contactEmail, setContactEmail] = useState(''); // drives the confirmation email
   const [savingContact, setSavingContact] = useState(false);
 
   // Ping Owner state
@@ -423,7 +425,7 @@ export default function RealMapScreen({ navigation }: any) {
     setGateOpened(null);
     setPickerNotes(''); setPickerRating(null);
     setSelectedLabel(null);
-    setContactName(''); setContactPhone(''); setContactInsurance('');
+    setContactName(''); setContactPhone(''); setContactInsurance(''); setContactEmail('');
     setPropertyYearBuilt(''); setPropertySqft('');
     setPingOwnerSent(false);
     setPendingAddress(undefined);
@@ -500,10 +502,11 @@ export default function RealMapScreen({ navigation }: any) {
         knocked_at: new Date(),
         user_id: SupabaseService.getUserId() ?? undefined,
       });
-      if (contactName || contactPhone || contactInsurance) {
+      if (contactName || contactPhone || contactEmail || contactInsurance) {
         await SupabaseService.upsertContact(savedKnock.id, {
           name: contactName || undefined,
           phone: toE164(contactPhone) ?? (contactPhone || undefined),
+          email: contactEmail.trim() || undefined,
           insurance_carrier: contactInsurance || undefined,
         });
       }
@@ -520,7 +523,7 @@ export default function RealMapScreen({ navigation }: any) {
       setPickerVisible(false);
       setSelectedLabel(null);
       setPickerNotes(''); setPickerRating(null);
-      setContactName(''); setContactPhone(''); setContactInsurance('');
+      setContactName(''); setContactPhone(''); setContactInsurance(''); setContactEmail('');
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
       await loadKnocks();
@@ -551,10 +554,11 @@ export default function RealMapScreen({ navigation }: any) {
         knocked_at: new Date(),
         user_id: SupabaseService.getUserId() ?? undefined,
       });
-      if (contactName || contactPhone || contactInsurance) {
+      if (contactName || contactPhone || contactEmail || contactInsurance) {
         await SupabaseService.upsertContact(savedKnock.id, {
           name: contactName || undefined,
           phone: toE164(contactPhone) ?? (contactPhone || undefined),
+          email: contactEmail.trim() || undefined,
           insurance_carrier: contactInsurance || undefined,
         });
       }
@@ -565,6 +569,14 @@ export default function RealMapScreen({ navigation }: any) {
         Alert.alert('Schedule failed', res.error || 'Could not schedule inspection');
         return;
       }
+      // Snapshot before the reset below wipes the fields.
+      const confirmArgs = {
+        address: pendingAddress ?? undefined,
+        contactName: contactName || undefined,
+        contactEmail: contactEmail.trim() || undefined,
+        appointmentAt: apptDate.toISOString(),
+      };
+
       closeKnockSession(savedKnock.id, 'lead');
       doorLockRef.current = false;
       setHardOpenVisible(false);
@@ -572,11 +584,30 @@ export default function RealMapScreen({ navigation }: any) {
       setPickerVisible(false);
       setSelectedLabel(null);
       setPickerNotes(''); setPickerRating(null);
-      setContactName(''); setContactPhone(''); setContactInsurance('');
+      setContactName(''); setContactPhone(''); setContactInsurance(''); setContactEmail('');
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
       setServiceType('live'); setApptDate(null);
       await loadKnocks();
+
+      // Prompt rather than auto-open: the mail composer takes over the screen,
+      // and at a door you may want to keep moving and send it from the truck.
+      if (confirmArgs.contactEmail) {
+        Alert.alert(
+          'Scheduled ✓',
+          'Send the homeowner a confirmation email now?',
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Send',
+              onPress: async () => {
+                const opened = await openConfirmationDraft(confirmArgs);
+                if (!opened) Alert.alert('No mail app', 'Could not open a mail composer on this device.');
+              },
+            },
+          ]
+        );
+      }
     } catch (err) {
       Alert.alert('Schedule failed', 'Could not save & schedule. Check your connection.');
       console.error('[Map] saveAndSchedule error:', err);
@@ -617,6 +648,7 @@ export default function RealMapScreen({ navigation }: any) {
       await SupabaseService.upsertContact(detailKnock.id, {
         name: contactName || undefined,
         phone: toE164(contactPhone) ?? (contactPhone || undefined),
+        email: contactEmail.trim() || undefined,
         insurance_carrier: contactInsurance || undefined,
       });
       // Refresh contacts display
@@ -753,10 +785,11 @@ export default function RealMapScreen({ navigation }: any) {
         await SupabaseService.updateKnockLabel(
           pendingKnock.id, pendingKnock.label, selectedLabel, pickerNotes || undefined
         );
-        if (contactName || contactPhone || contactInsurance) {
+        if (contactName || contactPhone || contactEmail || contactInsurance) {
           await SupabaseService.upsertContact(pendingKnock.id, {
             name: contactName || undefined,
             phone: toE164(contactPhone) ?? (contactPhone || undefined),
+            email: contactEmail.trim() || undefined,
             insurance_carrier: contactInsurance || undefined,
           });
         }
@@ -779,10 +812,11 @@ export default function RealMapScreen({ navigation }: any) {
           user_id: SupabaseService.getUserId() ?? undefined,
         });
         savedKnockId = savedKnock.id;
-        if (contactName || contactPhone || contactInsurance) {
+        if (contactName || contactPhone || contactEmail || contactInsurance) {
           await SupabaseService.upsertContact(savedKnock.id, {
             name: contactName || undefined,
             phone: toE164(contactPhone) ?? (contactPhone || undefined),
+            email: contactEmail.trim() || undefined,
             insurance_carrier: contactInsurance || undefined,
           });
         }
@@ -804,7 +838,7 @@ export default function RealMapScreen({ navigation }: any) {
       setPickerVisible(false);
       setSelectedLabel(null);
       setPickerNotes(''); setPickerRating(null);
-      setContactName(''); setContactPhone(''); setContactInsurance('');
+      setContactName(''); setContactPhone(''); setContactInsurance(''); setContactEmail('');
       setPropertyYearBuilt(''); setPropertySqft('');
       setPingOwnerSent(false);
       await loadKnocks();
@@ -1346,6 +1380,16 @@ export default function RealMapScreen({ navigation }: any) {
                       )}
                     </>
                   )}
+                  <TextInput
+                    style={styles.contactInput}
+                    placeholder="Email (for the confirmation)"
+                    placeholderTextColor="#9ca3af"
+                    value={contactEmail}
+                    onChangeText={setContactEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                   <TextInput
                     style={styles.contactInput}
                     placeholder="Insurance Carrier"
