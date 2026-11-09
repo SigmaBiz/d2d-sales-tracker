@@ -12,14 +12,18 @@
  *  - `lead` DOES require name + phone ("we want to command respect").
  *  - `follow_up` is the post-inspection state, held until signed.
  *
- * ⚠ ASSUMPTION worth revisiting: the owner described follow_up twice — once
- * pre-inspection ("they engage but can't act yet, so you book a follow-up") and
- * once post-inspection ("inspected ... it would be a follow up until signed").
- * Those are different states, and collapsing them would make the label unable to
- * tell you whether a roof has actually been looked at — which breaks the funnel.
- * Resolved here as: follow_up is POST-inspection only; the pre-inspection booked
- * case is a `lead` that carries an appointment. Revisit if that feels wrong in
- * the field.
+ * RESOLVED by the owner 2026-11-09 (was flagged as an assumption):
+ *  - A pre-inspection follow-up IS JUST A LEAD. There is no pre-inspection
+ *    follow_up state.
+ *  - `lead` therefore covers both: the booked pre-inspection follow-up, AND a
+ *    plain warm lead where we hold contact info — appointment or not. What makes
+ *    it a lead rather than a cold address is the CONTACT'S EXPECTATION that they
+ *    will be contacted.
+ *  - `follow_up` is strictly POST-inspection: the roof has been looked at and we
+ *    are working it toward signed.
+ * Consequence: follow_up (and signed) can only be reached from an inspected
+ * door. Allowing a jump straight to follow_up would destroy the one thing the
+ * funnel exists to measure — whether a roof was actually looked at, and when.
  */
 
 import { KnockOutcome } from '../types';
@@ -39,6 +43,16 @@ export const LABEL_RANK: Partial<Record<KnockOutcome, number>> = {
 
 /** Stages that require a reachable human on file. inspected deliberately omitted. */
 const NEEDS_CONTACT: KnockOutcome[] = ['lead', 'follow_up'];
+
+/**
+ * Minimum rank a door must ALREADY hold before it can take this label.
+ * Both post-inspection states require an actual inspection on record — that is
+ * what makes knock→inspected→signed timings meaningful rather than guesswork.
+ */
+const MIN_PRIOR_RANK: Partial<Record<KnockOutcome, number>> = {
+  follow_up: LABEL_RANK.inspected!,
+  signed:    LABEL_RANK.inspected!,
+};
 
 export interface LabelContext {
   hasName: boolean;
@@ -70,6 +84,12 @@ export function canApplyLabel(
 
   const from = current ? LABEL_RANK[current] : undefined;
   const to = LABEL_RANK[next];
+
+  // Forward gate: post-inspection states need an inspection on record first.
+  const minPrior = MIN_PRIOR_RANK[next];
+  if (minPrior !== undefined && (from ?? 0) < minPrior) {
+    return { ok: false, reason: 'mark Inspected first' };
+  }
   // Only constrain moves WITHIN the funnel. Leaving it (e.g. marking a stale
   // lead not_interested) stays allowed — the door is being closed out, not
   // regressed.
