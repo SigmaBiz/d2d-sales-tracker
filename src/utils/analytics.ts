@@ -9,6 +9,7 @@
  * drop those doors — "everything except the three not-opened labels" cannot.
  */
 import { Knock, KnockOutcome } from '../types';
+import { LABEL_RANK } from './labelRules';
 
 // ── Label sets ────────────────────────────────────────────────────────────────
 
@@ -44,10 +45,28 @@ export const PIPELINE_LABELS: string[] = ['inspected', 'follow_up', 'lead', 'sig
  * Cumulative funnel sets. Labels are mutually exclusive snapshots — a signed
  * door no longer carries 'inspected' — so funnel stages must count "X or
  * beyond", not the raw label.
+ *
+ * DERIVED from LABEL_RANK rather than hand-listed: the hand-written version
+ * omitted `follow_up`, so relabelling inspected → follow_up silently erased the
+ * inspection from the day's numbers. Deriving makes that class of drift
+ * impossible — a new funnel label is counted correctly the moment it gets a rank.
  */
-export const INSPECTED_PLUS: string[] = ['inspected', 'signed', 'retarget'];
+export function labelsAtOrAbove(stage: KnockOutcome): string[] {
+  const floor = LABEL_RANK[stage];
+  if (floor === undefined) return [stage];
+  return Object.entries(LABEL_RANK)
+    .filter(([, rank]) => (rank ?? 0) >= floor)
+    .map(([label]) => label);
+}
+
+/** Terminal outcomes that sit outside LABEL_RANK but still imply an inspection. */
+const POST_INSPECTION_TERMINALS = ['retarget', 'flaked', 'arch_hard'];
+
+export const INSPECTED_PLUS: string[] = [
+  ...labelsAtOrAbove('inspected'), 'retarget',
+];
 export const CONVERSATION_PLUS: string[] = [
-  'conversation', 'follow_up', 'lead', 'flaked', 'arch_hard', ...INSPECTED_PLUS,
+  ...labelsAtOrAbove('conversation'), ...POST_INSPECTION_TERMINALS,
 ];
 
 // ── Classification ────────────────────────────────────────────────────────────
@@ -185,6 +204,80 @@ export function computeRangeStats(knocks: Knock[], win: RangeWindow): RangeStats
     activeDays: days.size,
     avgDailyDoors: days.size > 0 ? doors / days.size : null,
   counts,
+  };
+}
+
+// ── Trajectory ("reached") stats ─────────────────────────────────────────────
+
+/** One relabel, from knock_history. */
+export interface LabelTransition {
+  knock_id: string;
+  new_label: string;
+  changed_at: string; // ISO
+}
+
+export interface ReachedStats {
+  lead: number;
+  inspected: number;
+  follow_up: number;
+  signed: number;
+}
+
+const FUNNEL_STAGES: KnockOutcome[] = ['lead', 'inspected', 'follow_up', 'signed'];
+
+/**
+ * How many DOORS reached each funnel stage during the window — the trajectory,
+ * not the snapshot.
+ *
+ * Why this exists: `knocks.label` holds only the CURRENT state, so a door that
+ * was inspected and then relabelled follow_up stops being visible as an
+ * inspection. computeRangeStats' cumulative sets patch that for the current
+ * label, but they still attribute the stage to the knock's ORIGINAL date — so
+ * inspecting a door today that you knocked last week would not show up in
+ * today's inspections. Counting transitions fixes both: credit lands on the day
+ * the stage was actually reached.
+ *
+ * A door counts for a stage if EITHER a transition into that stage (or beyond)
+ * landed in the window, OR the door was created in the window already at that
+ * stage (no transition row exists for a door's first label). Distinct doors, so
+ * lead → inspected → follow_up in one day is one door at each stage, not three.
+ */
+export function computeReachedStats(
+  knocks: Knock[],
+  transitions: LabelTransition[],
+  win: RangeWindow
+): ReachedStats {
+  const inWindow = (t: Date) =>
+    !(win.start && t < win.start) && !(win.end && t >= win.end);
+
+  const reached: Record<string, Set<string>> = {};
+  for (const stage of FUNNEL_STAGES) reached[stage] = new Set();
+
+  const credit = (knockId: string, label: string) => {
+    const rank = LABEL_RANK[label as KnockOutcome];
+    if (rank === undefined) return;
+    for (const stage of FUNNEL_STAGES) {
+      if (rank >= (LABEL_RANK[stage] ?? Infinity)) reached[stage].add(knockId);
+    }
+  };
+
+  // Doors created already at a funnel stage — their first label has no history row.
+  for (const k of knocks) {
+    const t = k.knocked_at instanceof Date ? k.knocked_at : new Date(k.knocked_at);
+    if (inWindow(t)) credit(k.id, k.label);
+  }
+
+  // Every relabel that landed in the window, credited to the transition date.
+  for (const tr of transitions) {
+    const t = new Date(tr.changed_at);
+    if (inWindow(t)) credit(tr.knock_id, tr.new_label);
+  }
+
+  return {
+    lead: reached.lead.size,
+    inspected: reached.inspected.size,
+    follow_up: reached.follow_up.size,
+    signed: reached.signed.size,
   };
 }
 

@@ -510,6 +510,31 @@ export class SupabaseService {
     }
   }
 
+  /**
+   * Every relabel in the period — the raw material for trajectory stats.
+   * knocks.label is only the CURRENT state, so without these a door that was
+   * inspected and later moved to follow_up loses its inspection from the day's
+   * numbers entirely.
+   */
+  static async getLabelTransitions(
+    since?: string
+  ): Promise<Array<{ knock_id: string; new_label: string; changed_at: string }>> {
+    if (!this.userId) return [];
+    let q = supabase
+      .from('knock_history')
+      .select('knock_id, new_label, changed_at')
+      .order('changed_at', { ascending: false })
+      .limit(5000);
+    if (since) q = q.gte('changed_at', since);
+
+    const { data, error } = await q;
+    if (error) {
+      console.error('[Supabase] getLabelTransitions error:', error);
+      return [];
+    }
+    return (data ?? []) as Array<{ knock_id: string; new_label: string; changed_at: string }>;
+  }
+
   /** Append-only event history for one knock (the per-lead Log). */
   static async getLeadEvents(knockId: string): Promise<Array<{
     action: string; from_status: string | null; to_status: string | null;

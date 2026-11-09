@@ -15,6 +15,7 @@ import {
   formatMinutes, ShiftWindow, DEFAULT_SHIFTS,
 } from '../utils/pacing';
 import { getShifts, getGoalOverride } from '../services/pacingSettings';
+import { computeReachedStats, LabelTransition } from '../utils/analytics';
 import { Knock, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL } from '../types';
 import {
   RangeKey,
@@ -52,6 +53,7 @@ export default function StatsScreen() {
   const [isOwner, setIsOwner] = useState(false);
   const [dailyGoal, setDailyGoal] = useState(75);
   const [shifts, setShiftWindows] = useState<ShiftWindow[]>(DEFAULT_SHIFTS);
+  const [transitions, setTransitions] = useState<LabelTransition[]>([]);
   const [limitHit, setLimitHit] = useState(false);
 
   const loadData = async (r: RangeKey) => {
@@ -60,6 +62,9 @@ export default function StatsScreen() {
     const since = previousWindow(r)?.start ?? rangeWindow(r).start ?? undefined;
     const [sh, override] = await Promise.all([getShifts(), getGoalOverride()]);
     setShiftWindows(sh);
+    setTransitions(await SupabaseService.getLabelTransitions(
+      rangeWindow(range).start?.toISOString()
+    ));
     const [knocksData, teamData, goal] = await Promise.all([
       SupabaseService.getKnocks(since),
       SupabaseService.getMyTeam(),
@@ -86,6 +91,14 @@ export default function StatsScreen() {
 
   const rateBand = openRateBand(current.openRate);
   const trend = trendPct(current.avgDailyDoors, previous?.avgDailyDoors ?? null);
+  // Trajectory: doors that REACHED each stage in the period, credited to the day
+  // the transition happened. Survives relabelling — an inspection that later
+  // became a follow-up is still an inspection for that day.
+  const reached = React.useMemo(
+    () => computeReachedStats(knocks, transitions, rangeWindow(range)),
+    [knocks, transitions, range]
+  );
+
   const goalProgress = Math.min(1, todayStats.doors / Math.max(1, dailyGoal));
   // Same pace math as the map, so the two screens can't disagree.
   const minsLeft = remainingShiftMinutes(new Date(), shifts);
@@ -256,6 +269,27 @@ export default function StatsScreen() {
           </View>
         </View>
 
+        {/* Trajectory — counts every stage a door PASSED THROUGH this period,
+            not just where it ended up. The funnel row above reads the current
+            label, so a door that moved on no longer shows at the stage it came
+            from; these are credited on the day the transition happened. */}
+        <View style={styles.reachedBox}>
+          <Text style={styles.reachedTitle}>REACHED THIS PERIOD (incl. doors that moved on)</Text>
+          <View style={styles.reachedRow}>
+            {([
+              ['Lead+', reached.lead],
+              ['Inspected+', reached.inspected],
+              ['Follow Up+', reached.follow_up],
+              ['Signed', reached.signed],
+            ] as [string, number][]).map(([label, value]) => (
+              <View key={label} style={styles.reachedItem}>
+                <Text style={styles.reachedValue}>{value}</Text>
+                <Text style={styles.reachedLabel}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.rateRow}>
           <View style={styles.rateItem}>
             <Text style={[styles.rateValue, { color: rateBand.color === '#9ca3af' ? '#1e40af' : rateBand.color }]}>
@@ -356,6 +390,19 @@ const styles = StyleSheet.create({
   goalToday: { fontSize: 26, fontWeight: '800', color: '#111827' },
   goalOf: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
   goalCaption: { fontSize: 12, color: '#9ca3af' },
+  reachedBox: {
+    backgroundColor: '#f8fafc', borderRadius: 10,
+    paddingVertical: 10, paddingHorizontal: 8, marginTop: 12,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: '#e2e8f0',
+  },
+  reachedTitle: {
+    fontSize: 9, fontWeight: '800', color: '#64748b',
+    letterSpacing: 0.5, textAlign: 'center', marginBottom: 8,
+  },
+  reachedRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  reachedItem: { alignItems: 'center' },
+  reachedValue: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  reachedLabel: { fontSize: 10, color: '#64748b', marginTop: 2, fontWeight: '600' },
   paceLine: { marginTop: 10, alignItems: 'center' },
   paceLineText: { fontSize: 13 },
   goalBarTrack: { height: 10, backgroundColor: '#f3f4f6', borderRadius: 5, overflow: 'hidden', marginHorizontal: 16 },
