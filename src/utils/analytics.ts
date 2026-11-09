@@ -212,6 +212,7 @@ export function computeRangeStats(knocks: Knock[], win: RangeWindow): RangeStats
 /** One relabel, from knock_history. */
 export interface LabelTransition {
   knock_id: string;
+  previous_label?: string;
   new_label: string;
   changed_at: string; // ISO
 }
@@ -226,21 +227,24 @@ export interface ReachedStats {
 const FUNNEL_STAGES: KnockOutcome[] = ['lead', 'inspected', 'follow_up', 'signed'];
 
 /**
- * How many DOORS reached each funnel stage during the window — the trajectory,
- * not the snapshot.
+ * How many doors ENTERED each funnel stage during the window — what you
+ * actually did in the period, credited to the day it happened.
  *
  * Why this exists: `knocks.label` holds only the CURRENT state, so a door that
  * was inspected and then relabelled follow_up stops being visible as an
  * inspection. computeRangeStats' cumulative sets patch that for the current
- * label, but they still attribute the stage to the knock's ORIGINAL date — so
- * inspecting a door today that you knocked last week would not show up in
- * today's inspections. Counting transitions fixes both: credit lands on the day
- * the stage was actually reached.
+ * label, but still attribute the stage to the knock's ORIGINAL date — so
+ * inspecting today a door you knocked last week would miss today's numbers.
  *
- * A door counts for a stage if EITHER a transition into that stage (or beyond)
- * landed in the window, OR the door was created in the window already at that
- * stage (no transition row exists for a door's first label). Distinct doors, so
- * lead → inspected → follow_up in one day is one door at each stage, not three.
+ * ENTRY semantics, deliberately — NOT "at or beyond". Signing today a door that
+ * was inspected last week credits Signed TODAY and leaves the inspection in
+ * LAST week, where it happened. Cumulative crediting double-counted the earlier
+ * stages into the current period and made "inspections today" a lie.
+ *
+ * A door's FIRST label writes no history row, so it is reconstructed from the
+ * `previous_label` of that door's earliest transition (falling back to the
+ * current label for doors that never moved). Using k.label directly would
+ * back-date a door's latest stage to its knock date.
  */
 export function computeReachedStats(
   knocks: Knock[],
@@ -250,34 +254,40 @@ export function computeReachedStats(
   const inWindow = (t: Date) =>
     !(win.start && t < win.start) && !(win.end && t >= win.end);
 
-  const reached: Record<string, Set<string>> = {};
-  for (const stage of FUNNEL_STAGES) reached[stage] = new Set();
+  const entered: Record<string, Set<string>> = {};
+  for (const stage of FUNNEL_STAGES) entered[stage] = new Set();
 
-  const credit = (knockId: string, label: string) => {
-    const rank = LABEL_RANK[label as KnockOutcome];
-    if (rank === undefined) return;
-    for (const stage of FUNNEL_STAGES) {
-      if (rank >= (LABEL_RANK[stage] ?? Infinity)) reached[stage].add(knockId);
-    }
+  const credit = (knockId: string, label: string | undefined) => {
+    if (!label) return;
+    if ((FUNNEL_STAGES as string[]).includes(label)) entered[label].add(knockId);
   };
 
-  // Doors created already at a funnel stage — their first label has no history row.
-  for (const k of knocks) {
-    const t = k.knocked_at instanceof Date ? k.knocked_at : new Date(k.knocked_at);
-    if (inWindow(t)) credit(k.id, k.label);
+  // Earliest transition per door — its `previous_label` is that door's first label.
+  const earliest = new Map<string, LabelTransition>();
+  for (const tr of transitions) {
+    const cur = earliest.get(tr.knock_id);
+    if (!cur || new Date(tr.changed_at) < new Date(cur.changed_at)) {
+      earliest.set(tr.knock_id, tr);
+    }
   }
 
-  // Every relabel that landed in the window, credited to the transition date.
+  // A door created in the window enters whatever stage it was FIRST labelled.
+  for (const k of knocks) {
+    const t = k.knocked_at instanceof Date ? k.knocked_at : new Date(k.knocked_at);
+    if (!inWindow(t)) continue;
+    credit(k.id, earliest.get(k.id)?.previous_label ?? k.label);
+  }
+
+  // Every relabel in the window enters exactly the stage it moved INTO.
   for (const tr of transitions) {
-    const t = new Date(tr.changed_at);
-    if (inWindow(t)) credit(tr.knock_id, tr.new_label);
+    if (inWindow(new Date(tr.changed_at))) credit(tr.knock_id, tr.new_label);
   }
 
   return {
-    lead: reached.lead.size,
-    inspected: reached.inspected.size,
-    follow_up: reached.follow_up.size,
-    signed: reached.signed.size,
+    lead: entered.lead.size,
+    inspected: entered.inspected.size,
+    follow_up: entered.follow_up.size,
+    signed: entered.signed.size,
   };
 }
 

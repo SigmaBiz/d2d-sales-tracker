@@ -269,17 +269,18 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Trajectory — counts every stage a door PASSED THROUGH this period,
-            not just where it ended up. The funnel row above reads the current
-            label, so a door that moved on no longer shows at the stage it came
-            from; these are credited on the day the transition happened. */}
+        {/* What you DID this period. ENTRY counts, credited to the day the
+            stage was actually reached — signing today a door inspected last
+            week shows Signed today and leaves that inspection in last week.
+            The funnel above reads the CURRENT label; these two answer
+            different questions and both are worth seeing. */}
         <View style={styles.reachedBox}>
-          <Text style={styles.reachedTitle}>REACHED THIS PERIOD (incl. doors that moved on)</Text>
+          <Text style={styles.reachedTitle}>ENTERED THIS PERIOD (credited when it happened)</Text>
           <View style={styles.reachedRow}>
             {([
-              ['Lead+', reached.lead],
-              ['Inspected+', reached.inspected],
-              ['Follow Up+', reached.follow_up],
+              ['Leads', reached.lead],
+              ['Inspections', reached.inspected],
+              ['Follow Ups', reached.follow_up],
               ['Signed', reached.signed],
             ] as [string, number][]).map(([label, value]) => (
               <View key={label} style={styles.reachedItem}>

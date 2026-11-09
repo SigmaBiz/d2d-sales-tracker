@@ -518,11 +518,11 @@ export class SupabaseService {
    */
   static async getLabelTransitions(
     since?: string
-  ): Promise<Array<{ knock_id: string; new_label: string; changed_at: string }>> {
+  ): Promise<Array<{ knock_id: string; previous_label?: string; new_label: string; changed_at: string }>> {
     if (!this.userId) return [];
     let q = supabase
       .from('knock_history')
-      .select('knock_id, new_label, changed_at')
+      .select('knock_id, previous_label, new_label, changed_at')
       .order('changed_at', { ascending: false })
       .limit(5000);
     if (since) q = q.gte('changed_at', since);
@@ -532,7 +532,7 @@ export class SupabaseService {
       console.error('[Supabase] getLabelTransitions error:', error);
       return [];
     }
-    return (data ?? []) as Array<{ knock_id: string; new_label: string; changed_at: string }>;
+    return (data ?? []) as Array<{ knock_id: string; previous_label?: string; new_label: string; changed_at: string }>;
   }
 
   /** Append-only event history for one knock (the per-lead Log). */
