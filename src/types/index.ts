@@ -103,8 +103,21 @@ export const RUNNER_LABS: KnockOutcome[] = [
   ...SETTER_LABS, 'inspected', 'signed', 'flaked', 'retarget',
 ];
 
+/**
+ * Labels offered for a role.
+ *
+ * null/undefined → RUNNER_LABS, deliberately. A null role means "no team row"
+ * (solo operation) or "role hasn't resolved yet" — and in BOTH cases the user is
+ * their own runner, so withholding inspected/signed is wrong. The previous
+ * `role === 'owner' ? ... : SETTER` silently dropped a solo operator to setter
+ * labels, making `inspected` unreachable — which is the single most important
+ * label in the funnel.
+ *
+ * Only an explicit 'member' is restricted. Safe: the server re-validates every
+ * write, so this is a UX convenience and never the gate.
+ */
 export function labsForRole(role: 'owner' | 'member' | null | undefined): KnockOutcome[] {
-  return role === 'owner' ? RUNNER_LABS : SETTER_LABS;
+  return role === 'member' ? SETTER_LABS : RUNNER_LABS;
 }
 
 export interface Knock {
