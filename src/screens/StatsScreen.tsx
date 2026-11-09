@@ -15,7 +15,7 @@ import {
   formatMinutes, ShiftWindow, DEFAULT_SHIFTS,
 } from '../utils/pacing';
 import { getShifts, getGoalOverride } from '../services/pacingSettings';
-import { computeReachedStats, LabelTransition } from '../utils/analytics';
+import { computeReachedStats, computeLabelActivity, LabelTransition } from '../utils/analytics';
 import { Knock, KnockOutcome, KNOCK_OUTCOME_EMOJI, KNOCK_OUTCOME_LABEL } from '../types';
 import {
   RangeKey,
@@ -34,12 +34,6 @@ const RANGES: { key: RangeKey; label: string }[] = [
 ];
 
 // Breakdown rows: picker labels + lifecycle-written ones (flaked/retarget).
-const BREAKDOWN_LABELS: KnockOutcome[] = [
-  'no_home', 'not_interested', 'no_soliciting', 'renter',
-  'conversation', 'inspected', 'follow_up', 'lead', 'signed', 'scout',
-  'flaked', 'retarget',
-];
-
 /** Format a 0–1 rate (or null) as a percent string. */
 function fmtRate(r: number | null): string {
   return r == null ? '—' : `${Math.round(r * 100)}%`;
@@ -107,8 +101,19 @@ export default function StatsScreen() {
   const band = paceBand(paceBudget);
   const achievement = current.avgDailyDoors != null ? current.avgDailyDoors / dailyGoal : null;
 
-  const breakdownTotal = Object.values(current.counts).reduce((s, n) => s + n, 0);
-  const archHardCount = current.counts['arch_hard'] ?? 0;
+  // Labels APPLIED in the period, not a snapshot of current labels keyed to each
+  // door's original knock date — relabelling an old door to Inspected today now
+  // registers today. Rows are derived from whatever keys exist, so a label added
+  // later can never be silently left out of the tally again (the old
+  // BREAKDOWN_LABELS array was missing five of them).
+  const activity = React.useMemo(
+    () => computeLabelActivity(knocks, transitions, rangeWindow(range)),
+    [knocks, transitions, range]
+  );
+  const activityRows = Object.entries(activity)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const breakdownTotal = activityRows.reduce((sum, [, n]) => sum + n, 0);
 
   if (loading) {
     return (
@@ -324,14 +329,19 @@ export default function StatsScreen() {
 
       {/* ── Label Breakdown ── */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>LABEL BREAKDOWN</Text>
-        {BREAKDOWN_LABELS.map(label => {
-          const count = current.counts[label] || 0;
+        <Text style={styles.sectionTitle}>LABEL BREAKDOWN (applied this period)</Text>
+        {activityRows.length === 0 ? (
+          <Text style={styles.breakdownEmpty}>No labels applied in this period.</Text>
+        ) : activityRows.map(([label, count]) => {
           const barWidth = breakdownTotal > 0 ? (count / breakdownTotal) * 100 : 0;
           return (
             <View key={label} style={styles.labelRow}>
-              <Text style={styles.labelEmoji}>{KNOCK_OUTCOME_EMOJI[label] ?? '❔'}</Text>
-              <Text style={styles.labelName}>{KNOCK_OUTCOME_LABEL[label] ?? label}</Text>
+              <Text style={styles.labelEmoji}>
+                {KNOCK_OUTCOME_EMOJI[label as KnockOutcome] ?? '❔'}
+              </Text>
+              <Text style={styles.labelName}>
+                {KNOCK_OUTCOME_LABEL[label as KnockOutcome] ?? label}
+              </Text>
               <View style={styles.labelBarTrack}>
                 <View style={[styles.labelBarFill, { width: `${barWidth}%` }]} />
               </View>
@@ -339,16 +349,6 @@ export default function StatsScreen() {
             </View>
           );
         })}
-        {archHardCount > 0 && (
-          <View style={styles.labelRow}>
-            <Text style={styles.labelEmoji}>🪦</Text>
-            <Text style={styles.labelName}>Archived</Text>
-            <View style={styles.labelBarTrack}>
-              <View style={[styles.labelBarFill, { width: `${(archHardCount / breakdownTotal) * 100}%` }]} />
-            </View>
-            <Text style={styles.labelCount}>{archHardCount}</Text>
-          </View>
-        )}
       </View>
 
       {limitHit && (
@@ -391,6 +391,7 @@ const styles = StyleSheet.create({
   goalToday: { fontSize: 26, fontWeight: '800', color: '#111827' },
   goalOf: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
   goalCaption: { fontSize: 12, color: '#9ca3af' },
+  breakdownEmpty: { fontSize: 13, color: '#9ca3af', textAlign: 'center', paddingVertical: 8 },
   reachedBox: {
     backgroundColor: '#f8fafc', borderRadius: 10,
     paddingVertical: 10, paddingHorizontal: 8, marginTop: 12,

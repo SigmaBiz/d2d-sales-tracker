@@ -291,6 +291,52 @@ export function computeReachedStats(
   };
 }
 
+/**
+ * Every label APPLIED during the window, counted on the day it was applied.
+ *
+ * Distinct from RangeStats.counts, which is a snapshot of current labels keyed
+ * to each door's ORIGINAL knock date — under that, relabelling an older door to
+ * Inspected today never showed up today. This answers "what did I label today",
+ * which is what the breakdown is actually read for.
+ *
+ * Returns a plain tally so the UI can render whatever keys exist, including
+ * server-written labels (arch_hard) and any label added later — no hand-kept
+ * list to fall out of date.
+ */
+export function computeLabelActivity(
+  knocks: Knock[],
+  transitions: LabelTransition[],
+  win: RangeWindow
+): Record<string, number> {
+  const inWindow = (t: Date) =>
+    !(win.start && t < win.start) && !(win.end && t >= win.end);
+
+  const out: Record<string, number> = {};
+  const bump = (label?: string) => {
+    if (!label) return;
+    out[label] = (out[label] ?? 0) + 1;
+  };
+
+  // A door's first label leaves no history row — recover it from the earliest
+  // transition's previous_label, else the door never moved and k.label is it.
+  const earliest = new Map<string, LabelTransition>();
+  for (const tr of transitions) {
+    const cur = earliest.get(tr.knock_id);
+    if (!cur || new Date(tr.changed_at) < new Date(cur.changed_at)) {
+      earliest.set(tr.knock_id, tr);
+    }
+  }
+
+  for (const k of knocks) {
+    const t = k.knocked_at instanceof Date ? k.knocked_at : new Date(k.knocked_at);
+    if (inWindow(t)) bump(earliest.get(k.id)?.previous_label ?? k.label);
+  }
+  for (const tr of transitions) {
+    if (inWindow(new Date(tr.changed_at))) bump(tr.new_label);
+  }
+  return out;
+}
+
 /** Percent change current vs previous; null when previous is unusable (no ∞/NaN). */
 export function trendPct(current: number | null, previous: number | null): number | null {
   if (current == null || previous == null || previous === 0) return null;
