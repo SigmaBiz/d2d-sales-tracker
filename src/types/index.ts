@@ -11,7 +11,10 @@ export type KnockOutcome =
   | 'scout'            // 📍 Address noted for future canvassing
   | 'flaked'           // 🥀 Homeowner backed out / never genuinely interested
   | 'retarget'         // 🎯 Inspection ran but couldn't close — worth another pass
-  | 'not_eligible'     // 🏚️ For sale/rent sign or unmaintained — property disqualified
+  | 'not_eligible'     // 🏚️ Disqualified, general case (for sale/rent, unmaintained)
+  | 'new_roof'         // 🆕 Roof is already new — nothing to sell
+  | 'no_damage'        // 👌 Roof inspected from the curb, no storm damage
+  | 'roofing_sign'     // 🪧 Competitor's yard sign — street already being worked
   | 'revisit';         // 👀 Didn't open, but roof worth coming back for (damage/age)
 
 export const KNOCK_OUTCOME_EMOJI: Record<KnockOutcome, string> = {
@@ -28,6 +31,9 @@ export const KNOCK_OUTCOME_EMOJI: Record<KnockOutcome, string> = {
   flaked:         '🥀',
   retarget:       '🎯',
   not_eligible:   '🏚️',
+  new_roof:       '🆕',
+  no_damage:      '👌',
+  roofing_sign:   '🪧',
   revisit:        '👀',
 };
 
@@ -45,6 +51,9 @@ export const KNOCK_OUTCOME_LABEL: Record<KnockOutcome, string> = {
   flaked:         'Flaked',
   retarget:       'Retarget',
   not_eligible:   'Not Eligible',
+  new_roof:       'New Roof',
+  no_damage:      'No Damage',
+  roofing_sign:   'Roofing Sign',
   revisit:        'Revisit',
 };
 
@@ -88,6 +97,7 @@ export type LeadStatus =
 export const SETTER_LABS: KnockOutcome[] = [
   'no_home', 'not_interested', 'no_soliciting', 'renter',
   'conversation', 'follow_up', 'lead', 'scout', 'not_eligible', 'revisit',
+  'new_roof', 'no_damage', 'roofing_sign',
 ];
 export const RUNNER_LABS: KnockOutcome[] = [
   ...SETTER_LABS, 'inspected', 'signed', 'flaked', 'retarget',

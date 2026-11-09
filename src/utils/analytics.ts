@@ -15,6 +15,17 @@ import { Knock, KnockOutcome } from '../types';
 /** Gate "No" outcomes — the door did not open. */
 export const NOT_OPENED_LABELS: KnockOutcome[] = [
   'no_home', 'no_soliciting', 'scout', 'not_eligible', 'revisit',
+  'new_roof', 'no_damage', 'roofing_sign',
+];
+
+/**
+ * Curb-side disqualifiers: assessed WITHOUT knocking, so they are not door
+ * attempts and must never drag the open rate. Owner's framing: "doors which
+ * don't count as knocks but require labeling" — they exist to capture intel
+ * (roofing_sign in particular maps competitor presence street by street).
+ */
+export const NON_DOOR_LABELS: string[] = [
+  'scout', 'not_eligible', 'new_roof', 'no_damage', 'roofing_sign',
 ];
 
 /**
@@ -47,8 +58,7 @@ export const CONVERSATION_PLUS: string[] = [
  * door attempt, so it never drags the open rate. Revisit IS a door (knocked,
  * nobody home, roof promising).
  */
-export const isDoor = (k: Knock): boolean =>
-  k.label !== 'scout' && k.label !== 'not_eligible';
+export const isDoor = (k: Knock): boolean => !NON_DOOR_LABELS.includes(k.label);
 
 /** Door opened = any door whose label isn't a not-opened outcome. */
 export const isOpened = (k: Knock): boolean =>

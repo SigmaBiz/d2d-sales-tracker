@@ -28,6 +28,7 @@ import DoorTimerChip from '../components/DoorTimerChip';
 import StarRating from '../components/StarRating';
 import { openConfirmationDraft } from '../services/appointmentEmail';
 import SlotPicker, { Slot } from '../components/SlotPicker';
+import { canApplyLabel, blockedReasons } from '../utils/labelRules';
 import { DoorTimerService } from '../services/doorTimerService';
 import {
   remainingShiftMinutes, doorBudgetMinutes, paceBand, PACE_COLOR,
@@ -934,6 +935,28 @@ export default function RealMapScreen({ navigation }: any) {
   }, [todayStats.doors, doorGoal, shifts, paceTick]);
   const phoneValid = isValidUSPhone(contactPhone);   // gates Ping/Schedule (F2d)
 
+  // Which labels the current door may NOT take, and why. lead/follow_up need a
+  // contact; the funnel is one-way (an inspected door can't drop back to lead).
+  const labelBlocks = React.useMemo(() => {
+    const candidates = pendingKnock
+      ? labsForRole(role)
+      : gateOpened === 'no'
+        ? NOT_OPENED_LABELS
+        : OPENED_PICKER_LABELS.filter(l => labsForRole(role).includes(l));
+    return blockedReasons(pendingKnock?.label ?? null, candidates, {
+      hasName: contactName.trim().length > 0,
+      hasPhone: phoneValid,
+    });
+  }, [pendingKnock, role, gateOpened, contactName, phoneValid]);
+
+  // If an already-picked label becomes illegal (e.g. the phone was cleared after
+  // choosing Lead), drop the selection rather than letting an invalid label reach
+  // the save and corrupt the funnel data.
+  useEffect(() => {
+    if (selectedLabel && labelBlocks[selectedLabel]) setSelectedLabel(null);
+  }, [labelBlocks, selectedLabel]);
+
+
   return (
     <View style={styles.container}>
       <NativeMap
@@ -1294,20 +1317,37 @@ export default function RealMapScreen({ navigation }: any) {
                         style={[
                           styles.labelButton,
                           selectedLabel === label && styles.labelButtonSelected,
+                          labelBlocks[label] && styles.labelButtonBlocked,
                         ]}
                         onPress={() => handleLabelTap(label)}
-                        disabled={savingKnock}
+                        disabled={savingKnock || !!labelBlocks[label]}
                       >
-                        <Text style={styles.labelEmoji}>{KNOCK_OUTCOME_EMOJI[label]}</Text>
+                        <Text style={[styles.labelEmoji, labelBlocks[label] && styles.labelDimmed]}>
+                          {KNOCK_OUTCOME_EMOJI[label]}
+                        </Text>
                         <Text style={[
                           styles.labelText,
                           selectedLabel === label && styles.labelTextSelected,
+                          labelBlocks[label] && styles.labelDimmed,
                         ]}>
                           {KNOCK_OUTCOME_LABEL[label]}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
+
+                  {/* Say WHY a label is greyed out. The contact fields live on
+                      the other tab, so a silently dead button at a door would be
+                      unexplainable from here. */}
+                  {Object.keys(labelBlocks).length > 0 && (
+                    <View style={styles.labelBlockNote}>
+                      {Object.entries(labelBlocks).map(([label, reason]) => (
+                        <Text key={label} style={styles.labelBlockText}>
+                          {KNOCK_OUTCOME_EMOJI[label as KnockOutcome]} {KNOCK_OUTCOME_LABEL[label as KnockOutcome]} — {reason}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
 
                   <View style={styles.ratingRow}>
                     <Text style={styles.ratingLabel}>RATING</Text>
@@ -1980,7 +2020,14 @@ const styles = StyleSheet.create({
   pickerTabTextActive: { color: '#111827' },
   pickerTabContent: { flexGrow: 0 },
   pickerSectionTitle: { fontSize: 11, fontWeight: '700', color: '#9ca3af', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
-  labelGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  labelGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  labelButtonBlocked: { opacity: 0.4 },
+  labelDimmed: { color: '#9ca3af' },
+  labelBlockNote: {
+    backgroundColor: '#f9fafb', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 7, marginBottom: 14,
+  },
+  labelBlockText: { fontSize: 11, color: '#6b7280', lineHeight: 16 },
   labelButton: {
     width: '30%', backgroundColor: '#f9fafb', borderRadius: 12,
     paddingVertical: 12, alignItems: 'center',
