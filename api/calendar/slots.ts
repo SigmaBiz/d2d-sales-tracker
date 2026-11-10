@@ -83,5 +83,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  return res.status(200).json({ configured: true, slots, busyCount: busyRanges.length });
+  // `busy` is the authoritative payload: absolute instants, no timezone
+  // assumptions. The server runs in UTC, so building the 8am-6pm grid HERE
+  // produced slots in UTC-local time — which surfaced as 2am-11am for a
+  // US-Central user. The CLIENT owns that math now; it knows the device
+  // timezone and DST. `slots` stays only so an older client build keeps working.
+  return res.status(200).json({
+    configured: true,
+    busy,
+    slots,
+    busyCount: busyRanges.length,
+  });
 }

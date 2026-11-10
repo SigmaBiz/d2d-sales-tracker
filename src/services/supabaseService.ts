@@ -465,24 +465,24 @@ export class SupabaseService {
    * not block booking while a homeowner is standing there.
    */
   static async getCalendarSlots(
-    days = 7,
-    dayStart = 8,
-    dayEnd = 18
-  ): Promise<{ configured: boolean; slots: Array<{ startISO: string; endISO: string }> }> {
+    days = 7
+  ): Promise<{ configured: boolean; busy: Array<{ start: string; end: string }> }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) return { configured: false, slots: [] };
+      if (!token) return { configured: false, busy: [] };
 
-      const res = await fetch(
-        `${API_BASE}/api/calendar/slots?days=${days}&dayStart=${dayStart}&dayEnd=${dayEnd}`, {
+      // Only `busy` is requested of the server — building the local 8am-6pm grid
+      // server-side produced UTC-local times (2am-11am for US-Central). Busy
+      // intervals are absolute instants and carry no timezone assumption.
+      const res = await fetch(`${API_BASE}/api/calendar/slots?days=${days}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return { configured: false, slots: [] };
+      if (!res.ok) return { configured: false, busy: [] };
       const body = await res.json();
-      return { configured: Boolean(body.configured), slots: body.slots ?? [] };
+      return { configured: Boolean(body.configured), busy: body.busy ?? [] };
     } catch {
-      return { configured: false, slots: [] };
+      return { configured: false, busy: [] };
     }
   }
 

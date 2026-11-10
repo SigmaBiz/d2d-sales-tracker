@@ -18,8 +18,11 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Modal,
 } from 'react-native';
 import { SupabaseService } from '../services/supabaseService';
+import { buildLocalSlots, Slot } from '../utils/slots';
 
-export interface Slot { startISO: string; endISO: string }
+export type { Slot };
+
+const DAYS = 7;
 
 interface Props {
   selected: Slot | null;
@@ -27,11 +30,6 @@ interface Props {
   /** Fired when the calendar can't be used, so the caller can degrade. */
   onUnavailable: () => void;
 }
-
-/** Booking window. Owner's hours — 8am to 6pm. */
-const DAY_START = 8;
-const DAY_END = 18;
-const DAYS = 7;
 
 const dayKeyOf = (iso: string) => new Date(iso).toDateString();
 const timeLabel = (iso: string) =>
@@ -52,18 +50,19 @@ export default function SlotPicker({ selected, onSelect, onUnavailable }: Props)
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await SupabaseService.getCalendarSlots(DAYS, DAY_START, DAY_END);
+      const res = await SupabaseService.getCalendarSlots(DAYS);
       if (cancelled) return;
       setLoading(false);
+      const built = res.configured ? buildLocalSlots(res.busy) : [];
       // Guarded: onUnavailable flips parent state, and firing it twice would
       // fight the parent's render.
-      if ((!res.configured || res.slots.length === 0) && !notified.current) {
+      if (built.length === 0 && !notified.current) {
         notified.current = true;
         onUnavailable();
         return;
       }
-      setSlots(res.slots);
-      setActiveDay(res.slots.length ? dayKeyOf(res.slots[0].startISO) : null);
+      setSlots(built);
+      setActiveDay(dayKeyOf(built[0].startISO));
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +114,7 @@ export default function SlotPicker({ selected, onSelect, onUnavailable }: Props)
           <TouchableOpacity style={styles.backdropFill} onPress={() => setOpen(false)} />
           <View style={styles.sheet}>
             <Text style={styles.title}>Pick a time</Text>
-            <Text style={styles.subtitle}>Open slots on your calendar · 8am–6pm</Text>
+            <Text style={styles.subtitle}>Open on your calendar · 8am–6pm · 30 min</Text>
 
             <ScrollView
               horizontal
@@ -144,7 +143,7 @@ export default function SlotPicker({ selected, onSelect, onUnavailable }: Props)
               })}
             </ScrollView>
 
-            <View style={styles.timeGrid}>
+            <ScrollView style={styles.timeScroll} contentContainerStyle={styles.timeGrid}>
               {active?.items.map(s => {
                 const on = selected?.startISO === s.startISO;
                 return (
@@ -159,7 +158,7 @@ export default function SlotPicker({ selected, onSelect, onUnavailable }: Props)
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             <TouchableOpacity style={styles.cancel} onPress={() => setOpen(false)}>
               <Text style={styles.cancelText}>Cancel</Text>
@@ -207,9 +206,10 @@ const styles = StyleSheet.create({
   dayChipCount: { fontSize: 9, color: '#9ca3af', fontWeight: '600' },
   dayChipTextOn: { color: 'white' },
 
-  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  timeScroll: { maxHeight: 260 },
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 6 },
   timeChip: {
-    minWidth: 82, paddingVertical: 11, borderRadius: 10,
+    minWidth: 76, paddingVertical: 10, borderRadius: 10,
     backgroundColor: '#eef2ff', alignItems: 'center', flexGrow: 1,
   },
   timeChipOn: { backgroundColor: '#1e40af' },
