@@ -465,14 +465,17 @@ export class SupabaseService {
    * not block booking while a homeowner is standing there.
    */
   static async getCalendarSlots(
-    days = 7
+    days = 7,
+    dayStart = 8,
+    dayEnd = 18
   ): Promise<{ configured: boolean; slots: Array<{ startISO: string; endISO: string }> }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) return { configured: false, slots: [] };
 
-      const res = await fetch(`${API_BASE}/api/calendar/slots?days=${days}`, {
+      const res = await fetch(
+        `${API_BASE}/api/calendar/slots?days=${days}&dayStart=${dayStart}&dayEnd=${dayEnd}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return { configured: false, slots: [] };
