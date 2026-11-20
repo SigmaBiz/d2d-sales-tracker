@@ -61,11 +61,28 @@ jobs:
 
           echo "Looking for MESH_Max_1440min for ${STORM_DATE} (${DATE_NODASH})"
 
-          # Fetch NOAA directory listing and find latest file for this date
-          NOAA_DIR="https://mrms.ncep.noaa.gov/data/2D/MESH_Max_1440min/"
-          LATEST_FILE=$(curl -s "$NOAA_DIR" | grep -oP "MRMS_MESH_Max_1440min_00\.50_${DATE_NODASH}-\d{6}\.grib2\.gz" | sort | tail -1)
+          # Fetch NOAA directory listing and find latest file for this date.
+          #
+          # NOTE (2026-11-20): NOAA dropped the /data/ path segment — the old
+          # URL now 301-redirects. The listing fetch had no -L, so it received
+          # the redirect HTML, matched nothing, and silently fell through to the
+          # Iowa archive for EVERY run (this is what killed 2026-06-22 after a
+          # 2h20m wait). URL corrected AND -L added so a future move self-heals.
+          NOAA_DIR="https://mrms.ncep.noaa.gov/2D/MESH_Max_1440min/"
+          LISTING=$(curl -sL --max-time 60 "$NOAA_DIR")
+          LATEST_FILE=$(echo "$LISTING" | grep -oP "MRMS_MESH_Max_1440min_00\.50_${DATE_NODASH}-\d{6}\.grib2\.gz" | sort | tail -1)
+
+          # Distinguish "listing unreachable" from "listing fine, date absent".
+          # Without this the two look identical in the log, which is exactly how
+          # the redirect hid for five months.
+          TOTAL_LISTED=$(echo "$LISTING" | grep -cE "MRMS_MESH_Max_1440min_00\.50_[0-9]{8}-[0-9]{6}\.grib2\.gz" || true)
+          echo "NOAA listing: ${TOTAL_LISTED} MESH files visible; match for ${DATE_NODASH}: ${LATEST_FILE:-none}"
+          if [ "$TOTAL_LISTED" -eq 0 ]; then
+            echo "::warning::NOAA listing returned ZERO files — the directory URL has probably moved again. Check ${NOAA_DIR}"
+          fi
 
           if [ -z "$LATEST_FILE" ]; then
+            echo "SOURCE=iowa-archive"
             echo "No NOAA real-time file found for ${STORM_DATE}. Trying next day (Iowa State archive)..."
             # Fall back to Iowa State archive. The 24h-max file timestamped
             # 00:00Z on storm_date+1 covers the storm day, and the archive
@@ -79,6 +96,7 @@ jobs:
             echo "Trying Iowa State: $IOWA_URL"
             curl -fL -o /tmp/mesh.grib2.gz "$IOWA_URL"
           else
+            echo "SOURCE=noaa-realtime"
             echo "Found NOAA file: ${LATEST_FILE}"
             curl -fL -o /tmp/mesh.grib2.gz "${NOAA_DIR}${LATEST_FILE}"
           fi
