@@ -4,28 +4,12 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execPromise = promisify(exec);
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
   try {
-    // Check eccodes installation
-    let eccodesVersion = 'not installed';
-    let eccodesStatus = 'missing';
-
-    try {
-      const { stdout } = await execPromise('grib_get_data --version 2>&1');
-      eccodesVersion = stdout.trim();
-      eccodesStatus = 'installed';
-    } catch (error) {
-      console.log('eccodes not found:', error);
-    }
-
     // Check node version
     const nodeVersion = process.version;
 
@@ -55,10 +39,15 @@ export default async function handler(
         platform: process.platform,
         arch: process.arch
       },
-      eccodes: {
-        status: eccodesStatus,
-        version: eccodesVersion,
-        available: eccodesStatus === 'installed'
+      // eccodes is deliberately ABSENT here. GRIB2 decoding needs a system
+      // binary that cannot run in a serverless function (see mesh/[date].ts) —
+      // it runs on the GitHub Actions runner, which installs libeccodes-tools.
+      // This endpoint used to shell out to `grib_get_data --version` and log a
+      // scary stack trace on every call for a capability it is not supposed to
+      // have. Removed: it was pure noise that misdirects debugging.
+      grib2: {
+        runsHere: false,
+        runsOn: 'github-actions (hail-swath.yml → libeccodes-tools)'
       },
       memory: {
         heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
@@ -91,7 +80,7 @@ export default async function handler(
         status: hasR2Credentials ? 'ready' : 'missing credentials'
       },
       capabilities: {
-        grib2Processing: eccodesStatus === 'installed',
+        grib2Processing: false, // by design — see grib2 above
         r2Caching: hasR2Credentials,
         spcPreFiltering: true
       },
