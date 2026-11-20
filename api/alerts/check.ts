@@ -210,8 +210,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     nwsAlerts = response.data.features || [];
     console.log(`[Alerts] Fetched ${nwsAlerts.length} active NWS alerts for Oklahoma`);
   } catch (err) {
+    // 200, NOT 502 — deliberately.
+    //
+    // This endpoint is a cron heartbeat. Its contract is "the check ran", not
+    // "the upstream was healthy". Returning an error status made cron-job.org
+    // count a failure, and its free tier AUTO-DISABLES a job after repeated
+    // failures. A single NWS hiccup on 2026-10-03 therefore killed storm
+    // detection permanently and silently — seven weeks with nothing polling.
+    // ζ: Z₁ (transient upstream failure ⇒ permanent heartbeat death)
+    //  → Z₂ (heartbeat survives; the upstream problem is reported in the body).
     console.error('[Alerts] NWS API error:', err);
-    return res.status(502).json({ error: 'NWS API unavailable', detail: String(err) });
+    return res.status(200).json({
+      ok: false,
+      upstream: 'nws_unavailable',
+      checked: 0, relevant: 0, fired: 0,
+      detail: String(err),
+      message: 'NWS API unavailable — check ran, upstream failed',
+    });
   }
 
   // 2. Filter to relevant alerts
@@ -262,8 +277,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('active', true);
 
   if (tokenError) {
+    // 200 for the same reason as the NWS branch above — a Supabase blip must
+    // not get the heartbeat auto-disabled. The alert stays unfired and
+    // un-recorded, so the NEXT run retries it naturally.
     console.error('[Alerts] Error fetching push tokens:', tokenError);
-    return res.status(500).json({ error: 'Failed to fetch push tokens' });
+    return res.status(200).json({
+      ok: false,
+      upstream: 'push_tokens_unavailable',
+      checked: nwsAlerts.length,
+      relevant: relevantAlerts.length,
+      fired: 0,
+      message: 'Could not read push tokens — check ran, will retry next cycle',
+    });
   }
 
   const tokens: string[] = (tokenRows || []).map((r: { token: string }) => r.token);
