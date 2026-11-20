@@ -70,6 +70,22 @@ export default async function handler(
         parsed: parsedDate.toISOString(),
         method: 'UTC-based (timezone bug fixed)'
       },
+      // The branch the swath workflow is dispatched on. NOT a secret — and
+      // exposing it is the point: the dispatch silently 404s when this names a
+      // ref the workflow file isn't on, which is how the pipeline sat dead for
+      // months. Readable config beats an encrypted value nobody can check.
+      swathDispatch: {
+        ref: process.env.GITHUB_WORKFLOW_REF || 'main (default)',
+        repo: process.env.GITHUB_REPO ? 'set' : 'MISSING',
+        token: process.env.GITHUB_ACTIONS_TOKEN ? 'set' : 'MISSING'
+      },
+      calendar: {
+        configured: !!(
+          process.env.GOOGLE_OAUTH_CLIENT_ID &&
+          process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+          process.env.GOOGLE_CALENDAR_REFRESH_TOKEN
+        )
+      },
       r2Cache: {
         configured: hasR2Credentials,
         status: hasR2Credentials ? 'ready' : 'missing credentials'
