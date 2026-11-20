@@ -109,6 +109,7 @@ jobs:
         run: npm ci --prefix api
 
       - name: Run preprocessor and upload to R2
+        id: preprocess
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -118,8 +119,11 @@ jobs:
         run: |
           node scripts/preprocess.js /tmp/mesh.grib2 ${{ github.event.inputs.storm_date }}
 
+      # Push ONLY when the date actually had hail. This previously fired on the
+      # `notify` input alone, so processing a quiet day still told the crew a
+      # map was ready and they opened an empty one.
       - name: Notify app — swath ready
-        if: ${{ github.event.inputs.notify != 'false' }}
+        if: ${{ github.event.inputs.notify != 'false' && steps.preprocess.outputs.hail_found == 'true' }}
         env:
           VERCEL_URL: ${{ secrets.VERCEL_URL }}
           ACTIONS_SECRET: ${{ secrets.ACTIONS_SECRET }}
@@ -129,4 +133,11 @@ jobs:
             -H "x-actions-secret: ${ACTIONS_SECRET}" \
             -d '{"date":"${{ github.event.inputs.storm_date }}"}' \
             "${VERCEL_URL}/api/alerts/swath-ready"
-          echo "Swath-ready notification sent."
+          echo "Swath-ready notification sent (${{ steps.preprocess.outputs.report_count }} reports)."
+
+      - name: No hail — push skipped
+        if: ${{ steps.preprocess.outputs.hail_found != 'true' }}
+        run: |
+          echo "No hail >= threshold for ${{ github.event.inputs.storm_date }} — no push sent."
+          echo "The date is intentionally absent from hail_grid, so it will not"
+          echo "appear in the app's Available Storm Maps list either."

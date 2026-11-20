@@ -35,6 +35,20 @@ const OKC_BOUNDS = {
 
 const MIN_HAIL_INCHES = 0.75;
 
+/**
+ * Publish a value to GitHub Actions as a step output (no-op when run locally).
+ * Lets the workflow branch on whether this date actually had hail.
+ */
+function emitOutput(name, value) {
+  const file = process.env.GITHUB_OUTPUT;
+  if (!file) return;
+  try {
+    require('fs').appendFileSync(file, `${name}=${value}\n`);
+  } catch (err) {
+    console.warn(`[preprocess] could not write step output ${name}:`, err.message);
+  }
+}
+
 const CITIES = [
   { name: 'Edmond',       lat: 35.6529, lon: -97.4779, radius: 0.12 },
   { name: 'Oklahoma City', lat: 35.4676, lon: -97.5164, radius: 0.18 },
@@ -305,7 +319,13 @@ async function main() {
   if (reports.length === 0) {
     console.log(`[preprocess] No hail >= ${MIN_HAIL_INCHES}" found in OKC Metro for ${dateStr}.`);
     console.log('[preprocess] This may be correct (no significant hail that day).');
+    // Tell the workflow so it can SKIP the "Hail Map Ready" push. Without this
+    // an empty day still pushed the crew, who opened an empty map.
+    emitOutput('hail_found', 'false');
+    emitOutput('report_count', '0');
   } else {
+    emitOutput('hail_found', 'true');
+    emitOutput('report_count', String(reports.length));
     const maxSize = Math.max(...reports.map(r => r.size));
     const avgSize = reports.reduce((s, r) => s + r.size, 0) / reports.length;
     console.log('');
